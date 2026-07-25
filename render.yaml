@@ -1,0 +1,15 @@
+services:
+  - type: worker
+    name: gambot
+    env: node
+    buildCommand: npm install
+    startCommand: node index.js
+    envVars:
+      - key: TOKEN
+        sync: false
+      - key: DB_PATH
+        value: /var/data
+    disk:
+      name: gambot-data
+      mountPath: /var/data
+      sizeGB: 1

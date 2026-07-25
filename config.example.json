@@ -1,0 +1,16 @@
+{
+  "token": "",
+  "prefixes": ["v", "ovo", "A"],
+  "ownerId": "536278876247162882",
+  "currency": "money",
+  "dailyAmount": 1000,
+  "dailyStreakBonus": 500,
+  "dailyMax": 5000,
+  "weeklyAmount": 5000,
+  "workMin": 50,
+  "workMax": 200,
+  "workCooldown": 600000,
+  "startBalance": 1000,
+  "lotteryInterval": 3600000,
+  "lotteryCut": 0.8
+}

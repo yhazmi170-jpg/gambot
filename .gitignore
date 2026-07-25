@@ -1,0 +1,5 @@
+node_modules/
+gambot.db
+.env
+config.json
+*.log
