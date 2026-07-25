@@ -1,9 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-let config;
-try { config = require('../config.json'); } catch { config = require('../config.example.json'); }
-if (process.env.TOKEN) config.token = process.env.TOKEN;
+const config = require('../config');
 const db = require('../db');
 const { embed, error } = require('./embed');
 const { checkCooldown } = require('./cooldowns');

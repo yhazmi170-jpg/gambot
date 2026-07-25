@@ -1,8 +1,6 @@
 const { Client, GatewayIntentBits, Partials } = require('discord.js');
 const { loadCommands, handleMessage } = require('./utils/commandHandler');
-let config;
-try { config = require('./config.json'); } catch { config = require('./config.example.json'); }
-if (process.env.TOKEN) config.token = process.env.TOKEN;
+const config = require('./config');
 const db = require('./db');
 const { embed } = require('./utils/embed');
 const http = require('http');
