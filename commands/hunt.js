@@ -26,7 +26,7 @@ module.exports = {
     const rarityColors = { common: 0x95a5a6, uncommon: 0x2ecc71, rare: 0x3498db, epic: 0x9b59b6, legendary: 0xf1c40f };
     const rarityEmojis = { common: '⚪', uncommon: '🟢', rare: '🔵', epic: '🟣', legendary: '🟡' };
 
-    const badge = db.getBadge ? db.getBadge(userId) : '';
+
     message.channel.send({
       embeds: [embed(`${rarityEmojis[animal.rarity]} Hunt`, [
         ['Species', `**${animal.species}**`],

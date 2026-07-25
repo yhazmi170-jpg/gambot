@@ -128,7 +128,8 @@ function acceptTerms(userId) {
 }
 
 function getBalance(userId) {
-  return ensureUser(userId).balance;
+  const u = ensureUser(userId);
+  return u ? u.balance : 0;
 }
 
 function addBalance(userId, amount) {
