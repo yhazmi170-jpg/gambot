@@ -1,3 +1,0 @@
-fix hunt + addAnimal returns object directly
-remove badge perk from shop
-version/uptime command
