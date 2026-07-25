@@ -25,6 +25,8 @@ loadCommands();
 
 async function start() {
   await db.init();
+  const { restore } = require('./backup');
+  await restore();
   await client.login(config.token);
 }
 
@@ -37,7 +39,7 @@ client.on('ready', () => {
     status: 'online',
   });
 
-  const backup = require('./backup');
+  const { backup } = require('./backup');
   setInterval(() => backup().catch(() => {}), 3600000);
   setTimeout(() => backup().catch(() => {}), 10000);
 

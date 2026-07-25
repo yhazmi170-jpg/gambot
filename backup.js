@@ -1,9 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const config = require('./config');
 
 const DB_PATH = process.env.DB_PATH ? path.join(process.env.DB_PATH, 'gambot.db') : path.join(__dirname, 'gambot.db');
-const TOKEN = process.env.TOKEN || require('./config.json').token;
+const TOKEN = process.env.GITHUB_TOKEN || config.github_token;
 const OWNER = 'yhazmi170-jpg';
 const REPO = 'gambot-data';
 const BRANCH = 'main';
@@ -60,4 +61,19 @@ function request(method, url, body) {
   });
 }
 
-module.exports = backup;
+async function restore() {
+  try {
+    const data = await request('GET', `/repos/${OWNER}/${REPO}/contents/gambot.db`);
+    if (data && data.content) {
+      const buf = Buffer.from(data.content, 'base64');
+      fs.writeFileSync(DB_PATH, buf);
+      console.log('restored db from github backup');
+      return true;
+    }
+  } catch (e) {
+    console.log('no backup to restore:', e.message);
+  }
+  return false;
+}
+
+module.exports = { backup, restore };

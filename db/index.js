@@ -48,6 +48,30 @@ async function init() {
   db.run(`CREATE TABLE IF NOT EXISTS purchases (user_id TEXT, perk TEXT, expires_at INTEGER, PRIMARY KEY (user_id, perk))`);
   db.run(`CREATE TABLE IF NOT EXISTS log_channels (guild_id TEXT PRIMARY KEY, channel_id TEXT NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS vip_roles (guild_id TEXT PRIMARY KEY, role_id TEXT NOT NULL)`);
+  db.run(`CREATE TABLE IF NOT EXISTS animals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    species TEXT NOT NULL,
+    rarity TEXT NOT NULL,
+    name TEXT NOT NULL DEFAULT 'Unnamed',
+    level INTEGER NOT NULL DEFAULT 1,
+    exp INTEGER NOT NULL DEFAULT 0,
+    hp INTEGER NOT NULL DEFAULT 100,
+    max_hp INTEGER NOT NULL DEFAULT 100,
+    attack INTEGER NOT NULL DEFAULT 10,
+    defense INTEGER NOT NULL DEFAULT 5,
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+  )`);
+  db.run(`CREATE TABLE IF NOT EXISTS teams (
+    user_id TEXT PRIMARY KEY,
+    slot1 INTEGER DEFAULT NULL,
+    slot2 INTEGER DEFAULT NULL,
+    slot3 INTEGER DEFAULT NULL
+  )`);
+  db.run(`CREATE TABLE IF NOT EXISTS hunt_cooldowns (
+    user_id TEXT PRIMARY KEY,
+    last_hunt INTEGER NOT NULL DEFAULT 0
+  )`);
   save();
 }
 
@@ -392,6 +416,144 @@ function getUserPerks(userId) {
   return rows[0].values.map(v => ({ perk: v[0], expires_at: v[1] }));
 }
 
+const SPECIES = {
+  common: ['Rabbit', 'Squirrel', 'Mouse', 'Sparrow', 'Frog', 'Chick', 'Duckling', 'Hamster', 'Fish', 'Butterfly'],
+  uncommon: ['Fox', 'Owl', 'Raccoon', 'Hedgehog', 'Ferret', 'Parrot', 'Turtle', 'Lizard'],
+  rare: ['Wolf', 'Eagle', 'Deer', 'Panther', 'Hawk', 'Lynx', 'Cobra', 'Boar'],
+  epic: ['Dragon', 'Phoenix', 'Griffin', 'Unicorn', 'Pegasus', 'Kraken', 'Basilisk'],
+  legendary: ['Leviathan', 'Thunderbird', 'Kirin', 'Cerberus', 'Fenrir', 'Jormungandr'],
+};
+
+const RARITY_WEIGHTS = { common: 50, uncommon: 25, rare: 15, epic: 8, legendary: 2 };
+const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
+
+function randomRarity() {
+  const total = Object.values(RARITY_WEIGHTS).reduce((a, b) => a + b, 0);
+  let roll = Math.random() * total;
+  for (const r of RARITY_ORDER) {
+    roll -= RARITY_WEIGHTS[r];
+    if (roll <= 0) return r;
+  }
+  return 'common';
+}
+
+function randomSpecies(rarity) {
+  const list = SPECIES[rarity];
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+function randomStats(rarity) {
+  const base = { common: [100, 10, 5], uncommon: [130, 18, 12], rare: [180, 30, 22], epic: [270, 50, 38], legendary: [400, 75, 60] };
+  const [hp, atk, def] = base[rarity];
+  return {
+    hp: Math.floor(hp * (0.9 + Math.random() * 0.2)),
+    attack: Math.floor(atk * (0.85 + Math.random() * 0.3)),
+    defense: Math.floor(def * (0.85 + Math.random() * 0.3)),
+  };
+}
+
+function expForLevel(level) { return level * 100; }
+
+function addAnimal(userId) {
+  const rarity = randomRarity();
+  const species = randomSpecies(rarity);
+  const stats = randomStats(rarity);
+  db.run(`INSERT INTO animals (user_id, species, rarity, hp, max_hp, attack, defense) VALUES ('${userId}', '${species}', '${rarity}', ${stats.hp}, ${stats.hp}, ${stats.attack}, ${stats.defense})`);
+  save();
+  const rows = db.exec('SELECT last_insert_rowid() as id');
+  return rows[0].values[0][0];
+}
+
+function getUserAnimals(userId) {
+  const rows = db.exec(`SELECT * FROM animals WHERE user_id = '${userId}' ORDER BY rarity DESC, level DESC`);
+  if (!rows.length) return [];
+  return rows[0].values.map(v => ({
+    id: v[0], user_id: v[1], species: v[2], rarity: v[3], name: v[4],
+    level: v[5], exp: v[6], hp: v[7], max_hp: v[8], attack: v[9], defense: v[10], created_at: v[11],
+  }));
+}
+
+function getAnimal(id) {
+  const rows = db.exec(`SELECT * FROM animals WHERE id = ${id}`);
+  if (!rows.length || !rows[0].values.length) return null;
+  const v = rows[0].values[0];
+  return { id: v[0], user_id: v[1], species: v[2], rarity: v[3], name: v[4], level: v[5], exp: v[6], hp: v[7], max_hp: v[8], attack: v[9], defense: v[10], created_at: v[11] };
+}
+
+function removeAnimal(id) {
+  db.run(`DELETE FROM animals WHERE id = ${id}`);
+  save();
+}
+
+function addExp(id, amount) {
+  const a = getAnimal(id);
+  if (!a) return;
+  let { level, exp } = a;
+  exp += amount;
+  while (exp >= expForLevel(level)) {
+    exp -= expForLevel(level);
+    level++;
+    const hpGain = Math.floor(15 * (1 + level * 0.02));
+    const atkGain = Math.floor(3 * (1 + level * 0.02));
+    const defGain = Math.floor(2 * (1 + level * 0.02));
+    db.run(`UPDATE animals SET level = ${level}, exp = ${exp}, max_hp = max_hp + ${hpGain}, attack = attack + ${atkGain}, defense = defense + ${defGain} WHERE id = ${id}`);
+  }
+  db.run(`UPDATE animals SET exp = ${exp} WHERE id = ${id}`);
+  save();
+}
+
+function renameAnimal(id, name) {
+  db.run(`UPDATE animals SET name = '${name.replace(/'/g, "''")}' WHERE id = ${id}`);
+  save();
+}
+
+function setTeam(userId, slot, animalId) {
+  const existing = getTeam(userId);
+  const slots = {};
+  for (const s of [1, 2, 3]) slots[`slot${s}`] = existing[s] || null;
+  slots[`slot${slot}`] = animalId;
+  if (existing) {
+    db.run(`UPDATE teams SET slot1 = ${slots.slot1 || 'NULL'}, slot2 = ${slots.slot2 || 'NULL'}, slot3 = ${slots.slot3 || 'NULL'} WHERE user_id = '${userId}'`);
+  } else {
+    db.run(`INSERT INTO teams (user_id, slot1, slot2, slot3) VALUES ('${userId}', ${slots.slot1 || 'NULL'}, ${slots.slot2 || 'NULL'}, ${slots.slot3 || 'NULL'})`);
+  }
+  save();
+}
+
+function removeFromTeam(userId, slot) {
+  db.run(`UPDATE teams SET slot${slot} = NULL WHERE user_id = '${userId}'`);
+  save();
+}
+
+function getTeam(userId) {
+  const rows = db.exec(`SELECT * FROM teams WHERE user_id = '${userId}'`);
+  if (!rows.length || !rows[0].values.length) return null;
+  const v = rows[0].values[0];
+  return { user_id: v[0], slot1: v[1], slot2: v[2], slot3: v[3] };
+}
+
+function setHuntCooldown(userId) {
+  const now = Math.floor(Date.now() / 1000);
+  db.run(`INSERT OR REPLACE INTO hunt_cooldowns (user_id, last_hunt) VALUES ('${userId}', ${now})`);
+  save();
+}
+
+function getHuntCooldown(userId) {
+  const rows = db.exec(`SELECT last_hunt FROM hunt_cooldowns WHERE user_id = '${userId}'`);
+  if (!rows.length || !rows[0].values.length) return 0;
+  return rows[0].values[0][0];
+}
+
+function sellPrice(animal) {
+  const mult = { common: 10, uncommon: 25, rare: 60, epic: 150, legendary: 500 };
+  return mult[animal.rarity] * animal.level;
+}
+
+function getAnimalCount(userId) {
+  const rows = db.exec(`SELECT COUNT(*) as c FROM animals WHERE user_id = '${userId}'`);
+  return rows[0].values[0][0];
+}
+
 module.exports = {
   init,
   ensureUser,
@@ -441,4 +603,7 @@ module.exports = {
   setAutoReactEmoji,
   getAutoReactEmoji,
   START_BALANCE,
+  addAnimal, getUserAnimals, getAnimal, removeAnimal, addExp, renameAnimal,
+  setTeam, removeFromTeam, getTeam, setHuntCooldown, getHuntCooldown, sellPrice, getAnimalCount,
+  SPECIES, RARITY_WEIGHTS, RARITY_ORDER, randomRarity, randomSpecies, randomStats, expForLevel,
 };
