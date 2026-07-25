@@ -105,10 +105,7 @@ client.on('messageCreate', (message) => {
       const emoji = db.getAutoReactEmoji(message.author.id) || '⭐';
       try { message.react(emoji); } catch {}
     }
-    if (perks.find(p => p.perk === 'badge')) {
-      const emoji = db.getBadgeEmoji(message.author.id);
-      try { message.react(emoji); } catch {}
-    }
+
   }
 });
 

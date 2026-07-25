@@ -36,7 +36,6 @@ const SHOP = [
     category: 'SOCIAL',
     items: [
       { id: 'colored_lb', name: 'Colored leaderboard name', price: 250000, desc: 'your name shows in color on v lb', use: 'Check v lb — your name is highlighted' },
-      { id: 'badge', name: 'Badge next to name', price: 150000, desc: 'a badge icon next to your name in chat', use: 'A badge shows next to your name in chat messages' },
       { id: 'profile', name: 'v profile stat card', price: 200000, desc: 'view detailed stats with v profile', use: 'Use v profile to see your stats' },
       { id: 'rep', name: 'v rep @user', price: 100000, desc: 'give reputation points to others', use: 'Use v rep @user to give reputation' },
     ],
