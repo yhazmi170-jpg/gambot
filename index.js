@@ -95,6 +95,10 @@ client.on('interactionCreate', (i) => {
   i._ackFallback = fallback;
 });
 
+client.on('disconnect', () => console.log('disconnected — will auto-reconnect'));
+client.on('reconnecting', () => console.log('reconnecting...'));
+client.on('resume', () => console.log('reconnected'));
+
 client.on('messageCreate', (message) => {
   handleMessage(message);
   if (message.author.bot) return;
@@ -111,4 +115,7 @@ client.on('messageCreate', (message) => {
 
 process.on('unhandledRejection', (err) => {
   console.error('unhandled rejection:', err.message);
+});
+process.on('uncaughtException', (err) => {
+  console.error('uncaught exception:', err.message);
 });
