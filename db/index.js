@@ -487,8 +487,7 @@ function addAnimal(userId) {
   const stats = randomStats(rarity);
   db.run(`INSERT INTO animals (user_id, species, rarity, hp, max_hp, attack, defense) VALUES ('${userId}', '${species}', '${rarity}', ${stats.hp}, ${stats.hp}, ${stats.attack}, ${stats.defense})`);
   save();
-  const rows = db.exec('SELECT last_insert_rowid() as id');
-  return rows[0].values[0][0];
+  return { species, rarity, ...stats, level: 1, exp: 0, name: 'Unnamed' };
 }
 
 function getUserAnimals(userId) {

@@ -20,8 +20,7 @@ module.exports = {
     db.addBalance(userId, -5);
     db.setHuntCooldown(userId);
 
-    const id = db.addAnimal(userId);
-    const animal = db.getAnimal(id);
+    const animal = db.addAnimal(userId);
 
     const rarityColors = { common: 0x95a5a6, uncommon: 0x2ecc71, rare: 0x3498db, epic: 0x9b59b6, legendary: 0xf1c40f };
     const rarityEmojis = { common: '⚪', uncommon: '🟢', rare: '🔵', epic: '🟣', legendary: '🟡' };
