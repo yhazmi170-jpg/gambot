@@ -24,9 +24,9 @@ const client = new Client({
 loadCommands();
 
 async function start() {
-  await db.init();
   const { restore } = require('./backup');
   await restore();
+  await db.init();
   await client.login(config.token);
 }
 
