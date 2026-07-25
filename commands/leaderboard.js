@@ -11,7 +11,7 @@ module.exports = {
     if (!top.length) return message.channel.send({ embeds: [embed('🏆 Leaderboard', [['info', 'no users yet']])] });
 
     const lines = top.map((u, i) => {
-      const highlight = db.hasPerk(u.user_id, 'colored_lb') ? '🌟 ' : '';
+      const highlight = db.hasPerk(u.user_id, 'colored_lb') ? db.getLbEmoji(u.user_id) + ' ' : '';
       return `${highlight}**#${i + 1}** <@${u.user_id}> — **${u.balance.toLocaleString()}** ${config.currency}`;
     });
     const chunks = [];
