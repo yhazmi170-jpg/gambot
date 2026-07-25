@@ -5,11 +5,14 @@ try { config = require('./config.json'); } catch { config = require('./config.ex
 if (process.env.TOKEN) config.token = process.env.TOKEN;
 const db = require('./db');
 const { embed } = require('./utils/embed');
+const http = require('http');
 
 if (!config.token) {
   console.error('no token set — set TOKEN env var or put it in config.json');
   process.exit(1);
 }
+
+http.createServer((req, res) => { res.writeHead(200); res.end('ok'); }).listen(process.env.PORT || 3000);
 
 const client = new Client({
   intents: [
