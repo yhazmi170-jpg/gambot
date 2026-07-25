@@ -36,6 +36,10 @@ client.on('ready', () => {
     status: 'online',
   });
 
+  const backup = require('./backup');
+  setInterval(() => backup().catch(() => {}), 3600000);
+  setTimeout(() => backup().catch(() => {}), 10000);
+
   setInterval(() => {
     const expired = db.getExpiredSubs();
     for (const sub of expired) {

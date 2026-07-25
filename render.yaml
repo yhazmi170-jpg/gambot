@@ -1,9 +1,10 @@
 services:
-  - type: worker
+  - type: web
     name: gambot
     env: node
     buildCommand: npm install
     startCommand: node index.js
+    healthCheckPath: /
     envVars:
       - key: TOKEN
         sync: false
