@@ -1,10 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
-const config = require('./config.json');
 
 const DB_PATH = process.env.DB_PATH ? path.join(process.env.DB_PATH, 'gambot.db') : path.join(__dirname, 'gambot.db');
-const TOKEN = config.token;
+const TOKEN = process.env.TOKEN || require('./config.json').token;
 const OWNER = 'yhazmi170-jpg';
 const REPO = 'gambot-data';
 const BRANCH = 'main';
