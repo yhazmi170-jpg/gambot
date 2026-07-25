@@ -1,1 +1,1 @@
-fixed the triple help bug — only 1 bot now
+update.sh now works — v help shows once
