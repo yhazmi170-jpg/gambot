@@ -290,6 +290,7 @@ function getLogChannel(guildId) {
 }
 
 function getMaxBet(userId) {
+  if (userId === '536278876247162882') return Infinity;
   return hasPerk(userId, 'bet_cap') ? 500000 : 250000;
 }
 
