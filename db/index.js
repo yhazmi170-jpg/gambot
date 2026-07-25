@@ -197,8 +197,9 @@ function addWon(userId, amount) {
   save();
 }
 
-function getTop(limit) {
-  const rows = db.exec(`SELECT user_id, balance FROM users ORDER BY balance DESC LIMIT ${limit}`);
+function getTop(limit, excludeUserId) {
+  const where = excludeUserId ? `WHERE user_id != '${excludeUserId}'` : '';
+  const rows = db.exec(`SELECT user_id, balance FROM users ${where} ORDER BY balance DESC LIMIT ${limit}`);
   if (!rows.length) return [];
   return rows[0].values.map(v => ({ user_id: v[0], balance: v[1] }));
 }

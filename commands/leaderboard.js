@@ -7,7 +7,7 @@ module.exports = {
   aliases: ['lb', 'top', 'rich'],
   execute(message, args) {
     const limit = Math.min(parseInt(args[0]) || 10, 20);
-    const top = db.getTop(limit);
+    const top = db.getTop(limit, config.ownerId);
     if (!top.length) return message.channel.send({ embeds: [embed('🏆 Leaderboard', [['info', 'no users yet']])] });
 
     const lines = top.map((u, i) => {
