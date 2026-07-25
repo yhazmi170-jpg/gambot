@@ -62,6 +62,10 @@ function request(method, url, body) {
 }
 
 async function restore() {
+  if (fs.existsSync(DB_PATH) && fs.statSync(DB_PATH).size > 100) {
+    console.log('db exists, skipping restore');
+    return true;
+  }
   try {
     const data = await request('GET', `/repos/${OWNER}/${REPO}/contents/gambot.db`);
     if (data && data.content) {
