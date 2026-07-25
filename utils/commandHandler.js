@@ -5,6 +5,7 @@ const config = require('../config');
 const db = require('../db');
 const { embed, error } = require('./embed');
 const { checkCooldown } = require('./cooldowns');
+const logger = require('./logger');
 
 const commands = new Map();
 const aliases = new Map();
@@ -106,9 +107,18 @@ function handleMessage(message) {
 
   try {
     cmd.execute(message, args);
+    logger.log(message.guild?.id, `Command: ${cmdName}`, [
+      ['User', `${message.author}`],
+      ['Args', args.join(' ') || '-'],
+      ['Channel', `${message.channel}`],
+    ], 0x2b2d31);
     } catch (err) {
       console.error(`Error in command ${cmdName}:`, err);
       message.channel.send({ embeds: [require('./embed').error('an error occurred')] });
+      logger.log(message.guild?.id, `Command Error: ${cmdName}`, [
+        ['User', `${message.author}`],
+        ['Error', err.message],
+      ], 0xed4245);
     }
 }
 

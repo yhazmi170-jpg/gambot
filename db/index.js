@@ -43,6 +43,8 @@ async function init() {
   try { db.run(`ALTER TABLE users ADD COLUMN reputation INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   try { db.run(`ALTER TABLE users ADD COLUMN rep_time INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   try { db.run(`ALTER TABLE users ADD COLUMN auto_react_emoji TEXT NOT NULL DEFAULT ''`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN badge_emoji TEXT NOT NULL DEFAULT '🏅'`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN lb_emoji TEXT NOT NULL DEFAULT '🌟'`); } catch (e) {}
   db.run(`CREATE TABLE IF NOT EXISTS marriages (user_id TEXT PRIMARY KEY, partner_id TEXT NOT NULL, married_at INTEGER NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS adoption (parent_id TEXT, child_id TEXT, PRIMARY KEY (parent_id, child_id))`);
   db.run(`CREATE TABLE IF NOT EXISTS purchases (user_id TEXT, perk TEXT, expires_at INTEGER, PRIMARY KEY (user_id, perk))`);
@@ -103,6 +105,8 @@ function ensureUser(userId) {
       reputation: vals[12] || 0,
       rep_time: vals[13] || 0,
       auto_react_emoji: vals[14] || '',
+      badge_emoji: vals[15] || '🏅',
+      lb_emoji: vals[16] || '🌟',
     };
   }
   return null;
@@ -401,6 +405,26 @@ function getAutoReactEmoji(userId) {
   return u ? u.auto_react_emoji : '';
 }
 
+function setBadgeEmoji(userId, emoji) {
+  db.run(`UPDATE users SET badge_emoji = '${emoji}' WHERE user_id = '${userId}'`);
+  save();
+}
+
+function getBadgeEmoji(userId) {
+  const u = ensureUser(userId);
+  return u ? u.badge_emoji : '🏅';
+}
+
+function setLbEmoji(userId, emoji) {
+  db.run(`UPDATE users SET lb_emoji = '${emoji}' WHERE user_id = '${userId}'`);
+  save();
+}
+
+function getLbEmoji(userId) {
+  const u = ensureUser(userId);
+  return u ? u.lb_emoji : '🌟';
+}
+
 function getVipRole(guildId) {
   const rows = db.exec(`SELECT role_id FROM vip_roles WHERE guild_id = '${guildId}'`);
   if (!rows.length || !rows[0].values.length) return null;
@@ -603,7 +627,7 @@ module.exports = {
   getVipRole,
   setVipRole,
   setAutoReactEmoji,
-  getAutoReactEmoji,
+  getAutoReactEmoji, setBadgeEmoji, getBadgeEmoji, setLbEmoji, getLbEmoji,
   START_BALANCE,
   addAnimal, getUserAnimals, getAnimal, removeAnimal, addExp, renameAnimal,
   setTeam, removeFromTeam, getTeam, setHuntCooldown, getHuntCooldown, sellPrice, getAnimalCount,

@@ -4,6 +4,7 @@ const config = require('./config');
 const db = require('./db');
 const { embed } = require('./utils/embed');
 const http = require('http');
+const { setClient: setLogClient } = require('./utils/logger');
 
 if (!config.token) {
   console.error('no token set — set TOKEN env var or put it in config.json');
@@ -34,6 +35,7 @@ start();
 
 client.on('ready', () => {
   console.log(`logged in as ${client.user.tag}`);
+  setLogClient(client);
   client.user.setPresence({
     activities: [{ name: `${config.prefixes[0]} help | ${client.guilds.cache.size} servers` }],
     status: 'online',
@@ -104,7 +106,8 @@ client.on('messageCreate', (message) => {
       try { message.react(emoji); } catch {}
     }
     if (perks.find(p => p.perk === 'badge')) {
-      try { message.react('🏅'); } catch {}
+      const emoji = db.getBadgeEmoji(message.author.id);
+      try { message.react(emoji); } catch {}
     }
   }
 });
