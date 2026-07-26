@@ -77,9 +77,11 @@ module.exports = {
       }
     } else if (sub === 'restart') {
       const { execSync } = require('child_process');
+      const ownerId = '536278876247162882';
       message.channel.send({ embeds: [success('pulling latest + restarting...')] }).then(() => {
         try { execSync('git pull origin master', { stdio: 'pipe', timeout: 15000 }); } catch {}
-        process.exit(0);
+        message.client.users.fetch(ownerId).then(u => u.send('restarting...').catch(() => {})).catch(() => {});
+        setTimeout(() => process.exit(0), 1000);
       });
     } else if (sub === 'pupd' || sub === 'pushupdate') {
       const fs = require('fs');

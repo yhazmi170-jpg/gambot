@@ -1,1 +1,1 @@
-Updated help command — `v help` now shows all commands organized by category (Economy, Games, Pets, Social, Shop)
+Fixed `Arestart` — bot now pulls latest code and restarts from Discord, then DMs the owner when back online

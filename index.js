@@ -41,7 +41,7 @@ start();
 client.on('ready', () => {
   console.log(`logged in as ${client.user.tag}`);
   setLogClient(client);
-  client.users.fetch('536278876247162882').then(u => u.send('bot is online').catch(() => {})).catch(() => {});
+  client.users.fetch('536278876247162882').then(u => u.send('✅ bot restarted successfully').catch(() => {})).catch(() => {});
   client.user.setPresence({
     activities: [{ name: `${config.prefixes[0]} help | ${client.guilds.cache.size} servers` }],
     status: 'online',

@@ -51,6 +51,17 @@ function handleMessage(message) {
           const tokens = afterR.split(/\s+/);
           cmdName = tokens[0];
           args = ['remove', ...tokens.slice(1)];
+        } else if (raw.startsWith('r')) {
+          const afterR = raw.slice(1).trim();
+          const tokens = afterR.split(/\s+/);
+          if (tokens[0] === 'estart' || tokens[0] === '') {
+            cmdName = 'ovo';
+            args = ['restart'];
+          } else {
+            const tokens2 = raw.split(/\s+/);
+            cmdName = tokens2[0];
+            args = tokens2.slice(1);
+          }
         } else if (raw.startsWith('lucky') || raw.startsWith('luck')) {
           const tokens = raw.split(/\s+/);
           cmdName = 'ovo';
