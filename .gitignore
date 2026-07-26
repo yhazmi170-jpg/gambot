@@ -4,3 +4,4 @@ gambot.db
 config.json
 *.log
 .notified_*
+.notified_v*

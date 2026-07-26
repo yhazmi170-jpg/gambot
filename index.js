@@ -5,6 +5,7 @@ const db = require('./db');
 const { embed } = require('./utils/embed');
 const http = require('http');
 const path = require('path');
+const { version } = require('./package.json');
 const { setClient: setLogClient } = require('./utils/logger');
 
 if (!config.token) {
@@ -55,15 +56,29 @@ client.on('ready', () => {
   }, 3600000);
 
   const fs = require('fs');
-  const notifyFlag = path.join(__dirname, '.notified_cr_update');
-  if (!fs.existsSync(notifyFlag)) {
+  const ver = version || '1.0.0';
+  const verFlag = path.join(__dirname, `.notified_v${ver}`);
+  if (!fs.existsSync(verFlag)) {
+    let updateMsg = '';
+    try { updateMsg = fs.readFileSync(path.join(__dirname, 'update_msg.txt'), 'utf8').trim(); } catch {}
+    if (updateMsg) {
+      const channels = db.getAllUpdateChannels();
+      for (const { guild_id, channel_id } of channels) {
+        const ch = client.channels.cache.get(channel_id);
+        if (ch) ch.send({ embeds: [embed('📢 Bot Update', [
+          ['Version', `v${ver}`],
+          ['What\'s New', updateMsg],
+          ['Uptime', 'Fresh deploy — check `v version` for details'],
+        ], 0x5865f2)] }).catch(() => {});
+      }
+    }
     const crHolders = db.getPerkHolders('custom_role');
     for (const uid of crHolders) {
       client.users.fetch(uid).then(u => {
         u.send('**Custom Role perk updated!**\nYou can now set your role yourself:\n`v customrole name | #hexcolor`\n\nExample: `v customrole Cool Guy | #ff0000`\n\nYour existing role will update, or a new one will be created.').catch(() => {});
       }).catch(() => {});
     }
-    fs.writeFileSync(notifyFlag, 'done');
+    fs.writeFileSync(verFlag, 'done');
   }
 
   setInterval(() => {

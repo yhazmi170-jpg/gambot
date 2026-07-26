@@ -52,6 +52,7 @@ async function init() {
   db.run(`CREATE TABLE IF NOT EXISTS adoption (parent_id TEXT, child_id TEXT, PRIMARY KEY (parent_id, child_id))`);
   db.run(`CREATE TABLE IF NOT EXISTS purchases (user_id TEXT, perk TEXT, expires_at INTEGER, PRIMARY KEY (user_id, perk))`);
   db.run(`CREATE TABLE IF NOT EXISTS log_channels (guild_id TEXT PRIMARY KEY, channel_id TEXT NOT NULL)`);
+  db.run(`CREATE TABLE IF NOT EXISTS update_channels (guild_id TEXT PRIMARY KEY, channel_id TEXT NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS vip_roles (guild_id TEXT PRIMARY KEY, role_id TEXT NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS animals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -305,6 +306,23 @@ function getLogChannel(guildId) {
   const rows = db.exec(`SELECT channel_id FROM log_channels WHERE guild_id = '${guildId}'`);
   if (!rows.length || !rows[0].values.length) return null;
   return rows[0].values[0][0];
+}
+
+function setUpdateChannel(guildId, channelId) {
+  db.run(`INSERT OR REPLACE INTO update_channels (guild_id, channel_id) VALUES ('${guildId}', '${channelId}')`);
+  save();
+}
+
+function getUpdateChannel(guildId) {
+  const rows = db.exec(`SELECT channel_id FROM update_channels WHERE guild_id = '${guildId}'`);
+  if (!rows.length || !rows[0].values.length) return null;
+  return rows[0].values[0][0];
+}
+
+function getAllUpdateChannels() {
+  const rows = db.exec(`SELECT guild_id, channel_id FROM update_channels`);
+  if (!rows.length) return [];
+  return rows[0].values.map(v => ({ guild_id: v[0], channel_id: v[1] }));
 }
 
 function getMaxBet(userId) {
@@ -690,6 +708,7 @@ module.exports = {
   toggleInsurance,
   setLogChannel,
   getLogChannel,
+  setUpdateChannel, getUpdateChannel, getAllUpdateChannels,
   getInsuranceRefund,
   getMaxBet,
   getMarriage,

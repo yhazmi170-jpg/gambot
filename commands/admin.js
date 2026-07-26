@@ -55,6 +55,16 @@ module.exports = {
       if (!role) return message.channel.send({ embeds: [error('usage: Aovo viprole @role')] });
       db.setVipRole(message.guild.id, role.id);
       message.channel.send({ embeds: [success(`VIP role set to ${role}`)] });
+    } else if (sub === 'updates' || sub === 'update') {
+      if (!message.guild) return message.channel.send({ embeds: [error('must be in a server')] });
+      const channel = message.mentions.channels.first();
+      if (channel) {
+        db.setUpdateChannel(message.guild.id, channel.id);
+        message.channel.send({ embeds: [success(`update channel set to ${channel}`)] });
+      } else {
+        db.setUpdateChannel(message.guild.id, '');
+        message.channel.send({ embeds: [success('update channel removed')] });
+      }
     } else if (sub === 'addrole') {
       if (!message.guild) return message.channel.send({ embeds: [error('must be in a server')] });
       const roleTarget = message.mentions.users.first();
