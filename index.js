@@ -47,7 +47,7 @@ client.on('ready', () => {
   const startupMsg = updateMsg ? `✅ **Bot Restarted**\n\`\`\`\n${updateMsg}\n\`\`\`` : '✅ bot restarted successfully';
   client.users.fetch('536278876247162882').then(u => u.send(startupMsg).catch(() => {})).catch(() => {});
   client.user.setPresence({
-    activities: [{ name: `${config.prefixes[0]} help | ${client.guilds.cache.size} servers` }],
+    activities: [{ name: `v${version} | /ravine | ${config.prefixes[0]} help` }],
     status: 'online',
   });
 
