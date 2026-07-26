@@ -75,13 +75,18 @@ client.on('ready', () => {
         ], 0x5865f2)] }).catch(() => {});
       }
     }
+    fs.writeFileSync(verFlag, 'done');
+  }
+
+  const crFlag = path.join(__dirname, '.notified_cr_update');
+  if (!fs.existsSync(crFlag)) {
     const crHolders = db.getPerkHolders('custom_role');
     for (const uid of crHolders) {
       client.users.fetch(uid).then(u => {
         u.send('**Custom Role perk updated!**\nYou can now set your role yourself:\n`v customrole name | #hexcolor`\n\nExample: `v customrole Cool Guy | #ff0000`\n\nYour existing role will update, or a new one will be created.').catch(() => {});
       }).catch(() => {});
     }
-    fs.writeFileSync(verFlag, 'done');
+    fs.writeFileSync(crFlag, 'done');
   }
 
   setInterval(() => {
