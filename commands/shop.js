@@ -174,6 +174,8 @@ function postShop(channel) {
 
 module.exports = { buildShop, postShop, handleInteraction,
   name: 'shop',
+  helpCategory: 'Shop',
+  helpArgs: '',
   aliases: ['store', 'market'],
   execute(message, args) {
     postShop(message.channel);

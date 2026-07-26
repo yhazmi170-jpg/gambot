@@ -10,6 +10,8 @@ const jobs = [
 
 module.exports = {
   name: 'work',
+  helpCategory: 'Economy',
+  helpArgs: '',
   aliases: ['w'],
   execute(message, args) {
     const user = db.ensureUser(message.author.id);

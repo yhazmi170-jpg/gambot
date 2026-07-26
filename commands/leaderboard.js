@@ -4,6 +4,8 @@ const config = require('../config');
 
 module.exports = {
   name: 'leaderboard',
+  helpCategory: 'Economy',
+  helpArgs: '',
   aliases: ['lb', 'top', 'rich'],
   execute(message, args) {
     const limit = Math.min(parseInt(args[0]) || 10, 20);

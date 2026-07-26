@@ -4,6 +4,8 @@ const config = require('../config');
 
 module.exports = {
   name: 'bank',
+  helpCategory: 'Economy',
+  helpArgs: '',
   aliases: ['banking'],
   execute(message, args) {
     const uid = message.author.id;

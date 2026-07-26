@@ -4,6 +4,8 @@ const config = require('../config');
 
 module.exports = {
   name: 'weekly',
+  helpCategory: 'Economy',
+  helpArgs: '',
   aliases: ['week'],
   execute(message, args) {
     const user = db.ensureUser(message.author.id);

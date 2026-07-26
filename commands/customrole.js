@@ -3,6 +3,8 @@ const { embed, error, success } = require('../utils/embed');
 
 module.exports = {
   name: 'customrole',
+  helpCategory: 'Shop',
+  helpArgs: 'name | #color',
   aliases: ['cr'],
   description: 'set your custom role name and color (requires Custom Role perk)',
   execute(message, args) {

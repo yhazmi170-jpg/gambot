@@ -3,6 +3,8 @@ const { embed, error, success } = require('../utils/embed');
 
 module.exports = {
   name: 'setlb',
+  helpCategory: 'Shop',
+  helpArgs: '<emoji>',
   aliases: ['setleaderboard'],
   description: 'set your leaderboard emoji (requires colored_lb perk)',
   async execute(message, args) {

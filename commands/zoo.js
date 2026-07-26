@@ -3,6 +3,8 @@ const { embed } = require('../utils/embed');
 
 module.exports = {
   name: 'zoo',
+  helpCategory: 'Pets',
+  helpArgs: '',
   description: 'view all your animals',
   async execute(message, args) {
     const animals = db.getUserAnimals(message.author.id);

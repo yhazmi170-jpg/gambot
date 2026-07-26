@@ -6,6 +6,8 @@ const TICKET_PRICE = 10;
 
 module.exports = {
   name: 'lottery',
+  helpCategory: 'Games',
+  helpArgs: 'buy <amount>',
   aliases: ['lotto', 'lot'],
   execute(message, args) {
     const sub = (args[0] || '').toLowerCase();

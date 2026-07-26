@@ -3,6 +3,8 @@ const { embed } = require('../utils/embed');
 
 module.exports = {
   name: 'sell',
+  helpCategory: 'Pets',
+  helpArgs: '<id>',
   description: 'sell an animal from your zoo',
   async execute(message, args) {
     const id = parseInt(args[0]);

@@ -5,6 +5,8 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 module.exports = {
   name: 'give',
+  helpCategory: 'Economy',
+  helpArgs: '<@user> <amount>',
   aliases: ['pay', 'share', 'donate'],
   execute(message, args) {
     const target = message.mentions.users.first();

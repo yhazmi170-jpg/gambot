@@ -2,6 +2,8 @@ const { embed } = require('../utils/embed');
 
 module.exports = {
   name: 'gamehelp',
+  helpCategory: 'Games',
+  helpArgs: '<game>',
   aliases: ['gh', 'howto', 'tutorial'],
   description: 'get rules and tips for a game',
   execute(message, args) {

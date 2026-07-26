@@ -3,6 +3,8 @@ const { embed, error, success } = require('../utils/embed');
 
 module.exports = {
   name: 'setbadge',
+  helpCategory: 'Shop',
+  helpArgs: '<emoji>',
   description: 'set your badge emoji (requires badge perk)',
   async execute(message, args) {
     if (!db.hasPerk(message.author.id, 'badge')) return message.channel.send({ embeds: [error('you need the badge perk — buy it from `v shop`')] });

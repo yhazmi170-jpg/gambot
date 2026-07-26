@@ -4,6 +4,8 @@ const config = require('../config');
 
 module.exports = {
   name: 'crash',
+  helpCategory: 'Games',
+  helpArgs: '<amount> <multiplier>',
   aliases: ['crsh'],
   execute(message, args) {
     let amount;

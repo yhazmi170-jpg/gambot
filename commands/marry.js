@@ -5,6 +5,8 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 module.exports = {
   name: 'marry',
+  helpCategory: 'Social',
+  helpArgs: '<@user>',
   aliases: ['adopt', 'divorce'],
   execute(message, args) {
     const sub = message.content.split(/\s+/).slice(1)[0] || '';

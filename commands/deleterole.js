@@ -3,6 +3,8 @@ const { error, success } = require('../utils/embed');
 
 module.exports = {
   name: 'deleterole',
+  helpCategory: 'Shop',
+  helpArgs: '',
   aliases: ['delrole', 'removerole'],
   description: 'delete your custom role (requires Custom Role perk)',
   execute(message, args) {

@@ -74,6 +74,8 @@ function buildContainer(game, outcome) {
 
 module.exports = {
   name: 'mines',
+  helpCategory: 'Games',
+  helpArgs: '<amount>',
   aliases: ['mine'],
   execute(message, args) {
     let testMode = false;

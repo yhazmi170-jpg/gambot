@@ -4,6 +4,8 @@ const config = require('../config');
 
 module.exports = {
   name: 'bal',
+  helpCategory: 'Economy',
+  helpArgs: '',
   aliases: ['balance', 'wallet', 'cash'],
   execute(message, args) {
     const target = message.mentions.users.first() || message.author;

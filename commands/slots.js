@@ -34,6 +34,8 @@ function slotLine(reels, revealCount) {
 
 module.exports = {
   name: 'slots',
+  helpCategory: 'Games',
+  helpArgs: '<amount>',
   aliases: ['slot', 'spin'],
   async execute(message, args) {
     let amount;

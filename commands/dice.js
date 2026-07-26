@@ -4,6 +4,8 @@ const config = require('../config');
 
 module.exports = {
   name: 'dice',
+  helpCategory: 'Games',
+  helpArgs: '<amount> over/under <num>',
   aliases: ['roll', 'diceroll'],
   execute(message, args) {
     let amount;

@@ -3,6 +3,8 @@ const { embed } = require('../utils/embed');
 
 module.exports = {
   name: 'team',
+  helpCategory: 'Pets',
+  helpArgs: '<slot> <id>',
   aliases: ['t'],
   description: 'manage your battle team (up to 3 animals)',
   async execute(message, args) {

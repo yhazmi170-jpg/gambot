@@ -3,6 +3,8 @@ const { embed } = require('../utils/embed');
 
 module.exports = {
   name: 'battle',
+  helpCategory: 'Pets',
+  helpArgs: '<@user>',
   aliases: ['b', 'fight'],
   description: 'battle another user\'s team',
   async execute(message, args) {

@@ -3,6 +3,8 @@ const { embed } = require('../utils/embed');
 
 module.exports = {
   name: 'hunt',
+  helpCategory: 'Pets',
+  helpArgs: '',
   aliases: ['h'],
   description: 'hunt for animals (costs 5 coins)',
   async execute(message, args) {

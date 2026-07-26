@@ -132,6 +132,8 @@ function playLoop(msg, player, dealer, deck, bet, userId) {
 
 module.exports = {
   name: 'blackjack',
+  helpCategory: 'Games',
+  helpArgs: '<amount>',
   aliases: ['bj', 'twentyone'],
   execute(message, args) {
     let amount;

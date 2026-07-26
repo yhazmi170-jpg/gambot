@@ -3,6 +3,8 @@ const { embed, error, success } = require('../utils/embed');
 
 module.exports = {
   name: 'autoreact',
+  helpCategory: 'Shop',
+  helpArgs: '<emoji>',
   aliases: ['ar', 'autoreaction'],
   execute(message, args) {
     if (!db.hasPerk(message.author.id, 'auto_react')) {
