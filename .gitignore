@@ -3,3 +3,4 @@ gambot.db
 .env
 config.json
 *.log
+.notified_*

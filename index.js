@@ -4,6 +4,7 @@ const config = require('./config');
 const db = require('./db');
 const { embed } = require('./utils/embed');
 const http = require('http');
+const path = require('path');
 const { setClient: setLogClient } = require('./utils/logger');
 
 if (!config.token) {
@@ -53,11 +54,16 @@ client.on('ready', () => {
     }
   }, 3600000);
 
-  const crHolders = db.getPerkHolders('custom_role');
-  for (const uid of crHolders) {
-    client.users.fetch(uid).then(u => {
-      u.send('**Custom Role perk updated!**\nYou can now set your role yourself:\n`v customrole name | #hexcolor`\n\nExample: `v customrole Cool Guy | #ff0000`\n\nYour existing role will update, or a new one will be created.').catch(() => {});
-    }).catch(() => {});
+  const fs = require('fs');
+  const notifyFlag = path.join(__dirname, '.notified_cr_update');
+  if (!fs.existsSync(notifyFlag)) {
+    const crHolders = db.getPerkHolders('custom_role');
+    for (const uid of crHolders) {
+      client.users.fetch(uid).then(u => {
+        u.send('**Custom Role perk updated!**\nYou can now set your role yourself:\n`v customrole name | #hexcolor`\n\nExample: `v customrole Cool Guy | #ff0000`\n\nYour existing role will update, or a new one will be created.').catch(() => {});
+      }).catch(() => {});
+    }
+    fs.writeFileSync(notifyFlag, 'done');
   }
 
   setInterval(() => {
