@@ -12,7 +12,7 @@ const SHOP = [
       { id: 'double_work', name: 'Double work payout (perm)', price: 2000000, desc: 'permanently earn 2x from v work', use: 'Just use v work — it pays double automatically' },
       { id: 'bet_cap', name: 'Higher bet cap (500k)', price: 750000, desc: 'all-in up to 500k instead of 250k', use: 'Use v <game> all to bet up to 500k' },
       { id: 'lottery_ticket', name: 'Free lottery ticket/draw', price: 2500000, desc: 'get a free ticket every lottery draw', use: 'You will auto-get 1 free ticket each lottery draw' },
-      // { id: 'vip_games', name: 'VIP game modes access', price: 3000000, desc: 'unlocks exclusive games (poker, high-stakes)', use: 'New game commands will be announced when added' },
+      { id: 'vip_games', name: 'VIP game modes access', price: 3000000, desc: 'unlocks exclusive games (poker, high-stakes)', use: 'Use v poker <amount> to play Texas Hold\'em vs the dealer' },
     ],
   },
   {

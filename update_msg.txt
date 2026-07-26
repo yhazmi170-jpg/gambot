@@ -1,1 +1,1 @@
-Help command cleaned up — rob now requires 1m+ to use — shop purchase logs fixed
+v1.2.0 — Atomic lock prevents duplicate bot instances — New VIP game: v poker (video poker with hold/draw) — Arestart fixed — Command log spam removed (only shop purchases show now) — Better poker UI

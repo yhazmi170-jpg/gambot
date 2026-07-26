@@ -121,20 +121,10 @@ function handleMessage(message) {
     if (result instanceof Promise) result.catch(err => {
       console.error(`Error in command ${cmdName}:`, err);
       message.channel.send({ embeds: [error(err.message.slice(0, 100))] }).catch(() => {});
-      logger.logCmd(message.guild?.id, `Command Error: ${cmdName}`, [['User', `${message.author}`], ['Error', err.message]], 0xed4245);
     });
-    logger.logCmd(message.guild?.id, `Command: ${cmdName}`, [
-      ['User', `${message.author}`],
-      ['Args', args.join(' ') || '-'],
-      ['Channel', `${message.channel}`],
-    ], 0x2b2d31);
     } catch (err) {
       console.error(`Error in command ${cmdName}:`, err);
       message.channel.send({ embeds: [require('./embed').error('an error occurred')] });
-      logger.logCmd(message.guild?.id, `Command Error: ${cmdName}`, [
-        ['User', `${message.author}`],
-        ['Error', err.message],
-      ], 0xed4245);
     }
 }
 

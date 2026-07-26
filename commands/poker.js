@@ -19,9 +19,7 @@ function createDeck() {
   return deck;
 }
 
-function formatCards(cards) {
-  return cards.map(c => `\`${c.value}${c.suit}\``).join(' ');
-}
+function cardTag(c) { return `${c.value}${c.suit}`; }
 
 function evaluateHand(cards) {
   const values = cards.map(c => VALUE_RANK[c.value]).sort((a, b) => b - a);
@@ -43,154 +41,110 @@ function evaluateHand(cards) {
 
   const isRoyal = isStraight && isFlush && straightHigh === 14;
 
-  if (isRoyal) return { rank: 9, name: 'Royal Flush', payout: 800 };
-  if (isStraight && isFlush) return { rank: 8, name: 'Straight Flush', payout: 50 };
-  if (groups[0][1] === 4) return { rank: 7, name: 'Four of a Kind', payout: 25 };
-  if (groups[0][1] === 3 && groups[1] && groups[1][1] === 2) return { rank: 6, name: 'Full House', payout: 9 };
-  if (isFlush) return { rank: 5, name: 'Flush', payout: 6 };
-  if (isStraight) return { rank: 4, name: 'Straight', payout: 4 };
-  if (groups[0][1] === 3) return { rank: 3, name: 'Three of a Kind', payout: 3 };
-  if (groups[0][1] === 2 && groups[1] && groups[1][1] === 2) return { rank: 2, name: 'Two Pair', payout: 2 };
-  if (groups[0][1] === 2 && groups[0][0] >= VALUE_RANK['J']) return { rank: 1, name: 'Jacks or Better', payout: 1 };
-  return { rank: 0, name: 'Nothing', payout: 0 };
-}
-
-function buildDisplay(cards, held, bet, result) {
-  const lines = cards.map((c, i) => {
-    const icon = held[i] ? '🔒' : '🔄';
-    return `**${i + 1}:** ${formatCards([c])} ${icon}`;
-  }).join('\n');
-  const fields = [['Your Hand', lines], ['Bet', `${bet} ${config.currency}`]];
-  if (result) fields.push(['Result', result]);
-  return embed('🃏 Video Poker', fields, result ? (result.payout > 0 ? 0x57f287 : 0xed4245) : 0x2b2d31);
+  if (isRoyal) return { rank: 9, name: '👑 Royal Flush', payout: 800 };
+  if (isStraight && isFlush) return { rank: 8, name: '🌟 Straight Flush', payout: 50 };
+  if (groups[0][1] === 4) return { rank: 7, name: '🔥 Four of a Kind', payout: 25 };
+  if (groups[0][1] === 3 && groups[1] && groups[1][1] === 2) return { rank: 6, name: '🏠 Full House', payout: 9 };
+  if (isFlush) return { rank: 5, name: '💧 Flush', payout: 6 };
+  if (isStraight) return { rank: 4, name: '📏 Straight', payout: 4 };
+  if (groups[0][1] === 3) return { rank: 3, name: '🔱 Three of a Kind', payout: 3 };
+  if (groups[0][1] === 2 && groups[1] && groups[1][1] === 2) return { rank: 2, name: '✌️ Two Pair', payout: 2 };
+  if (groups[0][1] === 2 && groups[0][0] >= VALUE_RANK['J']) return { rank: 1, name: '👑 Jacks or Better', payout: 1 };
+  return { rank: 0, name: '💀 Nothing', payout: 0 };
 }
 
 module.exports = {
   name: 'poker',
+  description: 'video poker — try to make the best 5-card hand',
   helpCategory: 'Games',
   helpArgs: '<amount>',
   aliases: ['videopoker'],
   execute(message, args) {
-    const user = db.ensureUser(message.author.id);
-    const hasVip = db.getPerkHolders('vip_games').includes(message.author.id);
-    if (!hasVip && message.author.id !== config.ownerId)
-      return message.channel.send({ embeds: [error('this game requires the **VIP game modes access** perk from the shop')] });
+    const uid = message.author.id;
+    const user = db.ensureUser(uid);
+    if (!db.hasPerk(uid, 'vip_games') && uid !== config.ownerId)
+      return message.channel.send({ embeds: [error('this game requires the **VIP game modes access** perk — buy it in the shop')] });
 
     let amount;
     if ((args[0] || '').toLowerCase() === 'all') {
-      amount = Math.min(user.balance, db.getMaxBet(message.author.id));
+      amount = Math.min(user.balance, db.getMaxBet(uid));
       if (amount <= 0) return message.channel.send({ embeds: [error('you have no money')] });
     } else {
       amount = parseAmount(args[0]);
       if (isNaN(amount) || amount <= 0) return message.channel.send({ embeds: [error('bet an amount or use `all`')] });
     }
-
     if (user.balance < amount) return message.channel.send({ embeds: [error('not enough money')] });
 
     const deck = createDeck();
     let cards = [deck.pop(), deck.pop(), deck.pop(), deck.pop(), deck.pop()];
     let held = [false, false, false, false, false];
 
-    const buttons = cards.map((_, i) =>
-      new ButtonBuilder()
-        .setCustomId(`poker_hold_${i}`)
-        .setLabel(`${i + 1}`)
-        .setStyle(ButtonStyle.Secondary)
-    );
-    const drawBtn = new ButtonBuilder()
-      .setCustomId('poker_draw')
-      .setLabel('DRAW')
-      .setStyle(ButtonStyle.Success);
+    function makeField() {
+      const cardsLine = cards.map((c, i) => {
+        const tag = cardTag(c);
+        const status = held[i] ? '🔒' : '🔄';
+        return `\`${tag.padEnd(3)}\` ${status}`;
+      }).join('  ');
+      const labels = cards.map((_, i) => {
+        const state = held[i] ? '**HOLD**' : 'DRAW';
+        return `\`[${i + 1}]\` ${state}`;
+      }).join('  ');
+      return `**Bet:** ${amount.toLocaleString()} ${config.currency}\n\n${cardsLine}\n${labels}\n\n` +
+        `*Click card buttons to toggle hold, then press DRAW*\n` +
+        `Payouts: 👑800× 🌟50× 🔥25× 🏠9× 💧6× 📏4× 🔱3× ✌️2× 👑JJ+1×`;
+    }
 
-    const row1 = new ActionRowBuilder().addComponents(...buttons);
-    const row2 = new ActionRowBuilder().addComponents(drawBtn);
+    const btnStyle = (i) => held[i] ? ButtonStyle.Primary : ButtonStyle.Secondary;
+    const btnLabel = (i) => `${i + 1} ${held[i] ? '🔒' : '🔄'}`;
+    function makeButtons() {
+      return [
+        new ActionRowBuilder().addComponents(
+          cards.map((_, i) => new ButtonBuilder()
+            .setCustomId(`ph_${i}`).setLabel(btnLabel(i)).setStyle(btnStyle(i)))
+        ),
+        new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId('pd').setLabel('🃏 DRAW').setStyle(ButtonStyle.Success)
+        ),
+      ];
+    }
 
+    const color = 0x2b2d31;
     message.channel.send({
-      embeds: [buildDisplay(cards, held, amount, null)],
-      components: [row1, row2],
+      embeds: [embed('🃏 Video Poker', [['', makeField()] + (false ? '' : '')], color)],
+      components: makeButtons(),
     }).then(msg => {
-      function updateButtons() {
-        const newButtons = cards.map((_, i) =>
-          new ButtonBuilder()
-            .setCustomId(`poker_hold_${i}`)
-            .setLabel(`${i + 1}${held[i] ? ' 🔒' : ''}`)
-            .setStyle(held[i] ? ButtonStyle.Primary : ButtonStyle.Secondary)
-        );
-        return [
-          new ActionRowBuilder().addComponents(...newButtons),
-          new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-              .setCustomId('poker_draw')
-              .setLabel('DRAW')
-              .setStyle(ButtonStyle.Success)
-          ),
-        ];
-      }
-
-      const filter = i => i.user.id === message.author.id && (i.customId === 'poker_draw' || i.customId.startsWith('poker_hold_'));
+      const filter = i => i.user.id === uid && (i.customId === 'pd' || i.customId.startsWith('ph_'));
       const col = msg.createMessageComponentCollector({ filter, time: 60000 });
 
-      col.on('collect', async (interaction) => {
-        if (interaction.customId.startsWith('poker_hold_')) {
-          const idx = parseInt(interaction.customId.split('_')[2]);
-          held[idx] = !held[idx];
-          const newComponents = updateButtons();
-          await interaction.update({ embeds: [buildDisplay(cards, held, amount, null)], components: newComponents });
-        } else if (interaction.customId === 'poker_draw') {
-          for (let i = 0; i < 5; i++) {
-            if (!held[i]) cards[i] = deck.pop();
-          }
-          const result = evaluateHand(cards);
-          let resultStr;
-          let winnings = 0;
-
-          if (result.payout > 0) {
-            winnings = amount * result.payout;
-            if (result.payout === 1) {
-              resultStr = `**Jacks or Better!** — push (**${amount}** ${config.currency} returned)`;
-            } else {
-              const profit = winnings - amount;
-              db.addBalance(message.author.id, profit);
-              db.addWon(message.author.id, profit);
-              resultStr = `**${result.name}!** — won **${winnings}** ${config.currency} (+**${profit}**)`;
-            }
-          } else {
-            db.addBalance(message.author.id, -amount);
-            db.addGambled(message.author.id, amount);
-            resultStr = `**Nothing** — lost **${amount}** ${config.currency}`;
-          }
-
-          await interaction.update({
-            embeds: [buildDisplay(cards, held, amount, resultStr)],
-            components: [],
-          });
-          col.stop();
+      function finish(collected) {
+        for (let i = 0; i < 5; i++) if (!held[i]) cards[i] = deck.pop();
+        const result = evaluateHand(cards);
+        let line;
+        if (result.payout > 1) {
+          const profit = amount * result.payout - amount;
+          db.addBalance(uid, profit); db.addWon(uid, profit);
+          line = `**${result.name}!** 🎉 Won **${(amount * result.payout).toLocaleString()}** ${config.currency} (+**${profit.toLocaleString()}**)`;
+        } else if (result.payout === 1) {
+          line = `**Jacks or Better!** — push (bet returned)`;
+        } else {
+          db.addBalance(uid, -amount); db.addGambled(uid, amount);
+          line = `**${result.name}** — lost **${amount.toLocaleString()}** ${config.currency}`;
         }
+        msg.edit({
+          embeds: [embed('🃏 Video Poker', [['', makeField()], ['Result', line]], result.payout >= 1 ? 0x57f287 : 0xed4245)],
+          components: [],
+        }).catch(() => {});
+      }
+
+      col.on('collect', async (interaction) => {
+        if (interaction.customId === 'pd') { finish(true); col.stop(); return; }
+        const idx = parseInt(interaction.customId.split('_')[1]);
+        held[idx] = !held[idx];
+        await interaction.update({ embeds: [embed('🃏 Video Poker', [['', makeField()]], color)], components: makeButtons() });
       });
 
       col.on('end', async (collected) => {
-        if (!collected.size || !collected.some(i => i.customId === 'poker_draw')) {
-          for (let i = 0; i < 5; i++) {
-            if (!held[i]) cards[i] = deck.pop();
-          }
-          const result = evaluateHand(cards);
-          let resultStr;
-          if (result.payout > 0) {
-            if (result.payout === 1) {
-              resultStr = `**Jacks or Better!** — push (**${amount}** ${config.currency} returned)`;
-            } else {
-              const profit = amount * result.payout - amount;
-              db.addBalance(message.author.id, profit);
-              db.addWon(message.author.id, profit);
-              resultStr = `**${result.name}!** — won **${amount * result.payout}** ${config.currency} (+**${profit}**)`;
-            }
-          } else {
-            db.addBalance(message.author.id, -amount);
-            db.addGambled(message.author.id, amount);
-            resultStr = `**Nothing** — lost **${amount}** ${config.currency}`;
-          }
-          await msg.edit({ embeds: [buildDisplay(cards, held, amount, resultStr)], components: [] }).catch(() => {});
-        }
+        if (!collected.size) finish(false);
       });
     });
   },

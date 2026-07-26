@@ -83,6 +83,7 @@ module.exports = {
         try { execSync('git pull origin master', { stdio: 'pipe', timeout: 15000 }); } catch {}
         message.client.users.fetch(ownerId).then(u => u.send('restarting...').catch(() => {})).catch(() => {});
         if (global._server) try { global._server.close(); } catch {}
+        try { require('fs').unlinkSync(path.join(__dirname, '..', '.gambot.lock')); } catch {}
         setTimeout(() => {
           const child = spawn('node', [path.join(__dirname, '..', 'index.js')], {
             stdio: 'inherit',
