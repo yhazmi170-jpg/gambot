@@ -19,7 +19,7 @@ module.exports = {
       if (user.balance < cost) return message.channel.send({ embeds: [error('not enough coins')] });
 
       db.addBalance(message.author.id, -cost);
-      db.addTicket(message.author.id, amount, amount);
+      db.addTicket(message.author.id, amount);
 
       const total = db.totalTickets().total;
       message.channel.send({
@@ -37,7 +37,7 @@ module.exports = {
         ])],
       });
     } else {
-      const user = db.get(message.author.id);
+      const user = db.ensureUser(message.author.id);
       if (!user) return message.channel.send({ embeds: [embed('🎟️ Lottery', [['info', 'use `v lottery buy <amount>` to buy tickets']])] });
       const entry = db.getLottery().find(e => e.user_id === message.author.id);
       message.channel.send({

@@ -34,10 +34,14 @@ function cardDisplay(card) {
   return `${card.value}${card.suit}`;
 }
 
+function formatCards(cards) {
+  return cards.map(c => `\`${c.value}${c.suit}\``).join(' ');
+}
+
 function buildResult(player, dealer, revealDealer) {
   return revealDealer
-    ? `${dealer.map(cardDisplay).join(' ')} (**${handValue(dealer)}**)`
-    : `${cardDisplay(dealer[0])} + ?`;
+    ? `${formatCards(dealer)} **${handValue(dealer)}**`
+    : `${formatCards([dealer[0]])} + \`?\``;
 }
 
 function playLoop(msg, player, dealer, deck, bet, userId) {
@@ -49,8 +53,8 @@ function playLoop(msg, player, dealer, deck, bet, userId) {
 
   msg.edit({
     embeds: [embed('🃏 Blackjack', [
-      ['Your Hand', `${player.map(cardDisplay).join(' ')} (**${pv}**)`],
-      ['Dealer', buildResult(player, dealer, false)],
+      ['📌 Your Hand', `${formatCards(player)} — **${pv}**`],
+      ['🃏 Dealer', buildResult(player, dealer, false)],
     ])],
     components: [buttons],
   }).then(() => {
@@ -69,9 +73,9 @@ function playLoop(msg, player, dealer, deck, bet, userId) {
           while (handValue(dealer) < 17) dealer.push(deck.pop());
           await interaction.update({
             embeds: [embed('🃏 Blackjack', [
-              ['Your Hand', `${player.map(cardDisplay).join(' ')} (**${npv}**)`],
-              ['Dealer', `${dealer.map(cardDisplay).join(' ')} (**${handValue(dealer)}**)`],
-              ['Result', `bust — lost **${bet}** ${config.currency}${refund > 0 ? ` (🛡️ **${refund}** refunded)` : ''}`],
+              ['📌 Your Hand', `${formatCards(player)} — **${npv}**`],
+              ['🃏 Dealer', `${formatCards(dealer)} — **${handValue(dealer)}**`],
+              ['💥 Result', `**Bust!** Lost **${bet}** ${config.currency}${refund > 0 ? `\n🛡️ Insurance refund: **${refund}**` : ''}`],
             ], 0xed4245)],
             components: [],
           });
@@ -90,9 +94,9 @@ function playLoop(msg, player, dealer, deck, bet, userId) {
         else { const refund = db.getInsuranceRefund(userId, bet); if (refund > 0) db.addBalance(userId, refund); result = `lost **${bet}** ${config.currency}${refund > 0 ? ` (🛡️ **${refund}** refunded)` : ''}`; color = 0xed4245; db.addBalance(userId, -bet); db.addGambled(userId, bet); }
         await interaction.update({
           embeds: [embed('🃏 Blackjack', [
-            ['Your Hand', `${player.map(cardDisplay).join(' ')} (**${pv2}**)`],
-            ['Dealer', `${dealer.map(cardDisplay).join(' ')} (**${dv}**)`],
-            ['Result', result],
+            ['📌 Your Hand', `${formatCards(player)} — **${pv2}**`],
+            ['🃏 Dealer', `${formatCards(dealer)} — **${dv}**`],
+            ['🎯 Result', result],
           ], color)],
           components: [],
         });
@@ -111,9 +115,9 @@ function playLoop(msg, player, dealer, deck, bet, userId) {
         else { result = `lost **${bet}** ${config.currency}`; color = 0xed4245; db.addBalance(userId, -bet); db.addGambled(userId, bet); }
         await msg.edit({
           embeds: [embed('🃏 Blackjack', [
-            ['Your Hand', `${player.map(cardDisplay).join(' ')} (**${pv2}**)`],
-            ['Dealer', `${dealer.map(cardDisplay).join(' ')} (**${dv}**)`],
-            ['Result', `${result} (timed out)`],
+            ['📌 Your Hand', `${formatCards(player)} — **${pv2}**`],
+            ['🃏 Dealer', `${formatCards(dealer)} — **${dv}**`],
+            ['⏰ Result', `${result} (timed out)`],
           ], color)],
           components: [],
         }).catch(() => {});
@@ -156,14 +160,14 @@ module.exports = {
       while (handValue(dealer) < 17) dealer.push(deck.pop());
       return message.channel.send({
         embeds: [embed('🃏 Blackjack', [
-          ['Your Hand', `${player.map(cardDisplay).join(' ')} (**21**)`],
-          ['Dealer', `${dealer.map(cardDisplay).join(' ')} (**${handValue(dealer)}**)`],
-          ['Result', `blackjack! won **${amount + profit}** (+**${profit}**) ${config.currency}`],
+          ['📌 Your Hand', `${formatCards(player)} — **21** 🎉`],
+          ['🃏 Dealer', `${formatCards(dealer)} — **${handValue(dealer)}**`],
+          ['🎯 Result', `**Blackjack!** Won **${amount + profit}** (+**${profit}**) ${config.currency}`],
         ], 0x57f287)],
       });
     }
 
-    message.channel.send({ embeds: [embed('🃏 Blackjack', [['Loading', 'dealing...']])] }).then(msg => {
+    message.channel.send({ embeds: [embed('🃏 Blackjack', [['♠ Dealing...', ' shuffling cards']])] }).then(msg => {
       playLoop(msg, player, dealer, deck, amount, message.author.id);
     });
   },
