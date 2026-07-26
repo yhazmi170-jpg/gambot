@@ -1,1 +1,1 @@
-v1.1 — bank + loans added! v bank deposit/withdraw/loan
+v1.2 — split logging! Aovo log #channel (shop buys) + Aovo cmdlog #channel (all commands)
