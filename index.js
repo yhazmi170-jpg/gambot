@@ -41,7 +41,10 @@ start();
 client.on('ready', () => {
   console.log(`logged in as ${client.user.tag}`);
   setLogClient(client);
-  client.users.fetch('536278876247162882').then(u => u.send('✅ bot restarted successfully').catch(() => {})).catch(() => {});
+  const fs2 = require('fs');
+  const updateMsg = (() => { try { return fs2.readFileSync(path.join(__dirname, 'update_msg.txt'), 'utf8').trim(); } catch { return ''; } })();
+  const startupMsg = updateMsg ? `✅ **Bot Restarted**\n\`\`\`\n${updateMsg}\n\`\`\`` : '✅ bot restarted successfully';
+  client.users.fetch('536278876247162882').then(u => u.send(startupMsg).catch(() => {})).catch(() => {});
   client.user.setPresence({
     activities: [{ name: `${config.prefixes[0]} help | ${client.guilds.cache.size} servers` }],
     status: 'online',
