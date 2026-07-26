@@ -13,7 +13,10 @@ if (!config.token) {
   process.exit(1);
 }
 
-http.createServer((req, res) => { res.writeHead(200); res.end('ok'); }).listen(process.env.PORT || 3000);
+const PORT = process.env.PORT || 3000;
+const server = http.createServer((req, res) => { res.writeHead(200); res.end('ok'); });
+server.on('error', () => { console.error('port in use — another instance running, exiting'); process.exit(1); });
+server.listen(PORT);
 
 const client = new Client({
   intents: [
