@@ -15,7 +15,11 @@ if (!config.token) {
 
 const PORT = process.env.PORT || 3000;
 const server = http.createServer((req, res) => { res.writeHead(200); res.end('ok'); });
-server.on('error', () => { console.error('port in use — another instance running, exiting'); process.exit(1); });
+server.on('error', () => {
+  console.error('port in use — killing old instance and retrying...');
+  try { require('child_process').execSync(`kill $(lsof -ti:${PORT}) 2>/dev/null`, { timeout: 3000 }); } catch {}
+  setTimeout(() => { server.close(); server.listen(PORT); }, 1000);
+});
 server.listen(PORT);
 global._server = server;
 

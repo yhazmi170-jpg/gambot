@@ -1,1 +1,1 @@
-Bot status now shows version number and /ravine
+Help command cleaned up — rob now requires 1m+ to use — shop purchase logs fixed
