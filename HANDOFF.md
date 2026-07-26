@@ -25,3 +25,5 @@
 - Prefer Run-button deploy; don’t fight Shell + Run + `.gambot.lock`
 - Owner `536278876247162882` is exempt from balance factor and bet cap
 - After any behavior change: bump version, `update_msg.txt`, push, refresh this file + `AGENTS.md`
+- OpenCode Claude Fable adapter installed at `~/.config/opencode/plugins/` + `reference/`
+- Cursor port of that style: `~/.cursor/rules/claude-fable-adapter.mdc` (alwaysApply)
