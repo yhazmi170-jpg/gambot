@@ -1,1 +1,1 @@
-self-service custom role: v customrole name | #color
+v1.1 — bank + loans added! v bank deposit/withdraw/loan
