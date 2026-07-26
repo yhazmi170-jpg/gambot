@@ -45,6 +45,9 @@ async function init() {
   try { db.run(`ALTER TABLE users ADD COLUMN auto_react_emoji TEXT NOT NULL DEFAULT ''`); } catch (e) {}
   try { db.run(`ALTER TABLE users ADD COLUMN badge_emoji TEXT NOT NULL DEFAULT '🏅'`); } catch (e) {}
   try { db.run(`ALTER TABLE users ADD COLUMN lb_emoji TEXT NOT NULL DEFAULT '🌟'`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN bank INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN loan INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN loan_time INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   db.run(`CREATE TABLE IF NOT EXISTS marriages (user_id TEXT PRIMARY KEY, partner_id TEXT NOT NULL, married_at INTEGER NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS adoption (parent_id TEXT, child_id TEXT, PRIMARY KEY (parent_id, child_id))`);
   db.run(`CREATE TABLE IF NOT EXISTS purchases (user_id TEXT, perk TEXT, expires_at INTEGER, PRIMARY KEY (user_id, perk))`);
@@ -113,6 +116,9 @@ function ensureUser(userId) {
       auto_react_emoji: vals[14] || '',
       badge_emoji: vals[15] || '🏅',
       lb_emoji: vals[16] || '🌟',
+      bank: vals[17] || 0,
+      loan: vals[18] || 0,
+      loan_time: vals[19] || 0,
     };
   }
   return null;
@@ -586,6 +592,54 @@ function getAnimalCount(userId) {
   return rows[0].values[0][0];
 }
 
+const LOAN_INTEREST = 0.3;
+const MAX_LOAN_MULT = 2;
+
+function bankDeposit(userId, amount) {
+  const u = ensureUser(userId);
+  if (!u || u.balance < amount) return false;
+  db.run(`UPDATE users SET balance = balance - ${amount}, bank = bank + ${amount} WHERE user_id = '${userId}'`);
+  save();
+  return true;
+}
+
+function bankWithdraw(userId, amount) {
+  const u = ensureUser(userId);
+  if (!u || u.bank < amount) return false;
+  db.run(`UPDATE users SET balance = balance + ${amount}, bank = bank - ${amount} WHERE user_id = '${userId}'`);
+  save();
+  return true;
+}
+
+function takeLoan(userId, amount) {
+  const u = ensureUser(userId);
+  if (!u || u.loan > 0) return null;
+  const maxLoan = Math.floor((u.balance + u.bank) * MAX_LOAN_MULT);
+  const actual = Math.min(amount, maxLoan);
+  if (actual <= 0) return null;
+  const now = Math.floor(Date.now() / 1000);
+  const totalOwed = Math.floor(actual * (1 + LOAN_INTEREST));
+  db.run(`UPDATE users SET balance = balance + ${actual}, loan = ${totalOwed}, loan_time = ${now} WHERE user_id = '${userId}'`);
+  save();
+  return { received: actual, owed: totalOwed, interest: LOAN_INTEREST };
+}
+
+function payLoan(userId, amount) {
+  const u = ensureUser(userId);
+  if (!u || u.loan <= 0) return null;
+  const actual = Math.min(amount, u.balance, u.loan);
+  if (actual <= 0) return null;
+  const remaining = u.loan - actual;
+  if (remaining <= 0) {
+    db.run(`UPDATE users SET balance = balance - ${actual}, loan = 0, loan_time = 0 WHERE user_id = '${userId}'`);
+    save();
+    return { paid: actual, remaining: 0, cleared: true };
+  }
+  db.run(`UPDATE users SET balance = balance - ${actual}, loan = ${remaining} WHERE user_id = '${userId}'`);
+  save();
+  return { paid: actual, remaining, cleared: false };
+}
+
 function setCustomRole(userId, guildId, roleId) {
   db.run(`INSERT OR REPLACE INTO custom_roles (user_id, guild_id, role_id) VALUES ('${userId}', '${guildId}', '${roleId}')`);
   save();
@@ -660,5 +714,6 @@ module.exports = {
   addAnimal, getUserAnimals, getAnimal, removeAnimal, addExp, renameAnimal,
   setTeam, removeFromTeam, getTeam, setHuntCooldown, getHuntCooldown, sellPrice, getAnimalCount,
   setCustomRole, getCustomRole, deleteCustomRole, getPerkHolders,
+  bankDeposit, bankWithdraw, takeLoan, payLoan, LOAN_INTEREST, MAX_LOAN_MULT,
   SPECIES, RARITY_WEIGHTS, RARITY_ORDER, randomRarity, randomSpecies, randomStats, expForLevel,
 };
