@@ -65,6 +65,21 @@ module.exports = {
         db.setUpdateChannel(message.guild.id, '');
         message.channel.send({ embeds: [success('update channel removed')] });
       }
+    } else if (sub === 'pupd' || sub === 'pushupdate') {
+      const fs = require('fs');
+      const path = require('path');
+      const msgPath = path.join(__dirname, '..', 'update_msg.txt');
+      const msg = args.slice(1).join(' ').trim();
+      if (!msg) {
+        let current = '';
+        try { current = fs.readFileSync(msgPath, 'utf8').trim(); } catch {}
+        return message.channel.send({ embeds: [embed('📢 Push Update', [
+          ['Current', current || '(empty)'],
+          ['Set', '`Aovo pupd <message>` to update'],
+        ])] });
+      }
+      fs.writeFileSync(msgPath, msg);
+      message.channel.send({ embeds: [success(`update message set to:\n${msg}`)] });
     } else if (sub === 'addrole') {
       if (!message.guild) return message.channel.send({ embeds: [error('must be in a server')] });
       const roleTarget = message.mentions.users.first();
@@ -85,7 +100,9 @@ module.exports = {
         ['Aovo bal @user', 'check anyones balance'],
         ['Aovo shop add #channel', 'post shop in channel'],
         ['Aovo viprole @role', 'set VIP role for subscribers'],
+        ['Aovo updates #channel', 'set update broadcast channel'],
         ['Aovo addrole @user name | #color', 'create custom role'],
+        ['Aovo pupd <message>', 'view/set push update message'],
       ])] });
     }
   },
