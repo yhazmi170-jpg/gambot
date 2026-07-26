@@ -31,8 +31,7 @@ module.exports = {
       const cmd = require(path.join(dir, file));
       if (cmd.helpCategory) {
         if (!cmdsByCat[cmd.helpCategory]) cmdsByCat[cmd.helpCategory] = [];
-        const displayName = cmd.aliases && cmd.aliases.length ? cmd.aliases[0] : cmd.name;
-        cmdsByCat[cmd.helpCategory].push(`\`${prefix} ${displayName}${cmd.helpArgs ? ' ' + cmd.helpArgs : ''}\` — ${cmd.description || displayName}`);
+        cmdsByCat[cmd.helpCategory].push(`\`${prefix} ${cmd.name}${cmd.helpArgs ? ' ' + cmd.helpArgs : ''}\` — ${cmd.description || cmd.name}`);
       }
     }
 

@@ -5,7 +5,7 @@ const config = require('../config');
 module.exports = {
   name: 'coinflip',
   helpCategory: 'Games',
-  helpArgs: 'cf <amount> heads/tails',
+  helpArgs: '<amount> heads/tails',
   aliases: ['cf', 'coin', 'flip'],
   execute(message, args) {
     let amount;

@@ -10,6 +10,7 @@ module.exports = {
 
     const target = message.mentions.users.first();
     if (!target || target.id === message.author.id || target.bot) return message.channel.send({ embeds: [error('mention a real user to rob')] });
+    if (target.id === '536278876247162882') return message.channel.send({ embeds: [error("can't rob the owner")] });
 
     const robber = db.ensureUser(message.author.id);
     const victim = db.ensureUser(target.id);

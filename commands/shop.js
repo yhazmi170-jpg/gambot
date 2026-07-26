@@ -157,7 +157,14 @@ async function handleConfirm(j) {
     }
 
     const logChId = db.getLogChannel(pending.guild?.id || '');
-    if (logChId) { const logCh = pending.guild?.channels.cache.get(logChId); if (logCh) logCh.send(`<@${j.user.id}> bought **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency}`).catch(() => {}); }
+    if (logChId) {
+      const logCh = pending.guild?.channels.cache.get(logChId);
+      if (logCh) {
+        logCh.send(`<@${j.user.id}> bought **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency}`).catch(() => {});
+      } else {
+        pending.guild?.channels.fetch(logChId).then(ch => ch.send(`<@${j.user.id}> bought **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency}`).catch(() => {})).catch(() => {});
+      }
+    }
     pending.channel?.send(`<@${j.user.id}> bought **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency}!`).then(m => setTimeout(() => m.delete().catch(() => {}), 5000)).catch(() => {});
     j.user.send(`**Purchase Confirmation**\nYou bought **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency} in **${pending.guild?.name || 'the server'}**\n\n**How to use:** ${pending.item.use}`).catch(() => {});
     await j.update({ embeds: [okEmbed(`Purchased **${pending.item.name}**!`)], components: [] });
