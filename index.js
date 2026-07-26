@@ -53,6 +53,13 @@ client.on('ready', () => {
     }
   }, 3600000);
 
+  const crHolders = db.getPerkHolders('custom_role');
+  for (const uid of crHolders) {
+    client.users.fetch(uid).then(u => {
+      u.send('**Custom Role perk updated!**\nYou can now set your role yourself:\n`v customrole name | #hexcolor`\n\nExample: `v customrole Cool Guy | #ff0000`\n\nYour existing role will update, or a new one will be created.').catch(() => {});
+    }).catch(() => {});
+  }
+
   setInterval(() => {
     const ticketUsers = db.getLottery();
     for (const uid of client.users.cache.keys()) {
