@@ -10,5 +10,6 @@ kill $(pgrep -f "node.*index.js") 2>/dev/null
 pkill -9 node 2>/dev/null
 killall -9 node 2>/dev/null
 sleep 3
-echo "starting gambot..."
-node index.js
+echo "workflow is restarting the bot automatically..."
+# Don't start a new instance — let the Replit Run button handle it
+# This prevents duplicate instances (workflow + shell both running)
