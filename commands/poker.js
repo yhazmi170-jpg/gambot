@@ -41,16 +41,16 @@ function evaluateHand(cards) {
 
   const isRoyal = isStraight && isFlush && straightHigh === 14;
 
-  if (isRoyal) return { rank: 9, name: '👑 Royal Flush', payout: 800 };
-  if (isStraight && isFlush) return { rank: 8, name: '🌟 Straight Flush', payout: 50 };
-  if (groups[0][1] === 4) return { rank: 7, name: '🔥 Four of a Kind', payout: 25 };
-  if (groups[0][1] === 3 && groups[1] && groups[1][1] === 2) return { rank: 6, name: '🏠 Full House', payout: 9 };
-  if (isFlush) return { rank: 5, name: '💧 Flush', payout: 6 };
-  if (isStraight) return { rank: 4, name: '📏 Straight', payout: 4 };
-  if (groups[0][1] === 3) return { rank: 3, name: '🔱 Three of a Kind', payout: 3 };
-  if (groups[0][1] === 2 && groups[1] && groups[1][1] === 2) return { rank: 2, name: '✌️ Two Pair', payout: 2 };
-  if (groups[0][1] === 2 && groups[0][0] >= VALUE_RANK['J']) return { rank: 1, name: '👑 Jacks or Better', payout: 1 };
-  return { rank: 0, name: '💀 Nothing', payout: 0 };
+  if (isRoyal) return { rank: 9, name: 'Royal Flush', payout: 800 };
+  if (isStraight && isFlush) return { rank: 8, name: 'Straight Flush', payout: 50 };
+  if (groups[0][1] === 4) return { rank: 7, name: 'Four of a Kind', payout: 25 };
+  if (groups[0][1] === 3 && groups[1] && groups[1][1] === 2) return { rank: 6, name: 'Full House', payout: 9 };
+  if (isFlush) return { rank: 5, name: 'Flush', payout: 6 };
+  if (isStraight) return { rank: 4, name: 'Straight', payout: 4 };
+  if (groups[0][1] === 3) return { rank: 3, name: 'Three of a Kind', payout: 3 };
+  if (groups[0][1] === 2 && groups[1] && groups[1][1] === 2) return { rank: 2, name: 'Two Pair', payout: 2 };
+  if (groups[0][1] === 2 && groups[0][0] >= VALUE_RANK['J']) return { rank: 1, name: 'Jacks or Better', payout: 1 };
+  return { rank: 0, name: 'Nothing', payout: 0 };
 }
 
 module.exports = {
@@ -82,20 +82,19 @@ module.exports = {
     function makeField() {
       const cardsLine = cards.map((c, i) => {
         const tag = cardTag(c);
-        const status = held[i] ? '🔒' : '🔄';
-        return `\`${tag.padEnd(3)}\` ${status}`;
+        return `\`${tag.padEnd(3)}\` ${held[i] ? '**[HOLD]**' : ''}`;
       }).join('  ');
       const labels = cards.map((_, i) => {
         const state = held[i] ? '**HOLD**' : 'DRAW';
         return `\`[${i + 1}]\` ${state}`;
       }).join('  ');
       return `**Bet:** ${amount.toLocaleString()} ${config.currency}\n\n${cardsLine}\n${labels}\n\n` +
-        `*Click card buttons to toggle hold, then press DRAW*\n` +
-        `Payouts: 👑800× 🌟50× 🔥25× 🏠9× 💧6× 📏4× 🔱3× ✌️2× 👑JJ+1×`;
+        `*Click card buttons to toggle hold, then DRAW*\n` +
+        `800× 50× 25× 9× 6× 4× 3× 2× 1× (RF SF 4K FH Fl St 3K 2P JJ+)`;
     }
 
     const btnStyle = (i) => held[i] ? ButtonStyle.Primary : ButtonStyle.Secondary;
-    const btnLabel = (i) => `${i + 1} ${held[i] ? '🔒' : '🔄'}`;
+    const btnLabel = (i) => held[i] ? `HOLD ${i + 1}` : `${i + 1}`;
     function makeButtons() {
       return [
         new ActionRowBuilder().addComponents(
