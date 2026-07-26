@@ -1,1 +1,2 @@
 v1.2.5 — Help filled out for all commands + gamehelp covers poker/blackjack
+v1.2.6 — Acmds admin cmd, shutdown, economy balance factor adjusted, insurance refund in poker/mines, profile perk gate, leaderboard badge
