@@ -58,7 +58,7 @@ function evaluateHand(cards) {
 
 module.exports = {
   name: 'poker',
-  description: 'video poker — try to make the best 5-card hand',
+  description: 'video poker (VIP perk) — hold/draw for payouts',
   helpCategory: 'Games',
   helpArgs: '<amount>',
   aliases: ['videopoker'],

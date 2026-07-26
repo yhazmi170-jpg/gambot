@@ -6,6 +6,7 @@ module.exports = {
   name: 'crash',
   helpCategory: 'Games',
   helpArgs: '<amount> <multiplier>',
+  description: 'cash out before it crashes',
   aliases: ['crsh'],
   execute(message, args) {
     let amount;

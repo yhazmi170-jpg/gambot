@@ -5,6 +5,7 @@ module.exports = {
   name: 'autoreact',
   helpCategory: 'Shop',
   helpArgs: '<emoji>',
+  description: 'set auto-react emoji (requires perk)',
   aliases: ['ar', 'autoreaction'],
   execute(message, args) {
     if (!db.hasPerk(message.author.id, 'auto_react')) {

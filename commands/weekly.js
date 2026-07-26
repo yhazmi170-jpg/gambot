@@ -6,6 +6,7 @@ module.exports = {
   name: 'weekly',
   helpCategory: 'Economy',
   helpArgs: '',
+  description: 'claim weekly reward (high bal = slightly less)',
   aliases: ['week'],
   execute(message, args) {
     const user = db.ensureUser(message.author.id);

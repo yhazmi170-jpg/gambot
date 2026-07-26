@@ -76,6 +76,7 @@ module.exports = {
   name: 'mines',
   helpCategory: 'Games',
   helpArgs: '<amount>',
+  description: 'reveal tiles, avoid mines',
   aliases: ['mine'],
   execute(message, args) {
     let testMode = false;

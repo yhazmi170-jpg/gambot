@@ -183,6 +183,7 @@ module.exports = { buildShop, postShop, handleInteraction,
   name: 'shop',
   helpCategory: 'Shop',
   helpArgs: '',
+  description: 'browse and buy perks',
   aliases: ['store', 'market'],
   execute(message, args) {
     postShop(message.channel);

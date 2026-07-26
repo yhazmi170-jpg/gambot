@@ -1,1 +1,1 @@
-v1.2.4 — Blackjack layout now owo-style (Dealer [10+?], card back, your total)
+v1.2.5 — Help filled out for all commands + gamehelp covers poker/blackjack

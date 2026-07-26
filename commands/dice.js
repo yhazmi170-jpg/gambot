@@ -6,6 +6,7 @@ module.exports = {
   name: 'dice',
   helpCategory: 'Games',
   helpArgs: '<amount> over/under <num>',
+  description: 'over/under dice roll',
   aliases: ['roll', 'diceroll'],
   execute(message, args) {
     let amount;

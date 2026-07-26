@@ -36,6 +36,7 @@ module.exports = {
   name: 'slots',
   helpCategory: 'Games',
   helpArgs: '<amount>',
+  description: 'spin the slots',
   aliases: ['slot', 'spin'],
   async execute(message, args) {
     let amount;

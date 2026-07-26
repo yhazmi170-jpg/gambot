@@ -168,6 +168,7 @@ module.exports = {
   name: 'blackjack',
   helpCategory: 'Games',
   helpArgs: '<amount>',
+  description: 'blackjack — beat the dealer to 21',
   aliases: ['bj', 'twentyone'],
   execute(message, args) {
     let amount;

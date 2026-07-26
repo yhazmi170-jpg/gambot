@@ -8,6 +8,7 @@ module.exports = {
   name: 'lottery',
   helpCategory: 'Games',
   helpArgs: 'buy <amount>',
+  description: 'buy lottery tickets',
   aliases: ['lotto', 'lot'],
   execute(message, args) {
     const sub = (args[0] || '').toLowerCase();

@@ -6,6 +6,7 @@ module.exports = {
   name: 'bank',
   helpCategory: 'Economy',
   helpArgs: '',
+  description: 'deposit, withdraw, or take a loan',
   aliases: ['banking'],
   execute(message, args) {
     const uid = message.author.id;

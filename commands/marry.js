@@ -7,6 +7,7 @@ module.exports = {
   name: 'marry',
   helpCategory: 'Social',
   helpArgs: '<@user>',
+  description: 'marry, adopt, or divorce',
   aliases: ['adopt', 'divorce'],
   execute(message, args) {
     const sub = message.content.split(/\s+/).slice(1)[0] || '';

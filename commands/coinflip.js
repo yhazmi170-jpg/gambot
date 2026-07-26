@@ -6,6 +6,7 @@ module.exports = {
   name: 'coinflip',
   helpCategory: 'Games',
   helpArgs: '<amount> heads/tails',
+  description: '50/50 coinflip',
   aliases: ['cf', 'coin', 'flip'],
   execute(message, args) {
     let amount;

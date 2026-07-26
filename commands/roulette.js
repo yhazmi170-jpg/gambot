@@ -9,6 +9,7 @@ module.exports = {
   name: 'roulette',
   helpCategory: 'Games',
   helpArgs: '<amount> <red/black/green/num>',
+  description: 'spin the roulette wheel',
   aliases: ['roul', 'wheel'],
   execute(message, args) {
     let amount;

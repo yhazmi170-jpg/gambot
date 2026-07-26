@@ -12,6 +12,7 @@ module.exports = {
   name: 'work',
   helpCategory: 'Economy',
   helpArgs: '',
+  description: 'work for money (high bal = slightly less)',
   aliases: ['w'],
   execute(message, args) {
     const user = db.ensureUser(message.author.id);

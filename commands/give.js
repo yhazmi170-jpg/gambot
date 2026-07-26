@@ -7,6 +7,7 @@ module.exports = {
   name: 'give',
   helpCategory: 'Economy',
   helpArgs: '<@user> <amount>',
+  description: 'give money to someone',
   aliases: ['pay', 'share', 'donate'],
   execute(message, args) {
     const target = message.mentions.users.first();

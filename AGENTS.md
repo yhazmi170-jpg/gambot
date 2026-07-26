@@ -75,4 +75,11 @@ bash update.sh
 - `getTop` excludes owner from leaderboard
 - `addBalance` auto-creates users
 - Restore only if DB file is missing/empty (not every restart)
-- **EVERY PUSH (mandatory, do not skip):** bump `package.json` version, update `update_msg.txt` with a user-facing summary, verify new commands have `helpCategory` so they appear in `v help`, update `AGENTS.md` / `HANDOFF.md` if behavior or status changed
+- **EVERY PUSH (mandatory, do not skip):** bump `package.json` version, update `update_msg.txt` with a user-facing summary, verify new commands have `helpCategory` + `description` so they auto-appear in `v help`, update `gamehelp.js` when game rules/UI change, update `AGENTS.md` / `HANDOFF.md` if behavior or status changed
+
+## Help (mandatory)
+- `v help` auto-lists any command with `helpCategory` + `description` (+ optional `helpArgs`)
+- **Always** set/update those fields when adding or changing a user-facing command
+- **Always** update `commands/gamehelp.js` when a game’s rules, layout, or perks change (include aliases)
+- Perk-only commands: add a line to `perkCmdMap` in `help.js` when relevant
+- After help-related changes, mention it briefly in `update_msg.txt` if user-visible
