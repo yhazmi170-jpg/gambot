@@ -19,7 +19,9 @@ function createDeck() {
   return deck;
 }
 
-function cardTag(c) { return `${c.value}${c.suit}`; }
+const SUIT_BASE = { '♠': 0x1F0A0, '♥': 0x1F0B0, '♦': 0x1F0C0, '♣': 0x1F0D0 };
+const VAL_OFF = { 'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13 };
+function cardEmoji(c) { return String.fromCodePoint(SUIT_BASE[c.suit] + VAL_OFF[c.value]); }
 
 function evaluateHand(cards) {
   const values = cards.map(c => VALUE_RANK[c.value]).sort((a, b) => b - a);
@@ -81,20 +83,13 @@ module.exports = {
 
     function makeField() {
       const cardsLine = cards.map((c, i) => {
-        const tag = cardTag(c);
-        return `\`${tag.padEnd(3)}\` ${held[i] ? '**[HOLD]**' : ''}`;
+        return `${cardEmoji(c)}${held[i] ? ' `HOLD`' : ''}`;
       }).join('  ');
-      const labels = cards.map((_, i) => {
-        const state = held[i] ? '**HOLD**' : 'DRAW';
-        return `\`[${i + 1}]\` ${state}`;
-      }).join('  ');
-      return `**Bet:** ${amount.toLocaleString()} ${config.currency}\n\n${cardsLine}\n${labels}\n\n` +
-        `*Click card buttons to toggle hold, then DRAW*\n` +
-        `800× 50× 25× 9× 6× 4× 3× 2× 1× (RF SF 4K FH Fl St 3K 2P JJ+)`;
+      return `${cardsLine}\n**Bet:** ${amount.toLocaleString()} ${config.currency}\n\n800× 50× 25× 9× 6× 4× 3× 2× 1×`;
     }
 
     const btnStyle = (i) => held[i] ? ButtonStyle.Primary : ButtonStyle.Secondary;
-    const btnLabel = (i) => held[i] ? `HOLD ${i + 1}` : `${i + 1}`;
+    const btnLabel = (i) => `${i + 1}`;
     function makeButtons() {
       return [
         new ActionRowBuilder().addComponents(
@@ -102,7 +97,7 @@ module.exports = {
             .setCustomId(`ph_${i}`).setLabel(btnLabel(i)).setStyle(btnStyle(i)))
         ),
         new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId('pd').setLabel('🃏 DRAW').setStyle(ButtonStyle.Success)
+          new ButtonBuilder().setCustomId('pd').setLabel('DRAW').setStyle(ButtonStyle.Success)
         ),
       ];
     }
