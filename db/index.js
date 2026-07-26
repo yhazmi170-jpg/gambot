@@ -74,6 +74,12 @@ async function init() {
     user_id TEXT PRIMARY KEY,
     last_hunt INTEGER NOT NULL DEFAULT 0
   )`);
+  db.run(`CREATE TABLE IF NOT EXISTS custom_roles (
+    user_id TEXT NOT NULL,
+    guild_id TEXT NOT NULL,
+    role_id TEXT NOT NULL,
+    PRIMARY KEY (user_id, guild_id)
+  )`);
   save();
 }
 
@@ -580,6 +586,28 @@ function getAnimalCount(userId) {
   return rows[0].values[0][0];
 }
 
+function setCustomRole(userId, guildId, roleId) {
+  db.run(`INSERT OR REPLACE INTO custom_roles (user_id, guild_id, role_id) VALUES ('${userId}', '${guildId}', '${roleId}')`);
+  save();
+}
+
+function getCustomRole(userId, guildId) {
+  const rows = db.exec(`SELECT role_id FROM custom_roles WHERE user_id = '${userId}' AND guild_id = '${guildId}'`);
+  if (!rows.length || !rows[0].values.length) return null;
+  return rows[0].values[0][0];
+}
+
+function deleteCustomRole(userId, guildId) {
+  db.run(`DELETE FROM custom_roles WHERE user_id = '${userId}' AND guild_id = '${guildId}'`);
+  save();
+}
+
+function getPerkHolders(perk) {
+  const rows = db.exec(`SELECT user_id FROM purchases WHERE perk = '${perk}'`);
+  if (!rows.length) return [];
+  return rows[0].values.map(v => v[0]);
+}
+
 module.exports = {
   init,
   ensureUser,
@@ -631,5 +659,6 @@ module.exports = {
   START_BALANCE,
   addAnimal, getUserAnimals, getAnimal, removeAnimal, addExp, renameAnimal,
   setTeam, removeFromTeam, getTeam, setHuntCooldown, getHuntCooldown, sellPrice, getAnimalCount,
+  setCustomRole, getCustomRole, deleteCustomRole, getPerkHolders,
   SPECIES, RARITY_WEIGHTS, RARITY_ORDER, randomRarity, randomSpecies, randomStats, expForLevel,
 };

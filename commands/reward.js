@@ -13,7 +13,7 @@ module.exports = {
     const perk = args[1];
     if (!target || !perk) return message.channel.send({ embeds: [error('usage: Areward @user <perk_name>')] });
 
-    const validPerks = ['auto_react', 'colored_lb', 'daily_cap', 'bet_cap', 'vip_role_sub', 'sponsored_footer', 'lottery_ticket', 'rain'];
+    const validPerks = ['auto_react', 'colored_lb', 'daily_cap', 'bet_cap', 'vip_role_sub', 'sponsored_footer', 'lottery_ticket', 'rain', 'custom_role'];
     if (!validPerks.includes(perk)) return message.channel.send({ embeds: [error(`invalid perk. valid: ${validPerks.join(', ')}`)] });
 
     const duration = args[2] ? parseInt(args[2]) : 0;

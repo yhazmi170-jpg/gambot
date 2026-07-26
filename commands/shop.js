@@ -7,7 +7,7 @@ const SHOP = [
   {
     category: 'ONE-TIME PURCHASES',
     items: [
-      { id: 'custom_role', name: 'Custom Role (name + color)', price: 500000, desc: 'create a custom-named role with your color', use: 'DM the bot admin for your custom role name/color' },
+      { id: 'custom_role', name: 'Custom Role (name + color)', price: 500000, desc: 'create a custom-named role with your color', use: 'Use v customrole name | #hexcolor to set it yourself' },
       { id: 'rob', name: 'v rob @user ability', price: 5000000, desc: '50% steal 50% of target / 50% lose 50% of yours', use: 'Use v rob @user to attempt a robbery' },
       { id: 'double_work', name: 'Double work payout (perm)', price: 2000000, desc: 'permanently earn 2x from v work', use: 'Just use v work — it pays double automatically' },
       { id: 'bet_cap', name: 'Higher bet cap (500k)', price: 750000, desc: 'all-in up to 500k instead of 250k', use: 'Use v <game> all to bet up to 500k' },
