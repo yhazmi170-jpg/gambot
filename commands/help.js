@@ -23,6 +23,7 @@ module.exports = {
     const sections = [
       ['Economy', [
         `\`${prefix} bal\` — check balance`,
+        `\`${prefix} bank\` — deposit/withdraw/loans`,
         `\`${prefix} daily\` — daily reward`,
         `\`${prefix} weekly\` — weekly reward`,
         `\`${prefix} work\` — earn money`,
@@ -38,11 +39,28 @@ module.exports = {
         `\`${prefix} mines <amount>\` — mines`,
         `\`${prefix} crash <amount> <multiplier>\` — crash`,
         `\`${prefix} lottery buy <amount>\` — lottery`,
+        `\`${prefix} gamehelp <game>\` — rules & tips`,
+      ].join('\n')],
+      ['Pets', [
+        `\`${prefix} hunt\` — hunt for animals`,
+        `\`${prefix} zoo\` — view your animals`,
+        `\`${prefix} team <slot> <id>\` — set battle team`,
+        `\`${prefix} battle <@user>\` — battle pets`,
+        `\`${prefix} sell <id>\` — sell an animal`,
+        `\`${prefix} rename <id> <name>\` — rename pet`,
       ].join('\n')],
       ['Social', [
         `\`${prefix} marry <@user>\` — propose marriage`,
         `\`${prefix} divorce\` — divorce`,
         `\`${prefix} adopt <@user>\` — adopt a child`,
+      ].join('\n')],
+      ['Shop', [
+        `\`${prefix} shop\` — browse the shop`,
+        `\`${prefix} autoreact <emoji>\` — auto-react emoji`,
+        `\`${prefix} customrole name | #color\` — set custom role`,
+        `\`${prefix} deleterole\` — delete custom role`,
+        `\`${prefix} setbadge <emoji>\` — badge on profile`,
+        `\`${prefix} setlb <emoji>\` — leaderboard emoji`,
       ].join('\n')],
     ];
 
