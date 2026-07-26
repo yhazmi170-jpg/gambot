@@ -75,6 +75,12 @@ module.exports = {
         db.setUpdateChannel(message.guild.id, '');
         message.channel.send({ embeds: [success('update channel removed')] });
       }
+    } else if (sub === 'restart') {
+      const { execSync } = require('child_process');
+      message.channel.send({ embeds: [success('pulling latest + restarting...')] }).then(() => {
+        try { execSync('git pull origin master', { stdio: 'pipe', timeout: 15000 }); } catch {}
+        process.exit(0);
+      });
     } else if (sub === 'pupd' || sub === 'pushupdate') {
       const fs = require('fs');
       const path = require('path');
