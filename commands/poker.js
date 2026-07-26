@@ -110,7 +110,7 @@ module.exports = {
 
     const color = 0x2b2d31;
     message.channel.send({
-      embeds: [embed('🃏 Video Poker', [['', makeField()] + (false ? '' : '')], color)],
+      embeds: [embed('🃏 Video Poker', [['', makeField()]], color)],
       components: makeButtons(),
     }).then(msg => {
       const filter = i => i.user.id === uid && (i.customId === 'pd' || i.customId.startsWith('ph_'));
