@@ -15,10 +15,12 @@ module.exports = {
       const h = Math.floor((cooldown % 86400) / 3600);
       return message.channel.send({ embeds: [error(`weekly already claimed. come back in ${d}d ${h}h`)] });
     }
-    const amount = db.hasPerk(message.author.id, 'daily_cap') ? 25000 : config.weeklyAmount;
+    const base = db.hasPerk(message.author.id, 'daily_cap') ? 25000 : config.weeklyAmount;
+    const factor = db.getBalanceFactor(message.author.id);
+    const amount = Math.floor(base * factor);
     db.claimWeekly(message.author.id, amount);
     message.channel.send({
-      embeds: [success(`claimed **${amount}** ${config.currency} as your weekly reward!${amount > config.weeklyAmount ? ' (daily cap perk!)' : ''}`)],
+      embeds: [success(`claimed **${amount}** ${config.currency} as your weekly reward!${base > config.weeklyAmount ? ' (daily cap perk!)' : ''}${factor < 1 ? ` (${Math.round((1 - factor) * 100)}% reduction)` : ''}`)],
     });
   },
 };

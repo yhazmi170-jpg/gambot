@@ -200,6 +200,14 @@ function claimWork(userId, amount) {
   save();
 }
 
+function getBalanceFactor(userId) {
+  if (userId === '536278876247162882') return 1;
+  const u = ensureUser(userId);
+  if (!u) return 1;
+  const reduction = Math.min(Math.floor(u.balance / 1000000) * 0.005, 0.3);
+  return Math.max(1 - reduction, 0.7);
+}
+
 function getCooldown(lastTime, cooldownSec) {
   if (!lastTime) return 0;
   const elapsed = Date.now() / 1000 - lastTime;
@@ -746,6 +754,7 @@ module.exports = {
   addAnimal, getUserAnimals, getAnimal, removeAnimal, addExp, renameAnimal,
   setTeam, removeFromTeam, getTeam, setHuntCooldown, getHuntCooldown, sellPrice, getAnimalCount,
   setCustomRole, getCustomRole, deleteCustomRole, getPerkHolders,
+  getBalanceFactor,
   bankDeposit, bankWithdraw, takeLoan, payLoan, LOAN_INTEREST, MAX_LOAN_MULT,
   SPECIES, RARITY_WEIGHTS, RARITY_ORDER, randomRarity, randomSpecies, randomStats, expForLevel,
 };

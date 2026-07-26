@@ -23,11 +23,12 @@ module.exports = {
     }
     const base = Math.floor(Math.random() * (config.workMax - config.workMin + 1)) + config.workMin;
     const doubled = db.hasPerk(message.author.id, 'double_work');
-    const amount = doubled ? base * 2 : base;
+    const factor = db.getBalanceFactor(message.author.id);
+    const amount = Math.floor((doubled ? base * 2 : base) * factor);
     const job = jobs[Math.floor(Math.random() * jobs.length)];
     db.claimWork(message.author.id, amount);
     message.channel.send({
-      embeds: [success(`you worked **${job}** and earned **${amount}** ${config.currency}${doubled ? ' (2x perk!)' : ''}`)],
+      embeds: [success(`you worked **${job}** and earned **${amount}** ${config.currency}${doubled ? ' (2x perk!)' : ''}${factor < 1 ? ` (${Math.round((1 - factor) * 100)}% reduction)` : ''}`)],
     });
   },
 };
