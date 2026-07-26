@@ -10,5 +10,4 @@ kill $(pgrep -f "node.*index.js") 2>/dev/null
 pkill -9 node 2>/dev/null
 killall -9 node 2>/dev/null
 sleep 3
-echo "starting gambot..."
-node index.js
+echo "workflow will restart the bot automatically"
