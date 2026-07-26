@@ -1,1 +1,1 @@
-v1.1.2 — help auto-builds from commands + split logging (Aovo log + Aovo cmdlog)
+Updated help command — `v help` now shows all commands organized by category (Economy, Games, Pets, Social, Shop)

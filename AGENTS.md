@@ -33,3 +33,4 @@
 - `getTop` excludes owner from leaderboard
 - `addBalance` auto-creates users
 - Restore only happens if DB file is missing/empty (not on every restart)
+- **Every push**: update `update_msg.txt` with a user-facing summary (what members see), bump `package.json` version, and make sure `v help` shows new commands automatically via `helpCategory` field
