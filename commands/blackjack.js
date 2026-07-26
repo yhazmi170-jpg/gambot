@@ -89,7 +89,7 @@ function playLoop(msg, player, dealer, deck, bet, userId) {
         const pv2 = handValue(player);
         const isLucky = db.ensureUser(userId).lucky;
         let result, color;
-        if (dv > 21 || pv2 > dv) { const profit = bet * (isLucky ? 3 : 1); result = `won **${bet + profit}** (+**${profit}**) ${config.currency}`; color = 0x57f287; db.addBalance(userId, profit); db.addWon(userId, profit); }
+        if (dv > 21 || pv2 > dv) { const paid = db.payWin(userId, bet * (isLucky ? 3 : 1)); result = `won **${bet + paid}** (+**${paid}**) ${config.currency}`; color = 0x57f287; }
         else if (pv2 === dv) { result = `tie — **${bet}** returned`; color = 0xfee75c; }
         else { const refund = db.getInsuranceRefund(userId, bet); if (refund > 0) db.addBalance(userId, refund); result = `lost **${bet}** ${config.currency}${refund > 0 ? ` (🛡️ **${refund}** refunded)` : ''}`; color = 0xed4245; db.addBalance(userId, -bet); db.addGambled(userId, bet); }
         await interaction.update({
@@ -110,7 +110,7 @@ function playLoop(msg, player, dealer, deck, bet, userId) {
         const pv2 = handValue(player);
         const isLucky = db.ensureUser(userId).lucky;
         let result, color;
-        if (dv > 21 || pv2 > dv) { const profit = bet * (isLucky ? 3 : 1); result = `won **${bet + profit}** (+**${profit}**) ${config.currency}`; color = 0x57f287; db.addBalance(userId, profit); db.addWon(userId, profit); }
+        if (dv > 21 || pv2 > dv) { const paid = db.payWin(userId, bet * (isLucky ? 3 : 1)); result = `won **${bet + paid}** (+**${paid}**) ${config.currency}`; color = 0x57f287; }
         else if (pv2 === dv) { result = `tie — **${bet}** returned`; color = 0xfee75c; }
         else { result = `lost **${bet}** ${config.currency}`; color = 0xed4245; db.addBalance(userId, -bet); db.addGambled(userId, bet); }
         await msg.edit({
@@ -156,15 +156,13 @@ module.exports = {
 
     const pv = handValue(player);
     if (pv === 21) {
-      const profit = amount * (lucky ? 3 : 1);
-      db.addBalance(message.author.id, profit);
-      db.addWon(message.author.id, profit);
+      const paid = db.payWin(message.author.id, amount * (lucky ? 3 : 1));
       while (handValue(dealer) < 17) dealer.push(deck.pop());
       return message.channel.send({
         embeds: [embed('🃏 Blackjack', [
           ['Your Hand', `${formatCards(player)}\n**Total:** 21 🎉`],
           ['Dealer', `${formatCards(dealer)}\n**Total:** ${handValue(dealer)}`],
-          ['Result', `**Blackjack!** Won **${amount + profit}** (+**${profit}**) ${config.currency}`],
+          ['Result', `**Blackjack!** Won **${amount + paid}** (+**${paid}**) ${config.currency}`],
         ], 0x57f287)],
       });
     }

@@ -132,8 +132,7 @@ client.on('ready', () => {
     const pot = total * 10;
     const prize = Math.floor(pot * config.lotteryCut);
 
-    db.addBalance(winner.user_id, prize);
-    db.addWon(winner.user_id, prize);
+    const paid = db.payWin(winner.user_id, prize);
     db.resetLottery();
 
     const channel = client.channels.cache.find(c => c.name?.includes('lottery') || c.name?.includes('general'));
@@ -141,7 +140,7 @@ client.on('ready', () => {
       channel.send({
         embeds: [embed('🎟️ Lottery Winner', [
           ['Winner', `<@${winner.user_id}>`],
-          ['Prize', `**${prize}** ${config.currency}`],
+          ['Prize', `**${paid}** ${config.currency}`],
           ['Total Pot', `**${pot}** ${config.currency}`],
         ], 0xfee75c)],
       });

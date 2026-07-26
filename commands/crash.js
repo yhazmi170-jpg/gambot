@@ -33,9 +33,8 @@ module.exports = {
     const net = payout - amount;
 
     if (win) {
-      db.addBalance(message.author.id, net);
-      db.addWon(message.author.id, payout);
-      message.channel.send(`📈 crashed at **${crashPoint.toFixed(2)}x** — cashed out at **${target}x** for **${payout}** (+**${net}**)`);
+      const paid = db.payWin(message.author.id, net);
+      message.channel.send(`📈 crashed at **${crashPoint.toFixed(2)}x** — cashed out at **${target}x** for **${amount + paid}** (+**${paid}**)`);
     } else {
       db.addBalance(message.author.id, -amount);
       db.addGambled(message.author.id, amount);

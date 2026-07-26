@@ -120,8 +120,9 @@ module.exports = {
         if (i.customId === 'm_cash') {
           game.active = false; activeGames.delete(message.author.id);
           const p = Math.floor(game.bet * mult(game.revealed.size, game.bombCount, game.lucky));
-          if (!game.testMode) { db.addBalance(message.author.id, p); db.addWon(message.author.id, p); }
-          return i.update({ components: [new ContainerBuilder().setAccentColor(0x57f287).addTextDisplayComponents(new TextDisplayBuilder().setContent(`${game.testMode ? '🧪' : '💣'} Mines  |  Cashed Out${game.testMode ? ' [TEST]' : ''}\n\n**${p.toLocaleString()}** ${config.currency} (+**${p - game.bet}**)`))], flags: MessageFlags.IsComponentsV2 });
+          const paid = game.testMode ? (p - game.bet) : db.payWin(message.author.id, p - game.bet, game.bet);
+          const total = game.bet + paid;
+          return i.update({ components: [new ContainerBuilder().setAccentColor(0x57f287).addTextDisplayComponents(new TextDisplayBuilder().setContent(`${game.testMode ? '🧪' : '💣'} Mines  |  Cashed Out${game.testMode ? ' [TEST]' : ''}\n\n**${total.toLocaleString()}** ${config.currency} (+**${paid}**)`))], flags: MessageFlags.IsComponentsV2 });
         }
         const idx = parseInt(i.customId.split('_')[1]);
         if (game.revealed.has(idx)) { await i.deferUpdate().catch(() => {}); return; }
@@ -135,9 +136,10 @@ module.exports = {
         if (rc >= ROWS * COLS - game.bombCount) {
           game.active = false; activeGames.delete(message.author.id);
           const p = Math.floor(game.bet * mult(rc, game.bombCount, game.lucky));
-          if (!game.testMode) { db.addBalance(message.author.id, p); db.addWon(message.author.id, p); }
+          const paid = game.testMode ? (p - game.bet) : db.payWin(message.author.id, p - game.bet, game.bet);
+          const total = game.bet + paid;
           for (let j = 0; j < ROWS * COLS; j++) game.revealed.add(j);
-          return i.update({ components: [new ContainerBuilder().setAccentColor(0x57f287).addTextDisplayComponents(new TextDisplayBuilder().setContent(`${game.testMode ? '🧪' : '💣'} Mines  |  All Cleared!${game.testMode ? ' [TEST]' : ''}\n\n**${p.toLocaleString()}** ${config.currency} (+**${p - game.bet}**)${game.testMode ? ' (no money gained)' : ''}`)).addActionRowComponents(...buildButtons(game))], flags: MessageFlags.IsComponentsV2 });
+          return i.update({ components: [new ContainerBuilder().setAccentColor(0x57f287).addTextDisplayComponents(new TextDisplayBuilder().setContent(`${game.testMode ? '🧪' : '💣'} Mines  |  All Cleared!${game.testMode ? ' [TEST]' : ''}\n\n**${total.toLocaleString()}** ${config.currency} (+**${paid}**)${game.testMode ? ' (no money gained)' : ''}`)).addActionRowComponents(...buildButtons(game))], flags: MessageFlags.IsComponentsV2 });
         }
         i.update({ components: [buildContainer(game)], flags: MessageFlags.IsComponentsV2 }).catch(() => {});
       });

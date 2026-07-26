@@ -50,9 +50,8 @@ module.exports = {
     else if (!isNaN(parseInt(bet)) && parseInt(bet) === result) { won = true; payout = amount * 36 * mult; }
 
     if (won) {
-      db.addBalance(message.author.id, payout);
-      db.addWon(message.author.id, payout);
-      message.channel.send(`🎡 **${result}** ${emoji} — won **${payout}** (+**${payout - amount}**)`);
+      const paid = db.payWin(message.author.id, payout);
+      message.channel.send(`🎡 **${result}** ${emoji} — won **${paid}** (+**${Math.max(0, paid - amount)}**)`);
     } else {
       db.addBalance(message.author.id, -amount);
       db.addGambled(message.author.id, amount);

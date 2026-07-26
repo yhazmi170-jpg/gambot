@@ -116,8 +116,8 @@ module.exports = {
         let line;
         if (result.payout > 1) {
           const profit = amount * result.payout - amount;
-          db.addBalance(uid, profit); db.addWon(uid, profit);
-          line = `**${result.name}!** 🎉 Won **${(amount * result.payout).toLocaleString()}** ${config.currency} (+**${profit.toLocaleString()}**)`;
+          const paid = db.payWin(uid, profit);
+          line = `**${result.name}!** Won **${(amount + paid).toLocaleString()}** ${config.currency} (+**${paid.toLocaleString()}**)`;
         } else if (result.payout === 1) {
           line = `**Jacks or Better!** — push (bet returned)`;
         } else {

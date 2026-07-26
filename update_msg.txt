@@ -1,1 +1,1 @@
-v1.2.1 — Shop perks cost a bit more across the board
+v1.2.2 — High balances now get slightly smaller gambling wins too (same curve as daily/work)

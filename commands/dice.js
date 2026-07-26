@@ -45,9 +45,8 @@ module.exports = {
     if (win) {
       const mult = lucky ? 98 * 3 / (isOver ? (100 - num) : (num - 1)) : 98 / (isOver ? (100 - num) : (num - 1));
       const payout = Math.floor(amount * mult);
-      db.addBalance(message.author.id, payout);
-      db.addWon(message.author.id, payout);
-      message.channel.send(`🎲 **${roll}** — won **${payout}** (bet **${amount}** → ${mult.toFixed(2)}x)`);
+      const paid = db.payWin(message.author.id, payout);
+      message.channel.send(`🎲 **${roll}** — won **${paid}** (bet **${amount}** → ${mult.toFixed(2)}x)`);
     } else {
       db.addBalance(message.author.id, -amount);
       db.addGambled(message.author.id, amount);

@@ -62,8 +62,7 @@ module.exports = {
 
     if (winner) {
       const reward = 50 + myPets.length * 10;
-      db.addBalance(winner.id, reward);
-      db.addWon(winner.id, reward);
+      db.payWin(winner.id, reward);
 
       // add exp to surviving pets
       for (const pet of myPets) {

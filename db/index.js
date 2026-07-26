@@ -208,6 +208,15 @@ function getBalanceFactor(userId) {
   return Math.max(1 - reduction, 0.7);
 }
 
+/** Credit a gambling win: scales profit by balance factor. Optional stakeReturn (e.g. mines prepaid bet). Returns adjusted profit paid. */
+function payWin(userId, profit, stakeReturn = 0) {
+  const paid = profit > 0 ? Math.floor(profit * getBalanceFactor(userId)) : 0;
+  const credit = stakeReturn + paid;
+  if (credit > 0) addBalance(userId, credit);
+  if (paid > 0) addWon(userId, paid);
+  return paid;
+}
+
 function getCooldown(lastTime, cooldownSec) {
   if (!lastTime) return 0;
   const elapsed = Date.now() / 1000 - lastTime;
@@ -755,6 +764,7 @@ module.exports = {
   setTeam, removeFromTeam, getTeam, setHuntCooldown, getHuntCooldown, sellPrice, getAnimalCount,
   setCustomRole, getCustomRole, deleteCustomRole, getPerkHolders,
   getBalanceFactor,
+  payWin,
   bankDeposit, bankWithdraw, takeLoan, payLoan, LOAN_INTEREST, MAX_LOAN_MULT,
   SPECIES, RARITY_WEIGHTS, RARITY_ORDER, randomRarity, randomSpecies, randomStats, expForLevel,
 };

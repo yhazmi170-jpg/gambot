@@ -87,13 +87,12 @@ module.exports = {
 
     if (winnings > 0) {
       const net = winnings - amount;
-      db.addBalance(message.author.id, net);
-      db.addWon(message.author.id, net);
+      const paid = db.payWin(message.author.id, net);
       await msg.edit({
         embeds: [embed('🎰 Slots', [
           ['___SLOTS___', `\`\`\`${slotLine(reels, 3)}\`\`\``],
           ['bet', `${amount} ${config.currency}`],
-          ['payout', `**${winnings}** ${config.currency} (+**${net}**)`],
+          ['payout', `**${amount + paid}** ${config.currency} (+**${paid}**)`],
         ], 0x57f287)],
       });
     } else {

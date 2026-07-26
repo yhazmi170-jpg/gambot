@@ -34,9 +34,8 @@ module.exports = {
 
     if (win) {
       const profit = amount * mult;
-      db.addBalance(message.author.id, profit);
-      db.addWon(message.author.id, profit);
-      message.channel.send(`🪙 **${result}** — won **${amount + profit}** (+**${profit}**)`);
+      const paid = db.payWin(message.author.id, profit);
+      message.channel.send(`🪙 **${result}** — won **${amount + paid}** (+**${paid}**)`);
     } else {
       db.addBalance(message.author.id, -amount);
       db.addGambled(message.author.id, amount);
