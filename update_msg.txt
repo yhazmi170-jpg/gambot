@@ -1,1 +1,1 @@
-Fixed `Arestart` — bot now pulls latest code and restarts from Discord, then DMs the owner when back online
+Bot status now shows version number and /ravine
