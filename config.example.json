@@ -13,5 +13,6 @@
   "startBalance": 1000,
   "lotteryInterval": 3600000,
   "lotteryCut": 0.8,
-  "github_token": ""
+  "github_token": "",
+  "cardEmojis": {}
 }

@@ -1,1 +1,1 @@
-v1.2.3 — Poker/blackjack cards now use Discord suit emojis (looks clean)
+v1.2.4 — Blackjack layout now owo-style (Dealer [10+?], card back, your total)

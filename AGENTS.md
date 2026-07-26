@@ -38,8 +38,9 @@
 - Perks were bumped ~35% in v1.2.1 — adjust there if changing again
 
 ## Cards / UI
-- Poker + blackjack use Discord suit emojis (`♠️♥️♦️♣️`) + rank text — not Unicode playing-card glyphs
-- Poker hold buttons show rank + suit emoji
+- Blackjack uses owo-style board: `Dealer [10+?]` + card back, `Name [19]` + cards (description embed, not field grid)
+- Optional custom card art: `config.cardEmojis` map keys like `ah`, `10s`, `jh`, `cardback` → `<:name:id>`
+- Poker uses Discord suit emojis + rank; hold buttons show the card
 - Keep game text clean — no AI-sounding fluff
 
 ## Replit / single instance

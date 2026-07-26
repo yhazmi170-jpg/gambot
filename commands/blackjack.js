@@ -1,7 +1,11 @@
 const db = require('../db');
-const { embed, error, parseAmount } = require('../utils/embed');
+const { error, parseAmount, getSponsored } = require('../utils/embed');
 const config = require('../config');
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+
+const CARDBACK = '🎴';
+const SUIT_EMOJI = { '♠': '♠️', '♥': '♥️', '♦': '♦️', '♣': '♣️' };
+const SUIT_CODE = { '♠': 's', '♥': 'h', '♦': 'd', '♣': 'c' };
 
 function createDeck() {
   const suits = ['♠', '♥', '♦', '♣'];
@@ -30,33 +34,53 @@ function handValue(hand) {
   return val;
 }
 
-const SUIT_EMOJI = { '♠': '♠️', '♥': '♥️', '♦': '♦️', '♣': '♣️' };
+/** Prefer custom server emojis from config.cardEmojis if set (owo-style :jh:), else Discord suits. */
 function cardLabel(c) {
-  return `**${c.value}**${SUIT_EMOJI[c.suit]}`;
+  const key = `${c.value === '10' ? '10' : c.value.toLowerCase()}${SUIT_CODE[c.suit]}`;
+  const custom = config.cardEmojis && (config.cardEmojis[key] || config.cardEmojis[key.toUpperCase()]);
+  if (custom) return custom;
+  return `${c.value}${SUIT_EMOJI[c.suit]}`;
 }
 
 function formatCards(cards) {
-  return cards.map(c => cardLabel(c)).join('  ');
+  return cards.map(c => cardLabel(c)).join(' ');
 }
 
-function buildResult(player, dealer, revealDealer) {
-  return revealDealer
-    ? `${formatCards(dealer)}  **${handValue(dealer)}**`
-    : `${cardLabel(dealer[0])} ?  **?**`;
+function cardBack() {
+  return (config.cardEmojis && config.cardEmojis.cardback) || CARDBACK;
 }
 
-function playLoop(msg, player, dealer, deck, bet, userId) {
-  const pv = handValue(player);
+function bjEmbed(description, color = 0x2b2d31) {
+  const e = new EmbedBuilder().setColor(color).setDescription(description);
+  const sponsored = getSponsored();
+  if (sponsored) e.setFooter({ text: `Sponsored by @${sponsored}` });
+  return e;
+}
+
+function board({ name, player, dealer, reveal, bet, result }) {
+  const lines = [];
+  if (bet != null) lines.push(`you bet **${bet.toLocaleString()}** to play blackjack`, '');
+
+  if (reveal) {
+    lines.push(`**Dealer** [${handValue(dealer)}]`, formatCards(dealer));
+  } else {
+    const up = String(cardValue(dealer[0]));
+    lines.push(`**Dealer** [${up}+?]`, `${cardLabel(dealer[0])} ${cardBack()}`);
+  }
+
+  lines.push('', `**${name}** [${handValue(player)}]`, formatCards(player));
+  if (result) lines.push('', result);
+  return lines.join('\n');
+}
+
+function playLoop(msg, player, dealer, deck, bet, userId, name) {
   const buttons = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('bj_hit').setLabel('Hit').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('bj_stand').setLabel('Stand').setStyle(ButtonStyle.Danger),
   );
 
   msg.edit({
-    embeds: [embed('🃏 Blackjack', [
-      ['Your Hand', `${formatCards(player)}\n**Total:** ${pv}`],
-      ['Dealer', `${cardLabel(dealer[0])} ?\n**Total:** ?`],
-    ], 0x2b2d31)],
+    embeds: [bjEmbed(board({ name, player, dealer, reveal: false, bet }))],
     components: [buttons],
   }).then(() => {
     const filter = i => i.user.id === userId && (i.customId === 'bj_hit' || i.customId === 'bj_stand');
@@ -73,32 +97,39 @@ function playLoop(msg, player, dealer, deck, bet, userId) {
           if (refund > 0) db.addBalance(userId, refund);
           while (handValue(dealer) < 17) dealer.push(deck.pop());
           await interaction.update({
-            embeds: [embed('🃏 Blackjack', [
-              ['Your Hand', `${formatCards(player)}\n**Total:** ${npv} 💥`],
-              ['Dealer', `${formatCards(dealer)}\n**Total:** ${handValue(dealer)}`],
-              ['Result', `**Bust!** Lost **${bet}** ${config.currency}${refund > 0 ? `\n🛡️ Insurance refund: **${refund}**` : ''}`],
-            ], 0xed4245)],
+            embeds: [bjEmbed(board({
+              name, player, dealer, reveal: true, bet,
+              result: `bust — lost **${bet.toLocaleString()}**${refund > 0 ? ` (refund **${refund}**)` : ''}`,
+            }), 0xed4245)],
             components: [],
           });
           return;
         }
         await interaction.deferUpdate();
-        playLoop(msg, player, dealer, deck, bet, userId);
+        playLoop(msg, player, dealer, deck, bet, userId, name);
       } else {
         while (handValue(dealer) < 17) dealer.push(deck.pop());
         const dv = handValue(dealer);
         const pv2 = handValue(player);
         const isLucky = db.ensureUser(userId).lucky;
         let result, color;
-        if (dv > 21 || pv2 > dv) { const paid = db.payWin(userId, bet * (isLucky ? 3 : 1)); result = `won **${bet + paid}** (+**${paid}**) ${config.currency}`; color = 0x57f287; }
-        else if (pv2 === dv) { result = `tie — **${bet}** returned`; color = 0xfee75c; }
-        else { const refund = db.getInsuranceRefund(userId, bet); if (refund > 0) db.addBalance(userId, refund); result = `lost **${bet}** ${config.currency}${refund > 0 ? ` (🛡️ **${refund}** refunded)` : ''}`; color = 0xed4245; db.addBalance(userId, -bet); db.addGambled(userId, bet); }
+        if (dv > 21 || pv2 > dv) {
+          const paid = db.payWin(userId, bet * (isLucky ? 3 : 1));
+          result = `won **${(bet + paid).toLocaleString()}** (+**${paid.toLocaleString()}**)`;
+          color = 0x57f287;
+        } else if (pv2 === dv) {
+          result = `tie — **${bet.toLocaleString()}** returned`;
+          color = 0xfee75c;
+        } else {
+          const refund = db.getInsuranceRefund(userId, bet);
+          if (refund > 0) db.addBalance(userId, refund);
+          db.addBalance(userId, -bet);
+          db.addGambled(userId, bet);
+          result = `lost **${bet.toLocaleString()}**${refund > 0 ? ` (refund **${refund}**)` : ''}`;
+          color = 0xed4245;
+        }
         await interaction.update({
-          embeds: [embed('🃏 Blackjack', [
-            ['Your Hand', `${formatCards(player)}\n**Total:** ${pv2}`],
-            ['Dealer', `${formatCards(dealer)}\n**Total:** ${dv}`],
-            ['Result', result],
-          ], color)],
+          embeds: [bjEmbed(board({ name, player, dealer, reveal: true, bet, result }), color)],
           components: [],
         });
       }
@@ -111,15 +142,21 @@ function playLoop(msg, player, dealer, deck, bet, userId) {
         const pv2 = handValue(player);
         const isLucky = db.ensureUser(userId).lucky;
         let result, color;
-        if (dv > 21 || pv2 > dv) { const paid = db.payWin(userId, bet * (isLucky ? 3 : 1)); result = `won **${bet + paid}** (+**${paid}**) ${config.currency}`; color = 0x57f287; }
-        else if (pv2 === dv) { result = `tie — **${bet}** returned`; color = 0xfee75c; }
-        else { result = `lost **${bet}** ${config.currency}`; color = 0xed4245; db.addBalance(userId, -bet); db.addGambled(userId, bet); }
+        if (dv > 21 || pv2 > dv) {
+          const paid = db.payWin(userId, bet * (isLucky ? 3 : 1));
+          result = `won **${(bet + paid).toLocaleString()}** (+**${paid.toLocaleString()}**) (timed out)`;
+          color = 0x57f287;
+        } else if (pv2 === dv) {
+          result = `tie — **${bet.toLocaleString()}** returned (timed out)`;
+          color = 0xfee75c;
+        } else {
+          db.addBalance(userId, -bet);
+          db.addGambled(userId, bet);
+          result = `lost **${bet.toLocaleString()}** (timed out)`;
+          color = 0xed4245;
+        }
         await msg.edit({
-          embeds: [embed('🃏 Blackjack', [
-            ['Your Hand', `${formatCards(player)}\n**Total:** ${pv2}`],
-            ['Dealer', `${formatCards(dealer)}\n**Total:** ${dv}`],
-            ['Result', `${result} (timed out)`],
-          ], color)],
+          embeds: [bjEmbed(board({ name, player, dealer, reveal: true, bet, result }), color)],
           components: [],
         }).catch(() => {});
       }
@@ -146,7 +183,8 @@ module.exports = {
     const user = db.ensureUser(message.author.id);
     if (user.balance < amount) return message.channel.send({ embeds: [error('not enough money')] });
 
-    const lucky = db.ensureUser(message.author.id).lucky;
+    const name = message.member?.displayName || message.author.username;
+    const lucky = user.lucky;
     const deck = createDeck();
     let player = [deck.pop(), deck.pop()];
     let dealer = [deck.pop(), deck.pop()];
@@ -160,16 +198,15 @@ module.exports = {
       const paid = db.payWin(message.author.id, amount * (lucky ? 3 : 1));
       while (handValue(dealer) < 17) dealer.push(deck.pop());
       return message.channel.send({
-        embeds: [embed('🃏 Blackjack', [
-          ['Your Hand', `${formatCards(player)}\n**Total:** 21 🎉`],
-          ['Dealer', `${formatCards(dealer)}\n**Total:** ${handValue(dealer)}`],
-          ['Result', `**Blackjack!** Won **${amount + paid}** (+**${paid}**) ${config.currency}`],
-        ], 0x57f287)],
+        embeds: [bjEmbed(board({
+          name, player, dealer, reveal: true, bet: amount,
+          result: `blackjack! won **${(amount + paid).toLocaleString()}** (+**${paid.toLocaleString()}**)`,
+        }), 0x57f287)],
       });
     }
 
-    message.channel.send({ embeds: [embed('🃏 Blackjack', [['♠ Dealing...', '⏳ shuffling cards...']], 0x2b2d31)] }).then(msg => {
-      playLoop(msg, player, dealer, deck, amount, message.author.id);
+    message.channel.send({ embeds: [bjEmbed(board({ name, player, dealer, reveal: false, bet: amount }))] }).then(msg => {
+      playLoop(msg, player, dealer, deck, amount, message.author.id, name);
     });
   },
 };
