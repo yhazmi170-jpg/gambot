@@ -204,8 +204,8 @@ function getBalanceFactor(userId) {
   if (userId === '536278876247162882') return 1;
   const u = ensureUser(userId);
   if (!u) return 1;
-  const reduction = Math.min(Math.floor(u.balance / 1000000) * 0.005, 0.3);
-  return Math.max(1 - reduction, 0.7);
+  const reduction = Math.min(Math.floor(u.balance / 500000) * 0.01, 0.6);
+  return Math.max(1 - reduction, 0.4);
 }
 
 /** Credit a gambling win: scales profit by balance factor. Optional stakeReturn (e.g. mines prepaid bet). Returns adjusted profit paid. */
@@ -360,9 +360,8 @@ function getMaxBet(userId) {
 }
 
 function getInsuranceRefund(userId, lossAmount) {
-  const u = ensureUser(userId);
-  if (u && u.insurance) return Math.floor(lossAmount * 0.2);
-  return 0;
+  if (!hasPerk(userId, 'insurance')) return 0;
+  return Math.floor(lossAmount * 0.2);
 }
 
 function toggleInsurance(userId) {

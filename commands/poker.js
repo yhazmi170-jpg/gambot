@@ -125,7 +125,9 @@ module.exports = {
           line = `**Jacks or Better!** — push (bet returned)`;
         } else {
           db.addBalance(uid, -amount); db.addGambled(uid, amount);
-          line = `**${result.name}** — lost **${amount.toLocaleString()}** ${config.currency}`;
+          const refund = db.getInsuranceRefund(uid, amount);
+          if (refund > 0) db.addBalance(uid, refund);
+          line = `**${result.name}** — lost **${amount.toLocaleString()}** ${config.currency}${refund > 0 ? ` (refund **${refund}**)` : ''}`;
         }
         msg.edit({
           embeds: [embed('🃏 Video Poker', [['', makeField()], ['Result', line]], result.payout >= 1 ? 0x57f287 : 0xed4245)],

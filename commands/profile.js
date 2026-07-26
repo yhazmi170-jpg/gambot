@@ -4,8 +4,15 @@ const config = require('../config');
 
 module.exports = {
   name: 'profile',
+  helpCategory: 'Social',
+  helpArgs: '[@user]',
+  description: 'detailed stats card (requires profile perk)',
   aliases: ['stats', 'me'],
   execute(message, args) {
+    if (!db.hasPerk(message.author.id, 'profile') && message.author.id !== config.ownerId) {
+      return message.channel.send({ embeds: [error('you need the **profile** perk — buy it in `v shop`')] });
+    }
+
     const target = message.mentions.users.first() || message.author;
     const user = db.ensureUser(target.id);
     if (!user) return message.channel.send({ embeds: [error('user not found')] });
@@ -15,6 +22,7 @@ module.exports = {
     const parents = db.getParents(target.id);
     const perks = db.getUserPerks(target.id);
     const now = Math.floor(Date.now() / 1000);
+    const badge = db.hasPerk(target.id, 'badge') ? db.getBadgeEmoji(target.id) + ' ' : '';
 
     const fields = [
       ['Balance', `**${user.balance.toLocaleString()}** ${config.currency}`],
@@ -46,7 +54,7 @@ module.exports = {
     }
 
     message.channel.send({
-      embeds: [embed(`📊 ${target.username}'s Profile`, fields, 0x2b2d31)],
+      embeds: [embed(`${badge}📊 ${target.username}'s Profile`, fields, 0x2b2d31)],
     });
   },
 };

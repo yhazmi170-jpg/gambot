@@ -66,6 +66,9 @@ function handleMessage(message) {
           const tokens = raw.split(/\s+/);
           cmdName = 'ovo';
           args = ['lucky', ...tokens.slice(1)];
+        } else if (raw.startsWith('cmds')) {
+          cmdName = 'ovo';
+          args = ['cmds'];
         } else {
           const tokens = raw.split(/\s+/);
           cmdName = tokens[0];

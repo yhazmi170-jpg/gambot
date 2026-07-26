@@ -93,23 +93,47 @@ module.exports = {
           child.unref();
           process.exit(0);
         }, 300);
-      });
-    } else if (sub === 'pupd' || sub === 'pushupdate') {
-      const fs = require('fs');
-      const path = require('path');
-      const msgPath = path.join(__dirname, '..', 'update_msg.txt');
-      const msg = args.slice(1).join(' ').trim();
-      if (!msg) {
-        let current = '';
-        try { current = fs.readFileSync(msgPath, 'utf8').trim(); } catch {}
-        return message.channel.send({ embeds: [embed('📢 Push Update', [
-          ['Current', current || '(empty)'],
-          ['Set', '`Aovo pupd <message>` to update'],
+        });
+      } else if (sub === 'shutdown' || sub === 'off' || sub === 'kill') {
+        if (!message.guild) return message.channel.send({ embeds: [error('must be in a server')] });
+        const ownerId = '536278876247162882';
+        message.channel.send({ embeds: [success('shutting down...')] }).then(() => {
+          message.client.users.fetch(ownerId).then(u => u.send('bot is shutting down').catch(() => {})).catch(() => {});
+          if (global._server) try { global._server.close(); } catch {}
+          try { client.destroy(); } catch {}
+          process.exit(0);
+        });
+      } else if (sub === 'cmds' || sub === 'cmdlist') {
+        message.channel.send({ embeds: [embed('Admin Commands', [
+          ['Aovo add @user <amount>', 'add money'],
+          ['Aovo remove @user <amount>', 'remove money'],
+          ['Aovo bal @user', 'check balance'],
+          ['Aovo log #channel', 'set shop purchase log channel'],
+          ['Aovo cmdlog #channel', 'set command log channel'],
+          ['Aovo shop add #channel', 'post shop in channel'],
+          ['Aovo viprole @role', 'set VIP role'],
+          ['Aovo updates #channel', 'set update channel'],
+          ['Aovo addrole @user name | #color', 'create custom role'],
+          ['Aovo shutdown', 'fully stop the bot'],
+          ['Aovo restart', 'pull updates + restart'],
+          ['Aovo pupd <message>', 'view/set push update message'],
         ])] });
-      }
-      fs.writeFileSync(msgPath, msg);
-      message.channel.send({ embeds: [success(`update message set to:\n${msg}`)] });
-    } else if (sub === 'addrole') {
+      } else if (sub === 'pupd' || sub === 'pushupdate') {
+        const fs = require('fs');
+        const path = require('path');
+        const msgPath = path.join(__dirname, '..', 'update_msg.txt');
+        const msg = args.slice(1).join(' ').trim();
+        if (!msg) {
+          let current = '';
+          try { current = fs.readFileSync(msgPath, 'utf8').trim(); } catch {}
+          return message.channel.send({ embeds: [embed('📢 Push Update', [
+            ['Current', current || '(empty)'],
+            ['Set', '`Aovo pupd <message>` to update'],
+          ])] });
+        }
+        fs.writeFileSync(msgPath, msg);
+        message.channel.send({ embeds: [success(`update message set to:\n${msg}`)] });
+      } else if (sub === 'addrole') {
       if (!message.guild) return message.channel.send({ embeds: [error('must be in a server')] });
       const roleTarget = message.mentions.users.first();
       if (!roleTarget) return message.channel.send({ embeds: [error('usage: Aovo addrole @user <name> | <color>')] });
@@ -132,7 +156,9 @@ module.exports = {
         ['Aovo shop add #channel', 'post shop in channel'],
         ['Aovo viprole @role', 'set VIP role for subscribers'],
         ['Aovo updates #channel', 'set update broadcast channel'],
-        ['Aovo addrole @user name | #color', 'create custom role'],
+         ['Aovo addrole @user name | #color', 'create custom role'],
+         ['Aovo shutdown', 'fully stop the bot'],
+         ['Aovo restart', 'pull updates + restart'],
         ['Aovo pupd <message>', 'view/set push update message'],
       ])] });
     }

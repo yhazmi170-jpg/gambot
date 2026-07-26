@@ -12,11 +12,11 @@ const SHOP = [
       { id: 'double_work', name: 'Double work payout (perm)', price: 3000000, desc: 'permanently earn 2x from v work', use: 'Just use v work — it pays double automatically' },
       { id: 'bet_cap', name: 'Higher bet cap (500k)', price: 1000000, desc: 'all-in up to 500k instead of 250k', use: 'Use v <game> all to bet up to 500k' },
       { id: 'lottery_ticket', name: 'Free lottery ticket/draw', price: 3500000, desc: 'get a free ticket every lottery draw', use: 'You will auto-get 1 free ticket each lottery draw' },
-      { id: 'vip_games', name: 'VIP game modes access', price: 4000000, desc: 'unlocks exclusive games (poker, high-stakes)', use: 'Use v poker <amount> to play Texas Hold\'em vs the dealer' },
+      { id: 'vip_games', name: 'VIP game modes access', price: 4000000, desc: 'unlocks exclusive games (poker)', use: 'Use v poker <amount> to play video poker' },
     ],
   },
   {
-    category: 'MONTHLY SUB (auto-deduct)',
+    category: 'MONTHLY SUB (auto-renew if you can afford it)',
     items: [
       { id: 'vip_role_sub', name: 'VIP Role', price: 700000, desc: 'keeps your VIP role while subscribed', monthly: true, use: 'The VIP role is kept while your sub is active' },
       { id: 'insurance', name: 'Insurance (20% loss refund)', price: 150000, desc: '20% of losses refunded', monthly: true, use: 'Losses are auto-refunded 20% — no command needed' },
@@ -35,12 +35,21 @@ const SHOP = [
   {
     category: 'SOCIAL',
     items: [
-      { id: 'colored_lb', name: 'Colored leaderboard name', price: 350000, desc: 'your name shows in color on v lb', use: 'Check v lb — your name is highlighted' },
+      { id: 'colored_lb', name: 'Colored leaderboard name', price: 350000, desc: 'your name shows in color on v lb', use: 'Use v setlb <emoji> then check v lb' },
+      { id: 'badge', name: 'Custom badge emoji', price: 250000, desc: 'set a badge emoji shown on your profile and lb', use: 'Use v setbadge <emoji>' },
       { id: 'profile', name: 'v profile stat card', price: 300000, desc: 'view detailed stats with v profile', use: 'Use v profile to see your stats' },
       { id: 'rep', name: 'v rep @user', price: 150000, desc: 'give reputation points to others', use: 'Use v rep @user to give reputation' },
     ],
   },
 ];
+
+function allShopItems() {
+  return SHOP.flatMap(c => c.items);
+}
+
+function getShopItem(id) {
+  return allShopItems().find(it => it.id === id);
+}
 
 function priceStr(p) {
   if (p >= 1000000) return `${(p / 1000000).toFixed(p % 1000000 === 0 ? 0 : 1)}m`;
@@ -179,7 +188,7 @@ function postShop(channel) {
   channel.send({ components: [header, ...buildShop()], flags: MessageFlags.IsComponentsV2 }).catch(() => {});
 }
 
-module.exports = { buildShop, postShop, handleInteraction,
+module.exports = { buildShop, postShop, handleInteraction, SHOP, allShopItems, getShopItem,
   name: 'shop',
   helpCategory: 'Shop',
   helpArgs: '',

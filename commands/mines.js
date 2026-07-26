@@ -130,7 +130,12 @@ module.exports = {
         if (game.bombs[idx]) {
           game.active = false; game.hitBomb = idx; activeGames.delete(message.author.id);
           for (let j = 0; j < ROWS * COLS; j++) game.revealed.add(j);
-          return i.update({ components: [new ContainerBuilder().setAccentColor(0xed4245).addTextDisplayComponents(new TextDisplayBuilder().setContent(`${game.testMode ? '🧪' : '💥'} Mines  |  Touched a mine!${game.testMode ? ' [TEST]' : ''}\n\nLost **${game.bet.toLocaleString()}** ${config.currency}${game.testMode ? ' (no money lost)' : ''}`)).addActionRowComponents(...buildButtons(game))], flags: MessageFlags.IsComponentsV2 });
+          let refund = 0;
+          if (!game.testMode) {
+            refund = db.getInsuranceRefund(message.author.id, game.bet);
+            if (refund > 0) db.addBalance(message.author.id, refund);
+          }
+          return i.update({ components: [new ContainerBuilder().setAccentColor(0xed4245).addTextDisplayComponents(new TextDisplayBuilder().setContent(`${game.testMode ? '🧪' : '💥'} Mines  |  Touched a mine!${game.testMode ? ' [TEST]' : ''}\n\nLost **${game.bet.toLocaleString()}** ${config.currency}${refund > 0 ? ` (refund **${refund}**)` : ''}${game.testMode ? ' (no money lost)' : ''}`)).addActionRowComponents(...buildButtons(game))], flags: MessageFlags.IsComponentsV2 });
         }
         game.revealed.add(idx); game.lastSafe = idx;
         const rc = game.revealed.size;
