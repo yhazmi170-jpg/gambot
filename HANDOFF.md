@@ -5,8 +5,8 @@
 
 ## Status
 - **Branch**: `master`
-- **Version**: `1.2.5`
-- **Last update_msg**: Help + gamehelp updated for all games
+- **Version**: `1.2.6`
+- **Last update_msg**: Acmds admin cmd, shutdown, economy balance factor adjusted, insurance refund in poker/mines, profile perk gate, leaderboard badge
 
 ## Done recently
 - [x] Poker UI cleaned (Unicode cards, no AI fluff)
@@ -15,7 +15,7 @@
 - [x] Same factor on gambling wins via `db.payWin`
 - [x] Shop perks ~35% more expensive (v1.2.1)
 - [x] Docs: `AGENTS.md` + this `HANDOFF.md` kept in sync
-- [x] Poker/blackjack → Discord suit emojis (`A♠️` style) + card on hold buttons
+- [x] Poker/blackjack → Discord suit emojis
 - [x] Blackjack owo-style board (`Dealer [10+?]`, cardback, `Name [total]`)
 - [x] Help descriptions on all cmds + gamehelp poker/bj + standing “always update help” rule
 

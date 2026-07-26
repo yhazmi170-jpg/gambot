@@ -1,4 +1,4 @@
-# Gambot — Discord Economy Bot
+﻿# Gambot — Discord Economy Bot
 
 ## Identity
 - **Name**: always address user as "bro" (informal, friendly)
@@ -8,7 +8,7 @@
 - **Host**: Replit (free, no credit card) + UptimeRobot / `keepalive.ps1` ping for 24/7
 - **DB**: SQLite via sql.js, backed up to GitHub every hour
 - **Repo**: https://github.com/yhazmi170-jpg/gambot (branch `master`)
-- **Current version**: see `package.json` (as of last docs sync: **1.2.2**)
+- **Current version**: see `package.json` (as of last docs sync: **1.2.6**)
 
 ## Agent docs (mandatory)
 - **Always keep markdown in sync** after meaningful work:
@@ -23,11 +23,11 @@
 3. Pet/hunt/battle system (`v hunt`, `v zoo`, `v team`, `v battle`, `v sell`, `v rename`)
 4. Perk customization: `v setbadge`, `v setlb`, `v autoreact`
 5. Shop purchase log only if log channel is set (`Aovo log #channel`) — do not flood with every command
-6. Admin: `Aovo add`, `Aovo remove`, `Aovo bal`, `Areward`, `Aremovereward`, `Arestart`, `Aovo shop add #channel`
+6. Admin: `Aovo add`, `Aovo remove`, `Aovo bal`, `Areward`, `Aremovereward`, `Arestart`, `Aovo shop add #channel`, `Aovo cmds`, `Aovo shutdown`
 
 ## Economy — progressive balance factor
 - `getBalanceFactor(userId)` in `db/index.js`
-- Every **1m** balance → **0.5%** less (caps at **30%** cut → floor **0.7**)
+- Every **500k** balance → **1%** less (caps at **60%** cut → floor **0.4**)
 - Applies to: `daily`, `weekly`, `work`, and gambling wins via `payWin()`
 - Games using `payWin`: coinflip, blackjack, slots, crash, dice, roulette, poker, mines, lottery, battle
 - Losses stay full; PvP transfers (duel/rob/give/rain) are **not** scaled
