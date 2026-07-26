@@ -55,6 +55,16 @@ module.exports = {
       if (!role) return message.channel.send({ embeds: [error('usage: Aovo viprole @role')] });
       db.setVipRole(message.guild.id, role.id);
       message.channel.send({ embeds: [success(`VIP role set to ${role}`)] });
+    } else if (sub === 'cmdlog' || sub === 'cmdlogs') {
+      if (!message.guild) return message.channel.send({ embeds: [error('must be in a server')] });
+      const channel = message.mentions.channels.first();
+      if (channel) {
+        db.setCmdLogChannel(message.guild.id, channel.id);
+        message.channel.send({ embeds: [success(`command log channel set to ${channel}`)] });
+      } else {
+        db.setCmdLogChannel(message.guild.id, '');
+        message.channel.send({ embeds: [success('command log channel removed')] });
+      }
     } else if (sub === 'updates' || sub === 'update') {
       if (!message.guild) return message.channel.send({ embeds: [error('must be in a server')] });
       const channel = message.mentions.channels.first();
@@ -98,6 +108,8 @@ module.exports = {
         ['Aovo add @user <amount>', 'add money'],
         ['Aovo remove @user <amount>', 'remove money'],
         ['Aovo bal @user', 'check anyones balance'],
+        ['Aovo log #channel', 'set shop purchase log channel'],
+        ['Aovo cmdlog #channel', 'set command log channel'],
         ['Aovo shop add #channel', 'post shop in channel'],
         ['Aovo viprole @role', 'set VIP role for subscribers'],
         ['Aovo updates #channel', 'set update broadcast channel'],

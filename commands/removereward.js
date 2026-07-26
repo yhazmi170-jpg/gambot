@@ -19,7 +19,7 @@ module.exports = {
     db.removePerk(target.id, perk);
     message.channel.send({ embeds: [success(`removed **${perk}** from <@${target.id}>`)] });
 
-    logger.log(message.guild?.id, 'Admin Remove Reward', [
+    logger.logCmd(message.guild?.id, 'Admin Remove Reward', [
       ['Admin', `${message.author}`],
       ['Target', `${target}`],
       ['Perk', perk],

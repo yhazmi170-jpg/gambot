@@ -22,7 +22,7 @@ module.exports = {
     db.addPerk(target.id, perk, expiresAt);
     message.channel.send({ embeds: [success(`gave **${perk}** to <@${target.id}>${duration > 0 ? ` for ${duration} days` : ''}`)] });
 
-    logger.log(message.guild?.id, 'Admin Reward', [
+    logger.logCmd(message.guild?.id, 'Admin Reward', [
       ['Admin', `${message.author}`],
       ['Target', `${target}`],
       ['Perk', perk],

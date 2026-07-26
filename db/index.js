@@ -52,6 +52,7 @@ async function init() {
   db.run(`CREATE TABLE IF NOT EXISTS adoption (parent_id TEXT, child_id TEXT, PRIMARY KEY (parent_id, child_id))`);
   db.run(`CREATE TABLE IF NOT EXISTS purchases (user_id TEXT, perk TEXT, expires_at INTEGER, PRIMARY KEY (user_id, perk))`);
   db.run(`CREATE TABLE IF NOT EXISTS log_channels (guild_id TEXT PRIMARY KEY, channel_id TEXT NOT NULL)`);
+  db.run(`CREATE TABLE IF NOT EXISTS cmd_log_channels (guild_id TEXT PRIMARY KEY, channel_id TEXT NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS update_channels (guild_id TEXT PRIMARY KEY, channel_id TEXT NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS vip_roles (guild_id TEXT PRIMARY KEY, role_id TEXT NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS animals (
@@ -304,6 +305,17 @@ function setLogChannel(guildId, channelId) {
 
 function getLogChannel(guildId) {
   const rows = db.exec(`SELECT channel_id FROM log_channels WHERE guild_id = '${guildId}'`);
+  if (!rows.length || !rows[0].values.length) return null;
+  return rows[0].values[0][0];
+}
+
+function setCmdLogChannel(guildId, channelId) {
+  db.run(`INSERT OR REPLACE INTO cmd_log_channels (guild_id, channel_id) VALUES ('${guildId}', '${channelId}')`);
+  save();
+}
+
+function getCmdLogChannel(guildId) {
+  const rows = db.exec(`SELECT channel_id FROM cmd_log_channels WHERE guild_id = '${guildId}'`);
   if (!rows.length || !rows[0].values.length) return null;
   return rows[0].values[0][0];
 }
@@ -708,6 +720,7 @@ module.exports = {
   toggleInsurance,
   setLogChannel,
   getLogChannel,
+  setCmdLogChannel, getCmdLogChannel,
   setUpdateChannel, getUpdateChannel, getAllUpdateChannels,
   getInsuranceRefund,
   getMaxBet,
