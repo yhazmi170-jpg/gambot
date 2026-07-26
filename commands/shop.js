@@ -7,37 +7,37 @@ const SHOP = [
   {
     category: 'ONE-TIME PURCHASES',
     items: [
-      { id: 'custom_role', name: 'Custom Role (name + color)', price: 500000, desc: 'create a custom-named role with your color', use: 'Use v customrole name | #hexcolor to set it yourself' },
-      { id: 'rob', name: 'v rob @user ability', price: 5000000, desc: '50% steal 50% of target / 50% lose 50% of yours', use: 'Use v rob @user to attempt a robbery' },
-      { id: 'double_work', name: 'Double work payout (perm)', price: 2000000, desc: 'permanently earn 2x from v work', use: 'Just use v work — it pays double automatically' },
-      { id: 'bet_cap', name: 'Higher bet cap (500k)', price: 750000, desc: 'all-in up to 500k instead of 250k', use: 'Use v <game> all to bet up to 500k' },
-      { id: 'lottery_ticket', name: 'Free lottery ticket/draw', price: 2500000, desc: 'get a free ticket every lottery draw', use: 'You will auto-get 1 free ticket each lottery draw' },
-      { id: 'vip_games', name: 'VIP game modes access', price: 3000000, desc: 'unlocks exclusive games (poker, high-stakes)', use: 'Use v poker <amount> to play Texas Hold\'em vs the dealer' },
+      { id: 'custom_role', name: 'Custom Role (name + color)', price: 700000, desc: 'create a custom-named role with your color', use: 'Use v customrole name | #hexcolor to set it yourself' },
+      { id: 'rob', name: 'v rob @user ability', price: 7000000, desc: '50% steal 50% of target / 50% lose 50% of yours', use: 'Use v rob @user to attempt a robbery' },
+      { id: 'double_work', name: 'Double work payout (perm)', price: 3000000, desc: 'permanently earn 2x from v work', use: 'Just use v work — it pays double automatically' },
+      { id: 'bet_cap', name: 'Higher bet cap (500k)', price: 1000000, desc: 'all-in up to 500k instead of 250k', use: 'Use v <game> all to bet up to 500k' },
+      { id: 'lottery_ticket', name: 'Free lottery ticket/draw', price: 3500000, desc: 'get a free ticket every lottery draw', use: 'You will auto-get 1 free ticket each lottery draw' },
+      { id: 'vip_games', name: 'VIP game modes access', price: 4000000, desc: 'unlocks exclusive games (poker, high-stakes)', use: 'Use v poker <amount> to play Texas Hold\'em vs the dealer' },
     ],
   },
   {
     category: 'MONTHLY SUB (auto-deduct)',
     items: [
-      { id: 'vip_role_sub', name: 'VIP Role', price: 500000, desc: 'keeps your VIP role while subscribed', monthly: true, use: 'The VIP role is kept while your sub is active' },
-      { id: 'insurance', name: 'Insurance (20% loss refund)', price: 100000, desc: '20% of losses refunded', monthly: true, use: 'Losses are auto-refunded 20% — no command needed' },
-      { id: 'daily_cap', name: 'Higher daily/weekly cap', price: 200000, desc: 'daily cap raised to 15k, weekly to 25k', monthly: true, use: 'Use v daily and v weekly normally — caps are higher' },
+      { id: 'vip_role_sub', name: 'VIP Role', price: 700000, desc: 'keeps your VIP role while subscribed', monthly: true, use: 'The VIP role is kept while your sub is active' },
+      { id: 'insurance', name: 'Insurance (20% loss refund)', price: 150000, desc: '20% of losses refunded', monthly: true, use: 'Losses are auto-refunded 20% — no command needed' },
+      { id: 'daily_cap', name: 'Higher daily/weekly cap', price: 300000, desc: 'daily cap raised to 15k, weekly to 25k', monthly: true, use: 'Use v daily and v weekly normally — caps are higher' },
     ],
   },
   {
     category: 'SERVER TOOLS',
     items: [
-      { id: 'auto_react', name: 'Auto-react on messages', price: 500000, desc: 'set an emoji that the bot auto-reacts to your messages with', use: 'Use v autoreact <emoji> to set your reaction emoji' },
-      { id: 'sponsored_footer', name: 'Sponsored footer on bot', price: 800000, desc: '"Sponsored by @you" on all bot commands', use: 'Your name appears on all bot embeds' },
-      { id: 'rain', name: 'v rain <amount>', price: 1000000, desc: 'rain money to everyone online', use: 'Use v rain <amount> to share money with online members' },
-      { id: 'duel', name: 'v duel @user <amount>', price: 750000, desc: '1v1 coinflip challenge another user', use: 'Use v duel @user <amount> to challenge someone' },
+      { id: 'auto_react', name: 'Auto-react on messages', price: 700000, desc: 'set an emoji that the bot auto-reacts to your messages with', use: 'Use v autoreact <emoji> to set your reaction emoji' },
+      { id: 'sponsored_footer', name: 'Sponsored footer on bot', price: 1200000, desc: '"Sponsored by @you" on all bot commands', use: 'Your name appears on all bot embeds' },
+      { id: 'rain', name: 'v rain <amount>', price: 1500000, desc: 'rain money to everyone online', use: 'Use v rain <amount> to share money with online members' },
+      { id: 'duel', name: 'v duel @user <amount>', price: 1000000, desc: '1v1 coinflip challenge another user', use: 'Use v duel @user <amount> to challenge someone' },
     ],
   },
   {
     category: 'SOCIAL',
     items: [
-      { id: 'colored_lb', name: 'Colored leaderboard name', price: 250000, desc: 'your name shows in color on v lb', use: 'Check v lb — your name is highlighted' },
-      { id: 'profile', name: 'v profile stat card', price: 200000, desc: 'view detailed stats with v profile', use: 'Use v profile to see your stats' },
-      { id: 'rep', name: 'v rep @user', price: 100000, desc: 'give reputation points to others', use: 'Use v rep @user to give reputation' },
+      { id: 'colored_lb', name: 'Colored leaderboard name', price: 350000, desc: 'your name shows in color on v lb', use: 'Check v lb — your name is highlighted' },
+      { id: 'profile', name: 'v profile stat card', price: 300000, desc: 'view detailed stats with v profile', use: 'Use v profile to see your stats' },
+      { id: 'rep', name: 'v rep @user', price: 150000, desc: 'give reputation points to others', use: 'Use v rep @user to give reputation' },
     ],
   },
 ];

@@ -1,1 +1,1 @@
-v1.2.0 — New VIP game: v poker (video poker with hold/draw) — Log channels now only show shop purchases — Better looking games
+v1.2.1 — Shop perks cost a bit more across the board
