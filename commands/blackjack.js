@@ -30,18 +30,19 @@ function handValue(hand) {
   return val;
 }
 
-const SUIT_BASE = { '♠': 0x1F0A0, '♥': 0x1F0B0, '♦': 0x1F0C0, '♣': 0x1F0D0 };
-const VAL_OFF = { 'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13 };
-function cardEmoji(c) { return String.fromCodePoint(SUIT_BASE[c.suit] + VAL_OFF[c.value]); }
+const SUIT_EMOJI = { '♠': '♠️', '♥': '♥️', '♦': '♦️', '♣': '♣️' };
+function cardLabel(c) {
+  return `**${c.value}**${SUIT_EMOJI[c.suit]}`;
+}
 
 function formatCards(cards) {
-  return cards.map(c => cardEmoji(c)).join(' ');
+  return cards.map(c => cardLabel(c)).join('  ');
 }
 
 function buildResult(player, dealer, revealDealer) {
   return revealDealer
     ? `${formatCards(dealer)}  **${handValue(dealer)}**`
-    : `${cardEmoji(dealer[0])} ?  **?**`;
+    : `${cardLabel(dealer[0])} ?  **?**`;
 }
 
 function playLoop(msg, player, dealer, deck, bet, userId) {
@@ -54,7 +55,7 @@ function playLoop(msg, player, dealer, deck, bet, userId) {
   msg.edit({
     embeds: [embed('🃏 Blackjack', [
       ['Your Hand', `${formatCards(player)}\n**Total:** ${pv}`],
-      ['Dealer', `${cardEmoji(dealer[0])} ?\n**Total:** ?`],
+      ['Dealer', `${cardLabel(dealer[0])} ?\n**Total:** ?`],
     ], 0x2b2d31)],
     components: [buttons],
   }).then(() => {

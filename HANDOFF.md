@@ -4,9 +4,9 @@
 > Read `AGENTS.md` first, then this.
 
 ## Status
-- **Branch**: `master` @ `82b0929`
-- **Version**: `1.2.2`
-- **Last update_msg**: High balances get slightly smaller gambling wins (same curve as daily/work)
+- **Branch**: `master`
+- **Version**: `1.2.3`
+- **Last update_msg**: Poker/blackjack Discord suit emojis
 
 ## Done recently
 - [x] Poker UI cleaned (Unicode cards, no AI fluff)
@@ -15,6 +15,7 @@
 - [x] Same factor on gambling wins via `db.payWin`
 - [x] Shop perks ~35% more expensive (v1.2.1)
 - [x] Docs: `AGENTS.md` + this `HANDOFF.md` kept in sync
+- [x] Poker/blackjack → Discord suit emojis (`A♠️` style) + card on hold buttons
 
 ## Next / open
 - [ ] User still needs to deploy on Replit: `bash update.sh` then **Run** (or `Arestart`)

@@ -6,6 +6,7 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const SUITS = ['♠', '♥', '♦', '♣'];
 const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 const VALUE_RANK = Object.fromEntries(VALUES.map((v, i) => [v, i + 2]));
+const SUIT_EMOJI = { '♠': '♠️', '♥': '♥️', '♦': '♦️', '♣': '♣️' };
 
 function createDeck() {
   const deck = [];
@@ -19,9 +20,9 @@ function createDeck() {
   return deck;
 }
 
-const SUIT_BASE = { '♠': 0x1F0A0, '♥': 0x1F0B0, '♦': 0x1F0C0, '♣': 0x1F0D0 };
-const VAL_OFF = { 'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13 };
-function cardEmoji(c) { return String.fromCodePoint(SUIT_BASE[c.suit] + VAL_OFF[c.value]); }
+function cardLabel(c) {
+  return `**${c.value}**${SUIT_EMOJI[c.suit]}`;
+}
 
 function evaluateHand(cards) {
   const values = cards.map(c => VALUE_RANK[c.value]).sort((a, b) => b - a);
@@ -83,18 +84,20 @@ module.exports = {
 
     function makeField() {
       const cardsLine = cards.map((c, i) => {
-        return `${cardEmoji(c)}${held[i] ? ' `HOLD`' : ''}`;
-      }).join('  ');
-      return `${cardsLine}\n**Bet:** ${amount.toLocaleString()} ${config.currency}\n\n800× 50× 25× 9× 6× 4× 3× 2× 1×`;
+        return `${cardLabel(c)}${held[i] ? ' `HOLD`' : ''}`;
+      }).join('   ');
+      return `${cardsLine}\n**Bet:** ${amount.toLocaleString()} ${config.currency}\nRF \`800×\` · SF \`50×\` · 4K \`25×\` · FH \`9×\` · Fl \`6×\` · St \`4×\` · 3K \`3×\` · 2P \`2×\` · JoB \`1×\``;
     }
 
     const btnStyle = (i) => held[i] ? ButtonStyle.Primary : ButtonStyle.Secondary;
-    const btnLabel = (i) => `${i + 1}`;
     function makeButtons() {
       return [
         new ActionRowBuilder().addComponents(
-          cards.map((_, i) => new ButtonBuilder()
-            .setCustomId(`ph_${i}`).setLabel(btnLabel(i)).setStyle(btnStyle(i)))
+          cards.map((c, i) => new ButtonBuilder()
+            .setCustomId(`ph_${i}`)
+            .setLabel(c.value)
+            .setEmoji(SUIT_EMOJI[c.suit])
+            .setStyle(btnStyle(i)))
         ),
         new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId('pd').setLabel('DRAW').setStyle(ButtonStyle.Success)

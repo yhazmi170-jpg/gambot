@@ -1,1 +1,1 @@
-v1.2.2 — High balances now get slightly smaller gambling wins too (same curve as daily/work)
+v1.2.3 — Poker/blackjack cards now use Discord suit emojis (looks clean)

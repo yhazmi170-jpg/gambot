@@ -38,8 +38,9 @@
 - Perks were bumped ~35% in v1.2.1 — adjust there if changing again
 
 ## Cards / UI
-- Poker + blackjack use Unicode playing-card codepoints (`cardEmoji`)
-- Keep game text clean — no AI-sounding fluff / emoji spam in embeds
+- Poker + blackjack use Discord suit emojis (`♠️♥️♦️♣️`) + rank text — not Unicode playing-card glyphs
+- Poker hold buttons show rank + suit emoji
+- Keep game text clean — no AI-sounding fluff
 
 ## Replit / single instance
 - Atomic lock: `.gambot.lock` in project root (`index.js` `acquireLock`)
