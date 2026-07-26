@@ -100,7 +100,7 @@ module.exports = {
         message.channel.send({ embeds: [success('shutting down...')] }).then(() => {
           message.client.users.fetch(ownerId).then(u => u.send('bot is shutting down').catch(() => {})).catch(() => {});
           if (global._server) try { global._server.close(); } catch {}
-          try { client.destroy(); } catch {}
+          try { message.client.destroy(); } catch {}
           process.exit(0);
         });
       } else if (sub === 'cmds' || sub === 'cmdlist') {
