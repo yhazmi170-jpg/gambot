@@ -17,6 +17,7 @@ const PORT = process.env.PORT || 3000;
 const server = http.createServer((req, res) => { res.writeHead(200); res.end('ok'); });
 server.on('error', () => { console.error('port in use — another instance running, exiting'); process.exit(1); });
 server.listen(PORT);
+global._server = server;
 
 const client = new Client({
   intents: [

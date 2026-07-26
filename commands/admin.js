@@ -76,12 +76,22 @@ module.exports = {
         message.channel.send({ embeds: [success('update channel removed')] });
       }
     } else if (sub === 'restart') {
-      const { execSync } = require('child_process');
+      const { execSync, spawn } = require('child_process');
       const ownerId = '536278876247162882';
+      const path = require('path');
       message.channel.send({ embeds: [success('pulling latest + restarting...')] }).then(() => {
         try { execSync('git pull origin master', { stdio: 'pipe', timeout: 15000 }); } catch {}
         message.client.users.fetch(ownerId).then(u => u.send('restarting...').catch(() => {})).catch(() => {});
-        setTimeout(() => process.exit(0), 1000);
+        if (global._server) try { global._server.close(); } catch {}
+        setTimeout(() => {
+          const child = spawn('node', [path.join(__dirname, '..', 'index.js')], {
+            stdio: 'inherit',
+            detached: true,
+            env: { ...process.env, PORT: process.env.PORT || '3000' },
+          });
+          child.unref();
+          process.exit(0);
+        }, 300);
       });
     } else if (sub === 'pupd' || sub === 'pushupdate') {
       const fs = require('fs');
