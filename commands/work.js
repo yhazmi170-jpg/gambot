@@ -1,6 +1,6 @@
 const db = require('../db');
 const { embed, error, success } = require('../utils/embed');
-const config = require('../config.json');
+const config = require('../config');
 
 const jobs = [
   'flipping burgers', 'coding a website', 'driving uber', 'walking dogs',

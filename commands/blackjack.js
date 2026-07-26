@@ -1,6 +1,6 @@
 const db = require('../db');
 const { embed, error, parseAmount } = require('../utils/embed');
-const config = require('../config.json');
+const config = require('../config');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 function createDeck() {

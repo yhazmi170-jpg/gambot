@@ -1,6 +1,6 @@
 const db = require('../db');
 const { embed, error, success, parseAmount } = require('../utils/embed');
-const config = require('../config.json');
+const config = require('../config');
 
 const TICKET_PRICE = 10;
 

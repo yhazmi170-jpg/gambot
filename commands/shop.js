@@ -1,6 +1,6 @@
 const db = require('../db');
 const { setSponsored } = require('../utils/embed');
-const config = require('../config.json');
+const config = require('../config');
 const { ContainerBuilder, TextDisplayBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags, EmbedBuilder } = require('discord.js');
 
 const SHOP = [

@@ -1,5 +1,5 @@
 const db = require('../db');
-const config = require('../config.json');
+const config = require('../config');
 const { parseAmount } = require('../utils/embed');
 const { ContainerBuilder, TextDisplayBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 

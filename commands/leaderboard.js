@@ -1,6 +1,6 @@
 const db = require('../db');
 const { embed } = require('../utils/embed');
-const config = require('../config.json');
+const config = require('../config');
 
 module.exports = {
   name: 'leaderboard',
