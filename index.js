@@ -13,13 +13,22 @@ if (!config.token) {
   process.exit(1);
 }
 
+// pid lock — kill any previous instance that left a lock file
+const lockFile = path.join(__dirname, '.gambot.pid');
+try {
+  const oldPid = parseInt(require('fs').readFileSync(lockFile, 'utf8').trim());
+  if (oldPid && oldPid !== process.pid) {
+    try { process.kill(oldPid, 'SIGKILL'); } catch {}
+    require('child_process').execSync(`kill -9 ${oldPid} 2>/dev/null`, { timeout: 2000 });
+  }
+} catch {}
+require('fs').writeFileSync(lockFile, String(process.pid));
+process.on('exit', () => { try { require('fs').unlinkSync(lockFile); } catch {} });
+process.on('SIGINT', () => { try { require('fs').unlinkSync(lockFile); } catch {}; process.exit(); });
+process.on('SIGTERM', () => { try { require('fs').unlinkSync(lockFile); } catch {}; process.exit(); });
+
 const PORT = process.env.PORT || 3000;
 const server = http.createServer((req, res) => { res.writeHead(200); res.end('ok'); });
-server.on('error', () => {
-  console.error('port in use — killing old instance and retrying...');
-  try { require('child_process').execSync(`kill $(lsof -ti:${PORT}) 2>/dev/null`, { timeout: 3000 }); } catch {}
-  setTimeout(() => { server.close(); server.listen(PORT); }, 1000);
-});
 server.listen(PORT);
 global._server = server;
 
