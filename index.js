@@ -13,19 +13,17 @@ if (!config.token) {
   process.exit(1);
 }
 
-// pid lock — kill any previous instance that left a lock file
-const lockFile = path.join(__dirname, '.gambot.pid');
+// single-instance lock — exit if another gambot is already running
+const fs = require('fs');
+const pidFile = process.env.XDG_RUNTIME_DIR ? path.join(process.env.XDG_RUNTIME_DIR, 'gambot.pid') : '/tmp/gambot.pid';
 try {
-  const oldPid = parseInt(require('fs').readFileSync(lockFile, 'utf8').trim());
+  const oldPid = parseInt(fs.readFileSync(pidFile, 'utf8').trim());
   if (oldPid && oldPid !== process.pid) {
-    try { process.kill(oldPid, 'SIGKILL'); } catch {}
-    require('child_process').execSync(`kill -9 ${oldPid} 2>/dev/null`, { timeout: 2000 });
+    try { process.kill(oldPid, 0); console.log('another instance is running, exiting'); process.exit(0); } catch {}
   }
 } catch {}
-require('fs').writeFileSync(lockFile, String(process.pid));
-process.on('exit', () => { try { require('fs').unlinkSync(lockFile); } catch {} });
-process.on('SIGINT', () => { try { require('fs').unlinkSync(lockFile); } catch {}; process.exit(); });
-process.on('SIGTERM', () => { try { require('fs').unlinkSync(lockFile); } catch {}; process.exit(); });
+fs.writeFileSync(pidFile, String(process.pid));
+process.on('exit', () => { try { fs.unlinkSync(pidFile); } catch {} });
 
 const PORT = process.env.PORT || 3000;
 const server = http.createServer((req, res) => { res.writeHead(200); res.end('ok'); });
