@@ -1,1 +1,1 @@
-v1.2.13 — NEW user levels! Use any command to earn XP, level up, and get money rewards. Check with v level.
+v1.2.15 — bot stability: auto-restart supervisor, crash logging, and safer mines (bets are refunded if anything goes wrong).

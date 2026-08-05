@@ -81,38 +81,40 @@ module.exports = {
   aliases: ['mine'],
   execute(message, args) {
     let testMode = false;
-    if ((args[0] || '').toLowerCase() === 'test') {
-      if (message.author.id !== config.ownerId) return;
-      testMode = true;
-      args.shift();
-    }
-
     let amount;
-    if ((args[0] || '').toLowerCase() === 'all' && !testMode) { const u = db.ensureUser(message.author.id); amount = Math.min(u.balance, db.getMaxBet(message.author.id)); if (amount <= 0) return message.channel.send({ embeds: [error('you have no money')] }); }
-    else { amount = parseAmount(args[0]); if (isNaN(amount) || amount <= 0) amount = testMode ? 1000 : undefined; if (amount === undefined) return message.channel.send({ embeds: [error('bet an amount or use `all`')] }); }
+    try {
+      if ((args[0] || '').toLowerCase() === 'test') {
+        if (message.author.id !== config.ownerId) return;
+        testMode = true;
+        args.shift();
+      }
 
-    const user = db.ensureUser(message.author.id);
-    if (!testMode && user.balance < amount) return message.channel.send({ embeds: [error('not enough money')] });
-    if (activeGames.has(message.author.id)) return message.channel.send({ embeds: [error('you already have an active mines game')] });
+      let amount;
+      if ((args[0] || '').toLowerCase() === 'all' && !testMode) { const u = db.ensureUser(message.author.id); amount = Math.min(u.balance, db.getMaxBet(message.author.id)); if (amount <= 0) return message.channel.send({ embeds: [error('you have no money')] }); }
+      else { amount = parseAmount(args[0]); if (isNaN(amount) || amount <= 0) amount = testMode ? 1000 : undefined; if (amount === undefined) return message.channel.send({ embeds: [error('bet an amount or use `all`')] }); }
 
-    if (!testMode) {
-      db.addBalance(message.author.id, -amount);
-      db.addGambled(message.author.id, amount);
-    }
+      const user = db.ensureUser(message.author.id);
+      if (!testMode && user.balance < amount) return message.channel.send({ embeds: [error('not enough money')] });
+      if (activeGames.has(message.author.id)) return message.channel.send({ embeds: [error('you already have an active mines game')] });
 
-    const lucky = db.ensureUser(message.author.id).lucky;
-    const customMines = parseInt(args[1]);
-    const hasCustomMines = !isNaN(customMines) && customMines >= 1 && customMines <= 15;
-    let bombCount;
-    if (hasCustomMines) {
-      bombCount = customMines;
-    } else {
-      bombCount = lucky ? 1 : BOMBS;
-    }
-    const game = { bombs: createGrid(bombCount), bombCount, revealed: new Set(), bet: amount, active: true, lastSafe: -1, hitBomb: undefined, testMode, lucky, hasCustomMines };
-    activeGames.set(message.author.id, game);
+      if (!testMode) {
+        db.addBalance(message.author.id, -amount);
+        db.addGambled(message.author.id, amount);
+      }
 
-    message.channel.send(buildContainer(game)).then(msg => {
+      const lucky = db.ensureUser(message.author.id).lucky;
+      const customMines = parseInt(args[1]);
+      const hasCustomMines = !isNaN(customMines) && customMines >= 1 && customMines <= 15;
+      let bombCount;
+      if (hasCustomMines) {
+        bombCount = customMines;
+      } else {
+        bombCount = lucky ? 1 : BOMBS;
+      }
+      const game = { bombs: createGrid(bombCount), bombCount, revealed: new Set(), bet: amount, active: true, lastSafe: -1, hitBomb: undefined, testMode, lucky, hasCustomMines };
+      activeGames.set(message.author.id, game);
+
+      message.channel.send(buildContainer(game)).then(msg => {
       const col = msg.createMessageComponentCollector({ filter: i => i.user.id === message.author.id, time: 60000 });
       col.on('collect', async (i) => {
         if (!game.active) { await i.deferUpdate().catch(() => {}); return; }
@@ -158,5 +160,11 @@ module.exports = {
       console.error('mines send error:', err);
       message.channel.send({ embeds: [error('failed to start mines game')] }).catch(() => {});
     });
+    } catch (err) {
+      activeGames.delete(message.author.id);
+      if (!testMode) db.addBalance(message.author.id, amount);
+      console.error('mines execute error:', err);
+      message.channel.send({ embeds: [error('something went wrong starting mines')] }).catch(() => {});
+    }
   },
 };

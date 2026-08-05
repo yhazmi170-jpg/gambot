@@ -79,21 +79,36 @@ module.exports = {
       const { execSync, spawn } = require('child_process');
       const ownerId = '536278876247162882';
       const path = require('path');
+      const fs = require('fs');
+      const root = path.join(__dirname, '..');
+      const lockFile = path.join(root, '.gambot.lock');
       message.channel.send({ embeds: [success('pulling latest + restarting...')] }).then(() => {
         try { execSync('git pull origin master', { stdio: 'pipe', timeout: 15000 }); } catch {}
         message.client.users.fetch(ownerId).then(u => u.send('restarting...').catch(() => {})).catch(() => {});
         if (global._server) try { global._server.close(); } catch {}
-        try { require('fs').unlinkSync(path.join(__dirname, '..', '.gambot.lock')); } catch {}
+        try { fs.unlinkSync(lockFile); } catch {}
+        try { message.client.destroy(); } catch {}
         setTimeout(() => {
-          const child = spawn('node', [path.join(__dirname, '..', 'index.js')], {
-            stdio: 'inherit',
-            detached: true,
-            env: { ...process.env, PORT: process.env.PORT || '3000' },
-          });
-          child.unref();
-          process.exit(0);
+          if (global._supervisor) return;
+          global._supervisor = true;
+          const spawnBot = () => {
+            const child = spawn('node', [path.join(root, 'index.js')], {
+              stdio: 'inherit',
+              env: { ...process.env, PORT: process.env.PORT || '3000' },
+            });
+            child.on('exit', (code) => {
+              const lockAlive = (() => { try { return fs.existsSync(lockFile); } catch { return true; } })();
+              if (lockAlive) {
+                console.error(`[supervisor] bot child exited (code ${code}) — respawning in 3s`);
+                setTimeout(spawnBot, 3000);
+              } else {
+                console.error('[supervisor] clean exit (shutdown) — staying down');
+              }
+            });
+          };
+          spawnBot();
         }, 300);
-        });
+      });
       } else if (sub === 'shutdown' || sub === 'off' || sub === 'kill') {
         if (!message.guild) return message.channel.send({ embeds: [error('must be in a server')] });
         const ownerId = '536278876247162882';

@@ -176,9 +176,10 @@ client.on('messageCreate', (message) => {
   }
 });
 
-process.on('unhandledRejection', (err) => {
-  console.error('unhandled rejection:', err.message);
-});
-process.on('uncaughtException', (err) => {
-  console.error('uncaught exception:', err.message);
-});
+function logCrash(tag, err) {
+  const line = `${new Date().toISOString()} [${tag}] ${(err && (err.stack || err.message)) || err}\n`;
+  console.error(line);
+  try { fs.appendFileSync(path.join(__dirname, 'bot.err'), line); } catch {}
+}
+process.on('unhandledRejection', (err) => logCrash('UNHANDLED_REJECTION', err));
+process.on('uncaughtException', (err) => logCrash('UNCAUGHT_EXCEPTION', err));
