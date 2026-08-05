@@ -5,10 +5,11 @@
 
 ## Status
 - **Branch**: `master`
-- **Version**: `1.2.6`
-- **Last update_msg**: Acmds admin cmd, shutdown, economy balance factor adjusted, insurance refund in poker/mines, profile perk gate, leaderboard badge
+- **Version**: `1.2.7`
+- **Last update_msg**: Shop perks are pricier (custom role 1.5M, rob 15M, vip games 8M, double work 6M, and more)
 
 ## Done recently
+- [x] Shop perks raised ~2x (v1.2.7) — custom_role 1.5M, rob 15M, double_work 6M, bet_cap 2M, lottery_ticket 7M, vip_games 8M, vip_role_sub 1M/mo, insurance 300k/mo, daily_cap 600k/mo, auto_react 1.5M, sponsored_footer 2.5M, rain 3M, duel 2M, colored_lb 750k, badge 500k, profile 600k, rep 300k
 - [x] Poker UI cleaned (Unicode cards, no AI fluff)
 - [x] Blackjack Unicode card emojis
 - [x] Progressive economy on daily / weekly / work

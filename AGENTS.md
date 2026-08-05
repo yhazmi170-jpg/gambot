@@ -8,7 +8,7 @@
 - **Host**: Replit (free, no credit card) + UptimeRobot / `keepalive.ps1` ping for 24/7
 - **DB**: SQLite via sql.js, backed up to GitHub every hour
 - **Repo**: https://github.com/yhazmi170-jpg/gambot (branch `master`)
-- **Current version**: see `package.json` (as of last docs sync: **1.2.6**)
+- **Current version**: see `package.json` (as of last docs sync: **1.2.7**)
 
 ## Agent docs (mandatory)
 - **Always keep markdown in sync** after meaningful work:
@@ -35,7 +35,7 @@
 
 ## Shop
 - Prices live in `commands/shop.js` (`SHOP` array)
-- Perks were bumped ~35% in v1.2.1 — adjust there if changing again
+- Perks were bumped ~35% in v1.2.1, then ~2x more in v1.2.7 — adjust there if changing again
 
 ## Cards / UI
 - Blackjack uses owo-style board: `Dealer [10+?]` + card back, `Name [19]` + cards (description embed, not field grid)
