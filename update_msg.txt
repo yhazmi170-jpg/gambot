@@ -1,1 +1,1 @@
-v1.2.16 — disabled commands now show a notice ("x is disabled here") that auto-deletes, so they don't silently do nothing.
+v1.2.17 — enable/disable can never be locked out, even if all commands are disabled.
