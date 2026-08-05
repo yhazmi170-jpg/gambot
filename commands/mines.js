@@ -36,6 +36,7 @@ function buildButtons(game) {
       else { emoji = null; style = ButtonStyle.Secondary; disabled = false; }
       const b = new ButtonBuilder().setCustomId(`m_${idx}`).setStyle(style).setDisabled(disabled);
       if (emoji) b.setEmoji(emoji);
+      else b.setLabel('\u200b');
       comps.push(b);
     }
     if (r === ROWS - 1) {

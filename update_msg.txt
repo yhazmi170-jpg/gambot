@@ -1,1 +1,1 @@
-v1.2.11 — Mines fixed (game shows again, clean buttons) + crash actually pays real odds now
+v1.2.12 — Mines buttons fixed (game starts properly now)
