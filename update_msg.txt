@@ -1,1 +1,1 @@
-v1.2.20 -- v battle now renders a retro pixel-art battle screen (sprites, HP bars, stats) like old game.
+v1.2.21 -- gems added! Hunt up to 5 animals at once (v hunt <count>, costs gems). Gems drop from rare hunts and are in the shop.

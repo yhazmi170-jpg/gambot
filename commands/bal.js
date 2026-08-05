@@ -15,6 +15,7 @@ module.exports = {
       embeds: [embed('💰 Balance', [
         ['User', `<@${target.id}>`],
         [config.currency.charAt(0).toUpperCase() + config.currency.slice(1), `**${user.balance.toLocaleString()}**`],
+        ['Gems', `${user.gems} 💎`],
         ['Total Gambled', user.total_gambled ? user.total_gambled.toLocaleString() : '0'],
         ['Total Won', user.total_won ? user.total_won.toLocaleString() : '0'],
       ])],

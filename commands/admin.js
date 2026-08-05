@@ -26,6 +26,25 @@ module.exports = {
       const u = target ? db.ensureUser(target.id) : db.ensureUser(message.author.id);
       if (!u) return message.channel.send({ embeds: [error('user not found')] });
       message.channel.send(`**${u.balance}** money for <@${u.user_id}>`);
+    } else if (sub === 'gems' || sub === 'gem') {
+      const gsub = (args[1] || '').toLowerCase();
+      if (gsub === 'add' || gsub === 'give') {
+        const amt = parseAmount(args[3]);
+        if (!target || isNaN(amt) || amt <= 0) return message.channel.send({ embeds: [error('usage: Aovo gems add @user <amount>')] });
+        db.addGems(target.id, amt);
+        message.channel.send({ embeds: [success(`added **${amt}** gem${amt > 1 ? 's' : ''} 💎 to <@${target.id}>`)] });
+      } else if (gsub === 'remove' || gsub === 'rm' || gsub === 'take') {
+        const amt = parseAmount(args[3]);
+        if (!target || isNaN(amt) || amt <= 0) return message.channel.send({ embeds: [error('usage: Aovo gems remove @user <amount>')] });
+        db.addGems(target.id, -amt);
+        message.channel.send({ embeds: [success(`removed **${amt}** gem${amt > 1 ? 's' : ''} from <@${target.id}>`)] });
+      } else if (gsub === 'bal') {
+        const u = target ? db.ensureUser(target.id) : db.ensureUser(message.author.id);
+        if (!u) return message.channel.send({ embeds: [error('user not found')] });
+        message.channel.send(`**${u.gems}** gems 💎 for <@${u.user_id}>`);
+      } else {
+        message.channel.send({ embeds: [error('usage: Aovo gems add/remove/bal @user <amount>')] });
+      }
     } else if (sub === 'lucky') {
       if (!target) return message.channel.send({ embeds: [error('usage: Alucky @user')] });
       if (!db.ensureUser(target.id)) return message.channel.send({ embeds: [error('user not found')] });

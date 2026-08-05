@@ -51,6 +51,7 @@ async function init() {
   try { db.run(`ALTER TABLE users ADD COLUMN level INTEGER NOT NULL DEFAULT 1`); } catch (e) {}
   try { db.run(`ALTER TABLE users ADD COLUMN xp INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   try { db.run(`ALTER TABLE users ADD COLUMN xp_time INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN gems INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   db.run(`CREATE TABLE IF NOT EXISTS marriages (user_id TEXT PRIMARY KEY, partner_id TEXT NOT NULL, married_at INTEGER NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS adoption (parent_id TEXT, child_id TEXT, PRIMARY KEY (parent_id, child_id))`);
   db.run(`CREATE TABLE IF NOT EXISTS purchases (user_id TEXT, perk TEXT, expires_at INTEGER, PRIMARY KEY (user_id, perk))`);
@@ -127,6 +128,7 @@ function ensureUser(userId) {
       level: vals[20] || 1,
       xp: vals[21] || 0,
       xp_time: vals[22] || 0,
+      gems: vals[23] || 0,
     };
   }
   return null;
@@ -165,6 +167,26 @@ function addBalance(userId, amount) {
 
 function setBalance(userId, amount) {
   db.run(`UPDATE users SET balance = ${amount} WHERE user_id = '${userId}'`);
+  save();
+}
+
+function getGems(userId) {
+  const u = ensureUser(userId);
+  return u ? u.gems : 0;
+}
+
+function addGems(userId, amount) {
+  let u = ensureUser(userId);
+  if (!u) {
+    db.run(`INSERT INTO users (user_id, balance) VALUES ('${userId}', 0)`);
+    u = ensureUser(userId);
+  }
+  db.run(`UPDATE users SET gems = ${u.gems + amount} WHERE user_id = '${userId}'`);
+  save();
+}
+
+function setGems(userId, amount) {
+  db.run(`UPDATE users SET gems = ${amount} WHERE user_id = '${userId}'`);
   save();
 }
 
@@ -757,6 +779,9 @@ module.exports = {
   getBalance,
   addBalance,
   setBalance,
+  getGems,
+  addGems,
+  setGems,
   claimDaily,
   calcDailyReward,
   claimWeekly,
