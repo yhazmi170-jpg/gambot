@@ -1,1 +1,1 @@
-v1.2.8 — Mines grid uses dark tiles (looks way cleaner)
+v1.2.9 — Mines tiles are now clean blank grey buttons

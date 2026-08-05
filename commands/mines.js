@@ -33,8 +33,10 @@ function buildButtons(game) {
       else if (game.lastSafe === idx) { emoji = '💎'; style = ButtonStyle.Success; disabled = true; }
       else if (rev && game.bombs[idx]) { emoji = '💣'; style = ButtonStyle.Danger; disabled = true; }
       else if (rev) { emoji = '💎'; style = ButtonStyle.Primary; disabled = true; }
-      else { emoji = '⬛'; style = ButtonStyle.Secondary; disabled = false; }
-      comps.push(new ButtonBuilder().setCustomId(`m_${idx}`).setEmoji(emoji).setStyle(style).setDisabled(disabled));
+      else { emoji = null; style = ButtonStyle.Secondary; disabled = false; }
+      const b = new ButtonBuilder().setCustomId(`m_${idx}`).setStyle(style).setDisabled(disabled);
+      if (emoji) b.setEmoji(emoji);
+      comps.push(b);
     }
     if (r === ROWS - 1) {
       const cd = game.hitBomb !== undefined || !game.active;
