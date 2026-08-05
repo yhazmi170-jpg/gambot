@@ -1,1 +1,1 @@
-v1.2.9 — Mines tiles are now clean blank grey buttons
+v1.2.10 — v team add works by species or name (no need for the id)
