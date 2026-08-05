@@ -1,1 +1,1 @@
-v1.2.7 — Shop perks are pricier (custom role 1.5M, rob 15M, vip games 8M, double work 6M, and more)
+v1.2.8 — Mines grid uses dark tiles (looks way cleaner)
