@@ -48,6 +48,9 @@ async function init() {
   try { db.run(`ALTER TABLE users ADD COLUMN bank INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   try { db.run(`ALTER TABLE users ADD COLUMN loan INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   try { db.run(`ALTER TABLE users ADD COLUMN loan_time INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN level INTEGER NOT NULL DEFAULT 1`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN xp INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN xp_time INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   db.run(`CREATE TABLE IF NOT EXISTS marriages (user_id TEXT PRIMARY KEY, partner_id TEXT NOT NULL, married_at INTEGER NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS adoption (parent_id TEXT, child_id TEXT, PRIMARY KEY (parent_id, child_id))`);
   db.run(`CREATE TABLE IF NOT EXISTS purchases (user_id TEXT, perk TEXT, expires_at INTEGER, PRIMARY KEY (user_id, perk))`);
@@ -121,6 +124,9 @@ function ensureUser(userId) {
       bank: vals[17] || 0,
       loan: vals[18] || 0,
       loan_time: vals[19] || 0,
+      level: vals[20] || 1,
+      xp: vals[21] || 0,
+      xp_time: vals[22] || 0,
     };
   }
   return null;
@@ -539,6 +545,41 @@ function randomStats(rarity) {
 
 function expForLevel(level) { return level * 100; }
 
+const XP_PER_LEVEL = 100;
+const XP_COOLDOWN = 30;
+const LEVEL_REWARD = 1000;
+
+function xpForLevel(level) { return level * XP_PER_LEVEL; }
+
+function levelInfo(userId) {
+  const u = ensureUser(userId);
+  if (!u) return { level: 1, xp: 0, needed: xpForLevel(1), progress: 0 };
+  return { level: u.level, xp: u.xp, needed: xpForLevel(u.level), progress: u.xp / xpForLevel(u.level) };
+}
+
+/** Grant command XP with a cooldown. Returns { leveledUp, newLevel, reward } or null on cooldown. */
+function grantXp(userId, amount) {
+  let u = ensureUser(userId);
+  if (!u) { db.run(`INSERT INTO users (user_id, balance) VALUES ('${userId}', 0)`); u = ensureUser(userId); }
+  const now = Math.floor(Date.now() / 1000);
+  if (now - u.xp_time < XP_COOLDOWN) return null;
+
+  let level = u.level;
+  let xp = u.xp + amount;
+  let leveledUp = false;
+  let reward = 0;
+  while (xp >= xpForLevel(level)) {
+    xp -= xpForLevel(level);
+    level++;
+    leveledUp = true;
+    reward += Math.floor(LEVEL_REWARD * level * getBalanceFactor(userId));
+  }
+  db.run(`UPDATE users SET xp = ${xp}, xp_time = ${now}, level = ${level} WHERE user_id = '${userId}'`);
+  save();
+  if (reward > 0) addBalance(userId, reward);
+  return leveledUp ? { leveledUp, newLevel: level, reward, xp, needed: xpForLevel(level) } : { leveledUp: false, newLevel: level, reward: 0, xp, needed: xpForLevel(level) };
+}
+
 function addAnimal(userId) {
   const rarity = randomRarity();
   const species = randomSpecies(rarity);
@@ -764,6 +805,7 @@ module.exports = {
   setCustomRole, getCustomRole, deleteCustomRole, getPerkHolders,
   getBalanceFactor,
   payWin,
+  xpForLevel, levelInfo, grantXp,
   bankDeposit, bankWithdraw, takeLoan, payLoan, LOAN_INTEREST, MAX_LOAN_MULT,
   SPECIES, RARITY_WEIGHTS, RARITY_ORDER, randomRarity, randomSpecies, randomStats, expForLevel,
 };
