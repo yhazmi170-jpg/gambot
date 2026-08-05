@@ -1,1 +1,1 @@
-v1.2.21 -- gems added! Hunt up to 5 animals at once (v hunt <count>, costs gems). Gems drop from rare hunts and are in the shop.
+v1.2.22 -- v battle now asks the opponent to accept (Fight/Cancel) before starting.

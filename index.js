@@ -164,6 +164,10 @@ client.on('interactionCreate', (i) => {
     require('./commands/shop').handleInteraction(i);
     return;
   }
+  if (i.customId.startsWith('battle_')) {
+    require('./commands/battle').handleInteraction(i);
+    return;
+  }
   const fallback = setTimeout(() => i.deferUpdate().catch(() => {}), 2500);
   i._ackFallback = fallback;
 });
