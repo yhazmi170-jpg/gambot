@@ -1,5 +1,31 @@
 const db = require('../db');
-const { embed } = require('../utils/embed');
+const { embed, error } = require('../utils/embed');
+const { getSpeciesImage } = require('../utils/speciesImages');
+
+const RARITY_EMOJIS = { common: '⚪', uncommon: '🟢', rare: '🔵', epic: '🟣', legendary: '🟡' };
+
+function hpBar(pet) {
+  const max = pet.max_hp || pet.hp || 1;
+  const pct = Math.max(0, Math.min(1, pet.hp / max));
+  const total = 10;
+  const filled = Math.round(pct * total);
+  return '▰'.repeat(filled) + '▱'.repeat(total - filled);
+}
+
+function petEmbed(pet, label) {
+  const alive = pet.hp > 0;
+  const img = getSpeciesImage(pet.species);
+  const e = new (require('discord.js').EmbedBuilder)()
+    .setColor(alive ? 0x57f287 : 0xed4245)
+    .setTitle(`${alive ? '🟢' : '❌'} ${pet.species} — Lv.${pet.level}`)
+    .setDescription(
+      `${label}\n` +
+      `\`${hpBar(pet)}\` **${pet.hp}/${pet.max_hp || pet.hp}** (${Math.round((pet.hp / (pet.max_hp || pet.hp || 1)) * 100)}%)\n` +
+      `⚔️ ${pet.attack}   🛡️ ${pet.defense}`
+    );
+  if (img) e.setImage(img);
+  return e;
+}
 
 module.exports = {
   name: 'battle',
@@ -9,17 +35,17 @@ module.exports = {
   description: 'battle another user\'s team',
   async execute(message, args) {
     const target = message.mentions.users.first();
-    if (!target || target.bot) return message.channel.send({ embeds: [require('../utils/embed').error('mention someone to battle')] });
-    if (target.id === message.author.id) return message.channel.send({ embeds: [require('../utils/embed').error('you can\'t battle yourself')] });
+    if (!target || target.bot) return message.channel.send({ embeds: [error('mention someone to battle')] });
+    if (target.id === message.author.id) return message.channel.send({ embeds: [error('you can\'t battle yourself')] });
 
     const myTeam = db.getTeam(message.author.id);
     const theirTeam = db.getTeam(target.id);
-    if (!myTeam || (!myTeam.slot1 && !myTeam.slot2 && !myTeam.slot3)) return message.channel.send({ embeds: [require('../utils/embed').error('your team is empty — use `v team add`')] });
-    if (!theirTeam || (!theirTeam.slot1 && !theirTeam.slot2 && !theirTeam.slot3)) return message.channel.send({ embeds: [require('../utils/embed').error(`${target.username}'s team is empty`) ] });
+    if (!myTeam || (!myTeam.slot1 && !myTeam.slot2 && !myTeam.slot3)) return message.channel.send({ embeds: [error('your team is empty — use `v team add`')] });
+    if (!theirTeam || (!theirTeam.slot1 && !theirTeam.slot2 && !theirTeam.slot3)) return message.channel.send({ embeds: [error(`${target.username}'s team is empty`) ] });
 
     const myPets = [myTeam.slot1, myTeam.slot2, myTeam.slot3].filter(Boolean).map(id => db.getAnimal(id)).filter(Boolean);
     const theirPets = [theirTeam.slot1, theirTeam.slot2, theirTeam.slot3].filter(Boolean).map(id => db.getAnimal(id)).filter(Boolean);
-    if (!myPets.length || !theirPets.length) return message.channel.send({ embeds: [require('../utils/embed').error('one of the teams has no valid animals')] });
+    if (!myPets.length || !theirPets.length) return message.channel.send({ embeds: [error('one of the teams has no valid animals')] });
 
     const myCopy = myPets.map(p => ({ ...p }));
     const theirCopy = theirPets.map(p => ({ ...p }));
@@ -31,25 +57,23 @@ module.exports = {
       const myAlive = myCopy.filter(p => p.hp > 0);
       const theirAlive = theirCopy.filter(p => p.hp > 0);
 
-      // my pets attack
       for (const pet of myAlive) {
         if (!theirAlive.length) break;
-        const target = theirAlive.reduce((a, b) => a.hp < b.hp ? a : b);
-        const dmg = Math.max(0, pet.attack - Math.floor(target.defense / 2) + Math.floor(Math.random() * 10));
-        target.hp = Math.max(0, target.hp - dmg);
-        log.push(`**${pet.species}** deals ${dmg} damage to **${target.species}** (${target.hp} HP left)`);
-        if (target.hp <= 0) log.push(`❌ **${target.species}** fainted!`);
+        const t = theirAlive.reduce((a, b) => a.hp < b.hp ? a : b);
+        const dmg = Math.max(0, pet.attack - Math.floor(t.defense / 2) + Math.floor(Math.random() * 10));
+        t.hp = Math.max(0, t.hp - dmg);
+        log.push(`**${pet.species}** deals ${dmg} damage to **${t.species}** (${t.hp} HP left)`);
+        if (t.hp <= 0) log.push(`❌ **${t.species}** fainted!`);
       }
 
-      // their pets attack
       for (const pet of theirCopy.filter(p => p.hp > 0)) {
         const myAliveNow = myCopy.filter(p => p.hp > 0);
         if (!myAliveNow.length) break;
-        const target = myAliveNow.reduce((a, b) => a.hp < b.hp ? a : b);
-        const dmg = Math.max(0, pet.attack - Math.floor(target.defense / 2) + Math.floor(Math.random() * 10));
-        target.hp = Math.max(0, target.hp - dmg);
-        log.push(`**${pet.species}** deals ${dmg} damage to **${target.species}** (${target.hp} HP left)`);
-        if (target.hp <= 0) log.push(`❌ **${target.species}** fainted!`);
+        const t = myAliveNow.reduce((a, b) => a.hp < b.hp ? a : b);
+        const dmg = Math.max(0, pet.attack - Math.floor(t.defense / 2) + Math.floor(Math.random() * 10));
+        t.hp = Math.max(0, t.hp - dmg);
+        log.push(`**${pet.species}** deals ${dmg} damage to **${t.species}** (${t.hp} HP left)`);
+        if (t.hp <= 0) log.push(`❌ **${t.species}** fainted!`);
       }
     }
 
@@ -60,11 +84,25 @@ module.exports = {
     else if (theirAlive > myAlive) { winner = target; loser = message.author; }
     else { winner = null; loser = null; }
 
+    const embeds = [];
+    embeds.push(embed(`${message.author.username} goes into battle!`, [
+      ['Your Team', myPets.map(p => `Lv.${p.level} ${RARITY_EMOJIS[p.rarity] || ''} ${p.species}`).join('\n'), true],
+      ['Enemy Team', theirPets.map(p => `Lv.${p.level} ${RARITY_EMOJIS[p.rarity] || ''} ${p.species}`).join('\n'), true],
+    ], 0x2b2d31));
+
+    myPets.forEach((p, i) => {
+      const live = myCopy.find(x => x.id === p.id) || p;
+      embeds.push(petEmbed(live, `Your pet`));
+    });
+    theirPets.forEach((p, i) => {
+      const live = theirCopy.find(x => x.id === p.id) || p;
+      embeds.push(petEmbed(live, `Enemy pet`));
+    });
+
     if (winner) {
       const reward = 50 + myPets.length * 10;
       db.payWin(winner.id, reward);
 
-      // add exp to surviving pets
       for (const pet of myPets) {
         const survived = myCopy.find(p => p.id === pet.id);
         if (survived && survived.hp > 0) db.addExp(pet.id, 20);
@@ -77,20 +115,18 @@ module.exports = {
       }
 
       const logText = log.slice(-8).join('\n');
-      return message.channel.send({
-        embeds: [embed('⚔️ Battle Results', [
-          ['Winner', `${winner}`],
-          ['Prize', `**${reward}** ${require('../config').currency}`],
-          ['', logText || 'a close fight!'],
-        ], 0xe74c3c)],
-      });
-    }
-
-    message.channel.send({
-      embeds: [embed('⚔️ Battle Results', [
+      embeds.push(embed('⚔️ Battle Results', [
+        ['Winner', `${winner} (owned by ${winner.username})`],
+        ['Prize', `**${reward}** ${require('../config').currency}`],
+        ['', logText || 'a close fight!'],
+      ], 0xe74c3c));
+    } else {
+      embeds.push(embed('⚔️ Battle Results', [
         ['Draw', 'both teams fought bravely!'],
         ['', log.slice(-5).join('\n')],
-      ], 0x95a5a6)],
-    });
+      ], 0x95a5a6));
+    }
+
+    message.channel.send({ embeds });
   },
 };

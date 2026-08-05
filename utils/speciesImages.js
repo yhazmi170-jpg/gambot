@@ -1,0 +1,47 @@
+const SPECIES_IMAGES = {
+  Rabbit: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/Oryctolagus_cuniculus_Rcdo.jpg/330px-Oryctolagus_cuniculus_Rcdo.jpg',
+  Squirrel: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/68/Sciuridae.jpg/330px-Sciuridae.jpg',
+  Mouse: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/%D0%9C%D1%8B%D1%88%D1%8C_2.jpg/330px-%D0%9C%D1%8B%D1%88%D1%8C_2.jpg',
+  Sparrow: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9b/House_sparrow_male_in_Prospect_Park_%2853532%29.jpg/330px-House_sparrow_male_in_Prospect_Park_%2853532%29.jpg',
+  Frog: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f5/Red-eyed_Leaf_Frog_%2849661076226%29.jpg/330px-Red-eyed_Leaf_Frog_%2849661076226%29.jpg',
+  Chick: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/84/Male_and_female_chicken_sitting_together.jpg/330px-Male_and_female_chicken_sitting_together.jpg',
+  Duckling: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/Bucephala-albeola-010.jpg/330px-Bucephala-albeola-010.jpg',
+  Hamster: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/European_hamster_%28Cricetus_cricetus%29_Meidling.jpg/330px-European_hamster_%28Cricetus_cricetus%29_Meidling.jpg',
+  Fish: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7f/Balantiocheilos_melanopterus_-_Karlsruhe_Zoo_02_%28cropped%29.jpg/330px-Balantiocheilos_melanopterus_-_Karlsruhe_Zoo_02_%28cropped%29.jpg',
+  Butterfly: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Fesoj_-_Papilio_machaon_%28by%29.jpg/330px-Fesoj_-_Papilio_machaon_%28by%29.jpg',
+  Fox: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Vulpes_vulpes_ssp_fulvus.jpg/330px-Vulpes_vulpes_ssp_fulvus.jpg',
+  Owl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/56/Bubo_bubo_sibiricus_-_01.JPG/330px-Bubo_bubo_sibiricus_-_01.JPG',
+  Raccoon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Raccoon_in_Central_Park_%2835264%29.jpg/330px-Raccoon_in_Central_Park_%2835264%29.jpg',
+  Hedgehog: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/72/Igel.JPG/330px-Igel.JPG',
+  Ferret: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/32/Ferret_2008.png/330px-Ferret_2008.png',
+  Parrot: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ad/Rainbow_lorikeet_%28Trichoglossus_moluccanus_moluccanus%29_Sydney.jpg/330px-Rainbow_lorikeet_%28Trichoglossus_moluccanus_moluccanus%29_Sydney.jpg',
+  Turtle: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/21/Turtle_diversity.jpg/330px-Turtle_diversity.jpg',
+  Lizard: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Hemidactylus_platyurus_%28Flat-tailed_House_Gecko%29_on_white_background%2C_focus_stacking.jpg/330px-Hemidactylus_platyurus_%28Flat-tailed_House_Gecko%29_on_white_background%2C_focus_stacking.jpg',
+  Wolf: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/68/Eurasian_wolf_2.jpg/330px-Eurasian_wolf_2.jpg',
+  Eagle: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/60/Eagles_together.jpg/330px-Eagles_together.jpg',
+  Deer: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d9/Family_Cervidae_five_species.jpg/330px-Family_Cervidae_five_species.jpg',
+  Panther: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Black_Panther_-_India.jpg/330px-Black_Panther_-_India.jpg',
+  Hawk: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/81/Northern_Goshawk_ad_M2.jpg/330px-Northern_Goshawk_ad_M2.jpg',
+  Lynx: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/Lynx_heads_collage.jpg/330px-Lynx_heads_collage.jpg',
+  Cobra: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/Indiancobra.jpg/330px-Indiancobra.jpg',
+  Boar: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/Wildschwein%2C_N%C3%A4he_Pulverstampftor_%28cropped%29.jpg/330px-Wildschwein%2C_N%C3%A4he_Pulverstampftor_%28cropped%29.jpg',
+  Dragon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/St_Catherine%2C_St_George_and_the_Dragon_%28M%C3%A4staren_fr%C3%A5n_Kappenberg%29_-_Nationalmuseum_-_18337_%28brightened%29%2C_draken.png/330px-St_Catherine%2C_St_George_and_the_Dragon_%28M%C3%A4staren_fr%C3%A5n_Kappenberg%29_-_Nationalmuseum_-_18337_%28brightened%29%2C_draken.png',
+  Phoenix: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Phoenix_%281583%29.svg/330px-Phoenix_%281583%29.svg.png',
+  Griffin: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Knossos_fresco_in_throne_palace.JPG/330px-Knossos_fresco_in_throne_palace.JPG',
+  Unicorn: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/70/Oftheunicorn.jpg/330px-Oftheunicorn.jpg',
+  Pegasus: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Lakonian_Black-Figure_Kylix%3B_detached_fragments.jpg/330px-Lakonian_Black-Figure_Kylix%3B_detached_fragments.jpg',
+  Kraken: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/Le_Poulpe_Colossal.jpg/330px-Le_Poulpe_Colossal.jpg',
+  Basilisk: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Basilisk_aldrovandi.jpg/330px-Basilisk_aldrovandi.jpg',
+  Leviathan: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/Destruction_of_Leviathan.png/330px-Destruction_of_Leviathan.png',
+  Thunderbird: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9c/Thunderbird_on_Totem_Pole.jpg/330px-Thunderbird_on_Totem_Pole.jpg',
+  Kirin: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Qilin-shaped_incense_burner_1_CAC.JPG/330px-Qilin-shaped_incense_burner_1_CAC.JPG',
+  Cerberus: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Herakles_Kerberos_Eurystheus_Louvre_E701.jpg/330px-Herakles_Kerberos_Eurystheus_Louvre_E701.jpg',
+  Fenrir: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/17/Tullstorpstenen%2C_DR_271%2CTullstorp_1-1%2C_Runristning_%28cropped%29.jpg/330px-Tullstorpstenen%2C_DR_271%2CTullstorp_1-1%2C_Runristning_%28cropped%29.jpg',
+  Jormungandr: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Ragnarok_-_Louis_Moe_%2817006%29_-_cropped_%28cropped%29.png/330px-Ragnarok_-_Louis_Moe_%2817006%29_-_cropped_%28cropped%29.png',
+};
+
+function getSpeciesImage(species) {
+  return SPECIES_IMAGES[species] || null;
+}
+
+module.exports = { SPECIES_IMAGES, getSpeciesImage };
