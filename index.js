@@ -24,9 +24,19 @@ function acquireLock() {
     return true;
   } catch (e) {
     if (e.code === 'EEXIST') {
+      let stale = true;
       try {
         const oldPid = parseInt(fs.readFileSync(lockFile, 'utf8').trim());
-        if (oldPid) { try { process.kill(oldPid, 0); console.log('another instance is running, exiting'); process.exit(0); } catch {} }
+        if (oldPid) {
+          try {
+            const cmd = fs.readFileSync(`/proc/${oldPid}/cmdline`, 'utf8');
+            if (cmd.includes('index.js')) {
+              process.kill(oldPid, 0);
+              console.log('another instance is running, exiting');
+              process.exit(0);
+            }
+          } catch {}
+        }
       } catch {}
       try { fs.unlinkSync(lockFile); } catch {}
       return acquireLock();
