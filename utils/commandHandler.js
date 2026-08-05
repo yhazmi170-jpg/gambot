@@ -102,6 +102,7 @@ function handleMessage(message) {
   }
 
   if (message.guild && db.isCommandDisabled(message.guild.id, cmd.name)) {
+    message.channel.send({ embeds: [error(`\`${cmd.name}\` is disabled in this server`)] }).then(m => setTimeout(() => m.delete().catch(() => {}), 4000)).catch(() => {});
     return;
   }
 

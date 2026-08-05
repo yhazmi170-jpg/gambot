@@ -1,1 +1,1 @@
-v1.2.15 — bot stability: auto-restart supervisor, crash logging, and safer mines (bets are refunded if anything goes wrong).
+v1.2.16 — disabled commands now show a notice ("x is disabled here") that auto-deletes, so they don't silently do nothing.
