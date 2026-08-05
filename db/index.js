@@ -635,7 +635,7 @@ function renameAnimal(id, name) {
 function setTeam(userId, slot, animalId) {
   const existing = getTeam(userId);
   const slots = {};
-  for (const s of [1, 2, 3]) slots[`slot${s}`] = existing[s] || null;
+  for (const s of [1, 2, 3]) slots[`slot${s}`] = (existing || {})[s] || null;
   slots[`slot${slot}`] = animalId;
   if (existing) {
     db.run(`UPDATE teams SET slot1 = ${slots.slot1 || 'NULL'}, slot2 = ${slots.slot2 || 'NULL'}, slot3 = ${slots.slot3 || 'NULL'} WHERE user_id = '${userId}'`);

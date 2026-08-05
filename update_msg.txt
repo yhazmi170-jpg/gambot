@@ -1,1 +1,1 @@
-v1.2.17 — enable/disable can never be locked out, even if all commands are disabled.
+v1.2.18 — fixed v team add crashing when you had no team yet.
