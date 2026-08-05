@@ -1,31 +1,6 @@
 const db = require('../db');
-const { embed, error } = require('../utils/embed');
-const { getSpeciesImage } = require('../utils/speciesImages');
-
-const RARITY_EMOJIS = { common: '⚪', uncommon: '🟢', rare: '🔵', epic: '🟣', legendary: '🟡' };
-
-function hpBar(pet) {
-  const max = pet.max_hp || pet.hp || 1;
-  const pct = Math.max(0, Math.min(1, pet.hp / max));
-  const total = 10;
-  const filled = Math.round(pct * total);
-  return '▰'.repeat(filled) + '▱'.repeat(total - filled);
-}
-
-function petEmbed(pet, label) {
-  const alive = pet.hp > 0;
-  const img = getSpeciesImage(pet.species);
-  const e = new (require('discord.js').EmbedBuilder)()
-    .setColor(alive ? 0x57f287 : 0xed4245)
-    .setTitle(`${alive ? '🟢' : '❌'} ${pet.species} — Lv.${pet.level}`)
-    .setDescription(
-      `${label}\n` +
-      `\`${hpBar(pet)}\` **${pet.hp}/${pet.max_hp || pet.hp}** (${Math.round((pet.hp / (pet.max_hp || pet.hp || 1)) * 100)}%)\n` +
-      `⚔️ ${pet.attack}   🛡️ ${pet.defense}`
-    );
-  if (img) e.setImage(img);
-  return e;
-}
+const { error } = require('../utils/embed');
+const { renderBattleImage } = require('../utils/battleImage');
 
 module.exports = {
   name: 'battle',
@@ -79,30 +54,16 @@ module.exports = {
 
     const myAlive = myCopy.filter(p => p.hp > 0).length;
     const theirAlive = theirCopy.filter(p => p.hp > 0).length;
-    let winner, loser;
-    if (myAlive > theirAlive) { winner = message.author; loser = target; }
-    else if (theirAlive > myAlive) { winner = target; loser = message.author; }
-    else { winner = null; loser = null; }
+    let winner;
+    if (myAlive > theirAlive) winner = message.author;
+    else if (theirAlive > myAlive) winner = target;
+    else winner = null;
 
-    const embeds = [];
-    embeds.push(embed(`${message.author.username} goes into battle!`, [
-      ['Your Team', myPets.map(p => `Lv.${p.level} ${RARITY_EMOJIS[p.rarity] || ''} ${p.species}`).join('\n'), true],
-      ['Enemy Team', theirPets.map(p => `Lv.${p.level} ${RARITY_EMOJIS[p.rarity] || ''} ${p.species}`).join('\n'), true],
-    ], 0x2b2d31));
-
-    myPets.forEach((p, i) => {
-      const live = myCopy.find(x => x.id === p.id) || p;
-      embeds.push(petEmbed(live, `Your pet`));
-    });
-    theirPets.forEach((p, i) => {
-      const live = theirCopy.find(x => x.id === p.id) || p;
-      embeds.push(petEmbed(live, `Enemy pet`));
-    });
+    const result = winner ? (winner.id === message.author.id ? `YOU WIN! +${20 * myPets.filter(p => myCopy.find(x => x.id === p.id) && myCopy.find(x => x.id === p.id).hp > 0).length} XP` : `YOU LOSE!`) : 'DRAW!';
 
     if (winner) {
       const reward = 50 + myPets.length * 10;
       db.payWin(winner.id, reward);
-
       for (const pet of myPets) {
         const survived = myCopy.find(p => p.id === pet.id);
         if (survived && survived.hp > 0) db.addExp(pet.id, 20);
@@ -113,20 +74,19 @@ module.exports = {
         if (survived && survived.hp > 0) db.addExp(pet.id, 20);
         else db.addExp(pet.id, 5);
       }
-
-      const logText = log.slice(-8).join('\n');
-      embeds.push(embed('⚔️ Battle Results', [
-        ['Winner', `${winner} (owned by ${winner.username})`],
-        ['Prize', `**${reward}** ${require('../config').currency}`],
-        ['', logText || 'a close fight!'],
-      ], 0xe74c3c));
-    } else {
-      embeds.push(embed('⚔️ Battle Results', [
-        ['Draw', 'both teams fought bravely!'],
-        ['', log.slice(-5).join('\n')],
-      ], 0x95a5a6));
     }
 
-    message.channel.send({ embeds });
+    const img = renderBattleImage({
+      playerName: message.author.username,
+      enemyName: target.username,
+      myPets: myCopy,
+      theirPets: theirCopy,
+      turns: round,
+      result,
+    });
+
+    return message.channel.send({
+      files: [{ attachment: img, name: 'battle.png' }],
+    });
   },
 };

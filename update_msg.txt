@@ -1,1 +1,1 @@
-v1.2.19 -- v battle now shows real pet images and health bars, owo style.
+v1.2.20 -- v battle now renders a retro pixel-art battle screen (sprites, HP bars, stats) like old game.
