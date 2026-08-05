@@ -1,7 +1,7 @@
 const db = require('../db');
 const config = require('../config');
-const { parseAmount } = require('../utils/embed');
-const { ContainerBuilder, TextDisplayBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
+const { embed, error, parseAmount } = require('../utils/embed');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 const activeGames = new Map();
 const ROWS = 4; const COLS = 4; const BOMBS = 4;
@@ -68,10 +68,8 @@ function buildContainer(game, outcome) {
     lines.push(`Gems: **${rc}**`);
     if (rc === 0 && !game.hasCustomMines) lines.push('', `_\`v mines <bet> <mines>\` to set mine count_`);
   }
-  return new ContainerBuilder()
-    .setAccentColor(outcome ? (outcome.includes('Cashed Out') || outcome.includes('Cleared') ? 0x57f287 : 0xed4245) : 0x2b2d31)
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')))
-    .addActionRowComponents(...buildButtons(game));
+  const color = outcome ? (outcome.includes('Cashed Out') || outcome.includes('Cleared') ? 0x57f287 : 0xed4245) : 0x2b2d31;
+  return { embeds: [embed('💣 Mines', [['', lines.join('\n')]], color)], components: buildButtons(game) };
 }
 
 module.exports = {
@@ -89,12 +87,12 @@ module.exports = {
     }
 
     let amount;
-    if ((args[0] || '').toLowerCase() === 'all' && !testMode) { const u = db.ensureUser(message.author.id); amount = Math.min(u.balance, db.getMaxBet(message.author.id)); if (amount <= 0) return message.channel.send('you have no money'); }
-    else { amount = parseAmount(args[0]); if (isNaN(amount) || amount <= 0) amount = testMode ? 1000 : undefined; if (amount === undefined) return message.channel.send('bet an amount or use `all`'); }
+    if ((args[0] || '').toLowerCase() === 'all' && !testMode) { const u = db.ensureUser(message.author.id); amount = Math.min(u.balance, db.getMaxBet(message.author.id)); if (amount <= 0) return message.channel.send({ embeds: [error('you have no money')] }); }
+    else { amount = parseAmount(args[0]); if (isNaN(amount) || amount <= 0) amount = testMode ? 1000 : undefined; if (amount === undefined) return message.channel.send({ embeds: [error('bet an amount or use `all`')] }); }
 
     const user = db.ensureUser(message.author.id);
-    if (!testMode && user.balance < amount) return message.channel.send('not enough money');
-    if (activeGames.has(message.author.id)) return message.channel.send('you already have an active mines game');
+    if (!testMode && user.balance < amount) return message.channel.send({ embeds: [error('not enough money')] });
+    if (activeGames.has(message.author.id)) return message.channel.send({ embeds: [error('you already have an active mines game')] });
 
     if (!testMode) {
       db.addBalance(message.author.id, -amount);
@@ -113,10 +111,7 @@ module.exports = {
     const game = { bombs: createGrid(bombCount), bombCount, revealed: new Set(), bet: amount, active: true, lastSafe: -1, hitBomb: undefined, testMode, lucky, hasCustomMines };
     activeGames.set(message.author.id, game);
 
-    message.channel.send({
-      components: [buildContainer(game)],
-      flags: MessageFlags.IsComponentsV2,
-    }).then(msg => {
+    message.channel.send(buildContainer(game)).then(msg => {
       const col = msg.createMessageComponentCollector({ filter: i => i.user.id === message.author.id, time: 60000 });
       col.on('collect', async (i) => {
         if (!game.active) { await i.deferUpdate().catch(() => {}); return; }
@@ -125,7 +120,7 @@ module.exports = {
           const p = Math.floor(game.bet * mult(game.revealed.size, game.bombCount, game.lucky));
           const paid = game.testMode ? (p - game.bet) : db.payWin(message.author.id, p - game.bet, game.bet);
           const total = game.bet + paid;
-          return i.update({ components: [new ContainerBuilder().setAccentColor(0x57f287).addTextDisplayComponents(new TextDisplayBuilder().setContent(`${game.testMode ? '🧪' : '💣'} Mines  |  Cashed Out${game.testMode ? ' [TEST]' : ''}\n\n**${total.toLocaleString()}** ${config.currency} (+**${paid}**)`))], flags: MessageFlags.IsComponentsV2 });
+          return i.update({ embeds: [embed('💣 Mines', [['', `${game.testMode ? '🧪' : '💣'} Cashed Out${game.testMode ? ' [TEST]' : ''}\n\n**${total.toLocaleString()}** ${config.currency} (+**${paid}**)${game.testMode ? ' (no money gained)' : ''}`]], 0x57f287)] }).catch(() => {});
         }
         const idx = parseInt(i.customId.split('_')[1]);
         if (game.revealed.has(idx)) { await i.deferUpdate().catch(() => {}); return; }
@@ -137,7 +132,8 @@ module.exports = {
             refund = db.getInsuranceRefund(message.author.id, game.bet);
             if (refund > 0) db.addBalance(message.author.id, refund);
           }
-          return i.update({ components: [new ContainerBuilder().setAccentColor(0xed4245).addTextDisplayComponents(new TextDisplayBuilder().setContent(`${game.testMode ? '🧪' : '💥'} Mines  |  Touched a mine!${game.testMode ? ' [TEST]' : ''}\n\nLost **${game.bet.toLocaleString()}** ${config.currency}${refund > 0 ? ` (refund **${refund}**)` : ''}${game.testMode ? ' (no money lost)' : ''}`)).addActionRowComponents(...buildButtons(game))], flags: MessageFlags.IsComponentsV2 });
+          const lines = [`${game.testMode ? '🧪' : '💥'} Touched a mine!${game.testMode ? ' [TEST]' : ''}\n\nLost **${game.bet.toLocaleString()}** ${config.currency}${refund > 0 ? ` (refund **${refund}**)` : ''}${game.testMode ? ' (no money lost)' : ''}`];
+          return i.update({ embeds: [embed('💣 Mines', [['', lines.join('\n')]], 0xed4245)], components: buildButtons(game) }).catch(() => {});
         }
         game.revealed.add(idx); game.lastSafe = idx;
         const rc = game.revealed.size;
@@ -147,13 +143,19 @@ module.exports = {
           const paid = game.testMode ? (p - game.bet) : db.payWin(message.author.id, p - game.bet, game.bet);
           const total = game.bet + paid;
           for (let j = 0; j < ROWS * COLS; j++) game.revealed.add(j);
-          return i.update({ components: [new ContainerBuilder().setAccentColor(0x57f287).addTextDisplayComponents(new TextDisplayBuilder().setContent(`${game.testMode ? '🧪' : '💣'} Mines  |  All Cleared!${game.testMode ? ' [TEST]' : ''}\n\n**${total.toLocaleString()}** ${config.currency} (+**${paid}**)${game.testMode ? ' (no money gained)' : ''}`)).addActionRowComponents(...buildButtons(game))], flags: MessageFlags.IsComponentsV2 });
+          const lines = [`${game.testMode ? '🧪' : '💣'} All Cleared!${game.testMode ? ' [TEST]' : ''}\n\n**${total.toLocaleString()}** ${config.currency} (+**${paid}**)${game.testMode ? ' (no money gained)' : ''}`];
+          return i.update({ embeds: [embed('💣 Mines', [['', lines.join('\n')]], 0x57f287)], components: buildButtons(game) }).catch(() => {});
         }
-        i.update({ components: [buildContainer(game)], flags: MessageFlags.IsComponentsV2 }).catch(() => {});
+        i.update(buildContainer(game)).catch(() => {});
       });
       col.on('end', () => {
         if (game.active) { game.active = false; activeGames.delete(message.author.id); msg.edit({ components: [] }).catch(() => {}); }
       });
+    }).catch(err => {
+      activeGames.delete(message.author.id);
+      if (!game.testMode) db.addBalance(message.author.id, game.bet);
+      console.error('mines send error:', err);
+      message.channel.send({ embeds: [error('failed to start mines game')] }).catch(() => {});
     });
   },
 };

@@ -28,14 +28,16 @@ module.exports = {
     }
 
     const lucky = db.ensureUser(message.author.id).lucky;
-    const crashPoint = lucky ? target + 10 + Math.random() * 20 : 1 + Math.random() * 9;
+    const crashPoint = lucky ? target + 10 + Math.random() * 20 : 0.99 / (1 - Math.random());
     const win = crashPoint >= target;
     const payout = win ? Math.floor(amount * (lucky ? target * 3 : target)) : 0;
     const net = payout - amount;
 
     if (win) {
       const paid = db.payWin(message.author.id, net);
-      message.channel.send(`📈 crashed at **${crashPoint.toFixed(2)}x** — cashed out at **${target}x** for **${amount + paid}** (+**${paid}**)`);
+      const realMult = ((amount + paid) / amount).toFixed(2);
+      const cut = paid < net ? ` (paid ${realMult}x after balance cut)` : '';
+      message.channel.send(`📈 crashed at **${crashPoint.toFixed(2)}x** — cashed out at **${target}x** for **${amount + paid}** (+**${paid}**)${cut}`);
     } else {
       db.addBalance(message.author.id, -amount);
       db.addGambled(message.author.id, amount);
