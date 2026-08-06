@@ -43,7 +43,8 @@
 - [x] Help descriptions on all cmds + gamehelp poker/bj + standing “always update help” rule
 
 ## Next / open
-- [ ] **PUSH v1.5.0 — DONE (pushed `3a8bf5c`..`cf2659d`).** Deploy verify: new tables (quests/bounties/vaults/blackmarket/achievements/stocks) + update embed posts (v1.5.0).
+- [ ] **Update channel announcement lesson (v1.5.0):** boot DM to owner ALWAYS fires with update_msg on every restart (that's the "it just dmed me" the user sees — normal). Channel posts were silently skipped (cache miss) then marked notified anyway → channel never got v1.5.0. Fixed with `postUpdateAnnouncement` (fetch + mark only on full send) + `Aovo announce` force-repost with per-channel results. If the 📢 channel still doesn't get a post: run `Aovo announce` and read the per-channel ✅/❌ report — stale channel IDs in `update_channels` table fail loudly now.
+- [ ] **PUSH v1.5.0 — DONE (pushed `3a8bf5c`..`97718c1`).** Deploy verify: new tables + update embed. Note: v1.5.0 channel announcement was lost to the cache bug; force-post with `Aovo announce` after deploy.
 - [ ] **AFTER ts ships:** slots jackpot effects — big win announcements (e.g. `777` → JACKPOTTTT-style text/flair) in `commands/slots.js`.
 - [ ] **Update policy active (v1.5.0 rule):** big updates = version bump + `update_msg.txt` + announce; small updates = push silently + append to `pending_updates.txt`, flush together after ~10. See AGENTS.md.
 - [ ] **Restore friend's lost ~30m** (`554257220523655199`, @伤害): live bal **2,445,528** (gems 0). Re-run `Aovo add @伤害 29774999` (target 32,220,527 from snapshot `1802448`, 2026-08-05T22:50:48Z). NOW SAFE: 1-min backups + empty-DB guard + shutdown backup + scan-all restore protect it.

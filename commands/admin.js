@@ -177,18 +177,24 @@ module.exports = {
         if (!msg) return message.channel.send({ embeds: [error('update message is empty — set one with `Aovo pupd <message>` first')] });
         const channels = db.getAllUpdateChannels();
         if (!channels.length) return message.channel.send({ embeds: [error('no update channel set — use `Aovo updates #channel` first')] });
-        let sent = 0;
-        for (const { channel_id } of channels) {
-          message.client.channels.fetch(channel_id).then(ch => {
-            if (!ch || typeof ch.send !== 'function') return;
-            ch.send({ embeds: [embed('📢 Bot Update', [
-              ['Version', `v${version}`],
-              ['What\'s New', msg],
-              ['Uptime', 'Manual re-announce'],
-            ], 0x5865f2)] }).then(() => { sent++; if (sent === channels.length) message.channel.send({ embeds: [success(`announced to ${sent} update channel${sent > 1 ? 's' : ''}`)] }); }).catch(() => {});
-          }).catch(() => {});
-        }
-        message.channel.send({ embeds: [success(`re-announcing to ${channels.length} update channel${channels.length > 1 ? 's' : ''}...`)] });
+        (async () => {
+          const lines = [];
+          for (const { guild_id, channel_id } of channels) {
+            try {
+              const ch = await message.client.channels.fetch(channel_id);
+              if (!ch || typeof ch.send !== 'function') { lines.push(`<#${channel_id}> — not a text channel`); continue; }
+              await ch.send({ embeds: [embed('📢 Bot Update', [
+                ['Version', `v${version}`],
+                ['What\'s New', msg],
+                ['Uptime', 'Manual re-announce'],
+              ], 0x5865f2)] });
+              lines.push(`<#${channel_id}> — posted ✅`);
+            } catch (e) {
+              lines.push(`<#${channel_id}> — FAILED (${(e && e.message || 'unknown').slice(0, 80)})`);
+            }
+          }
+          message.channel.send({ embeds: [embed('📢 Announce Result', [['', lines.join('\n')]], 0x2b2d31)] });
+        })();
       } else if (sub === 'addrole') {
       if (!message.guild) return message.channel.send({ embeds: [error('must be in a server')] });
       const roleTarget = message.mentions.users.first();
