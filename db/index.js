@@ -63,6 +63,8 @@ async function init() {
   try { db.run(`ALTER TABLE users ADD COLUMN snail_bought INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   try { db.run(`ALTER TABLE users ADD COLUMN snail_buy_day INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   try { db.run(`ALTER TABLE users ADD COLUMN eggs INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN hatched INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN battles_won INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   db.run(`CREATE TABLE IF NOT EXISTS marriages (user_id TEXT PRIMARY KEY, partner_id TEXT NOT NULL, married_at INTEGER NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS adoption (parent_id TEXT, child_id TEXT, PRIMARY KEY (parent_id, child_id))`);
   db.run(`CREATE TABLE IF NOT EXISTS purchases (user_id TEXT, perk TEXT, expires_at INTEGER, PRIMARY KEY (user_id, perk))`);
@@ -145,6 +147,19 @@ async function init() {
     deposited INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (guild_id, user_id)
   )`);
+  db.run(`CREATE TABLE IF NOT EXISTS achievements (
+    user_id TEXT NOT NULL,
+    key TEXT NOT NULL,
+    unlocked_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+    PRIMARY KEY (user_id, key)
+  )`);
+  db.run(`CREATE TABLE IF NOT EXISTS blackmarket (
+    slot INTEGER PRIMARY KEY,
+    item_id TEXT NOT NULL,
+    price INTEGER NOT NULL,
+    stock INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+  )`);
   save();
 }
 
@@ -197,6 +212,8 @@ function ensureUser(userId) {
       snail_bought: vals[32] || 0,
       snail_buy_day: vals[33] || 0,
       eggs: vals[34] || 0,
+      hatched: vals[35] || 0,
+      battles_won: vals[36] || 0,
     };
   }
   return null;
@@ -794,7 +811,7 @@ function addEgg(userId, n = 1) {
 
 function hatchEgg(userId) {
   if (getEggs(userId) <= 0) return null;
-  db.run(`UPDATE users SET eggs = eggs - 1 WHERE user_id = '${userId}'`);
+  db.run(`UPDATE users SET eggs = eggs - 1, hatched = hatched + 1 WHERE user_id = '${userId}'`);
   const r = Math.random();
   let rarity = 'common';
   let acc = 0;
@@ -1403,6 +1420,126 @@ function getVaultTop(guildId, limit = 10) {
   return rows[0].values.map(v => ({ user_id: v[0], deposited: v[1] }));
 }
 
+// ---------- Achievements ----------
+
+const ACHIEVEMENTS = [
+  { key: 'first_animal', name: '🐣 First Catch', desc: 'catch your first animal', reward: 10000, test: u => (u.animals || 0) >= 1 },
+  { key: 'zoo_10', name: '🐾 Zoo Keeper', desc: 'own 10 animals', reward: 50000, test: u => (u.animals || 0) >= 10 },
+  { key: 'zoo_50', name: '🏞️ Animal Collector', desc: 'own 50 animals', reward: 250000, test: u => (u.animals || 0) >= 50 },
+  { key: 'zoo_100', name: '🌍 Safari Legend', desc: 'own 100 animals', reward: 750000, test: u => (u.animals || 0) >= 100 },
+  { key: 'first_hatch', name: '🥚 Hatched', desc: 'hatch your first egg', reward: 20000, test: u => (u.hatched || 0) >= 1 },
+  { key: 'hatch_10', name: '🐣 Egg Factory', desc: 'hatch 10 eggs', reward: 100000, test: u => (u.hatched || 0) >= 10 },
+  { key: 'first_battle', name: '⚔️ First Blood', desc: 'win your first battle', reward: 15000, test: u => (u.battles_won || 0) >= 1 },
+  { key: 'battle_25', name: '🏆 Battle Hardened', desc: 'win 25 battles', reward: 200000, test: u => (u.battles_won || 0) >= 25 },
+  { key: 'gems_5', name: '💎 Gem Hoarder', desc: 'own 5 gems', reward: 30000, test: u => (u.gems || 0) >= 5 },
+  { key: 'gems_20', name: '💎💎 Gem Tycoon', desc: 'own 20 gems', reward: 150000, test: u => (u.gems || 0) >= 20 },
+  { key: 'essence_50', name: '✨ Essence Seeker', desc: 'hold 50 essence', reward: 40000, test: u => (u.essence || 0) >= 50 },
+  { key: 'essence_200', name: '✨✨ Essence Master', desc: 'hold 200 essence', reward: 200000, test: u => (u.essence || 0) >= 200 },
+  { key: 'gamble_1m', name: '🎰 Big Spender', desc: 'gamble 1M total', reward: 50000, test: u => (u.total_gambled || 0) >= 1000000 },
+  { key: 'gamble_10m', name: '🎰🎰 High Roller', desc: 'gamble 10M total', reward: 300000, test: u => (u.total_gambled || 0) >= 10000000 },
+  { key: 'won_1m', name: '💰 Winner', desc: 'win 1M total from games', reward: 75000, test: u => (u.total_won || 0) >= 1000000 },
+  { key: 'won_10m', name: '💰💰 Millionaire Machine', desc: 'win 10M total from games', reward: 400000, test: u => (u.total_won || 0) >= 10000000 },
+  { key: 'bal_1m', name: '🏦 Reached 1M', desc: 'hold 1M coins', reward: 100000, test: u => (u.balance || 0) >= 1000000 },
+  { key: 'bal_10m', name: '🏦🏦 Reached 10M', desc: 'hold 10M coins', reward: 500000, test: u => (u.balance || 0) >= 10000000 },
+  { key: 'first_legendary', name: '🌟 Legendary Owner', desc: 'own a legendary animal', reward: 250000, test: u => u.has_legendary === true },
+];
+
+function getAchievements(userId) {
+  const rows = db.exec(`SELECT key FROM achievements WHERE user_id = '${userId}'`);
+  if (!rows.length) return [];
+  return rows[0].values.map(v => v[0]);
+}
+
+/** Returns newly unlocked achievements (rewards already granted). */
+function checkAchievements(userId) {
+  const u = ensureUser(userId);
+  if (!u) return [];
+  const animals = getUserAnimals(userId);
+  const state = {
+    animals: animals.length,
+    has_legendary: animals.some(a => a.rarity === 'legendary'),
+    hatched: u.hatched,
+    battles_won: u.battles_won,
+    gems: u.gems,
+    essence: u.essence,
+    total_gambled: u.total_gambled,
+    total_won: u.total_won,
+    balance: u.balance,
+  };
+  const owned = new Set(getAchievements(userId));
+  const unlocked = [];
+  for (const ach of ACHIEVEMENTS) {
+    if (!owned.has(ach.key) && ach.test(state)) {
+      db.run(`INSERT INTO achievements (user_id, key) VALUES ('${userId}', '${ach.key}')`);
+      addBalance(userId, ach.reward);
+      unlocked.push(ach);
+    }
+  }
+  if (unlocked.length) save();
+  return unlocked;
+}
+
+function getAchievementList() {
+  return ACHIEVEMENTS;
+}
+
+// ---------- Black market (rotating special deals) ----------
+
+const BLACK_MARKET_ITEMS = [
+  { id: 'bm_egg', name: '🥚 Mystery Egg', desc: 'an egg — hatch it for a surprise pet', price: 250000, stock: 3, grant: (userId) => addEgg(userId, 1) },
+  { id: 'bm_essence50', name: '✨ Essence (50)', desc: '50 essence for upgrades', price: 400000, stock: 3, grant: (userId) => { db.run(`UPDATE users SET essence = essence + 50 WHERE user_id = '${userId}'`); save(); } },
+  { id: 'bm_gem', name: '💎 Gem', desc: '+1 hunt capacity gem', price: 1750000, stock: 2, grant: (userId) => addGems(userId, 1) },
+  { id: 'bm_common', name: '⚪ Common Pet', desc: 'a random common animal', price: 150000, stock: 5, grant: (userId) => addAnimal(userId, false) },
+  { id: 'bm_rare', name: '🔵 Rare Pet', desc: 'a random rare animal', price: 1500000, stock: 2, grant: (userId) => { const a = addAnimal(userId, true); return a; } },
+  { id: 'bm_essence200', name: '✨✨ Essence (200)', desc: '200 essence for upgrades', price: 1400000, stock: 2, grant: (userId) => { db.run(`UPDATE users SET essence = essence + 200 WHERE user_id = '${userId}'`); save(); } },
+  { id: 'bm_xp', name: '⚡ XP Boost', desc: '1000 bonus xp', price: 800000, stock: 2, grant: (userId) => addXpRaw(userId, 1000) },
+];
+
+const BM_SLOTS = 4;
+const BM_REFRESH_SECONDS = 6 * 3600;
+
+function refreshBlackMarket() {
+  const pool = [...BLACK_MARKET_ITEMS];
+  db.run(`DELETE FROM blackmarket`);
+  for (let s = 0; s < BM_SLOTS; s++) {
+    if (!pool.length) break;
+    const idx = Math.floor(Math.random() * pool.length);
+    const item = pool.splice(idx, 1)[0];
+    const jitter = 0.85 + Math.random() * 0.3;
+    const price = Math.floor(item.price * jitter);
+    db.run(`INSERT INTO blackmarket (slot, item_id, price, stock, expires_at) VALUES (${s}, '${item.id}', ${price}, ${item.stock}, ${Math.floor(Date.now() / 1000) + BM_REFRESH_SECONDS})`);
+  }
+  save();
+}
+
+function getBlackMarket() {
+  const rows = db.exec(`SELECT * FROM blackmarket`);
+  if (!rows.length || !rows[0].values.length) {
+    refreshBlackMarket();
+    return getBlackMarket();
+  }
+  const items = rows[0].values.map(v => ({ slot: v[0], item_id: v[1], price: v[2], stock: v[3], expires_at: v[4] }));
+  const now = Math.floor(Date.now() / 1000);
+  if (items.some(it => it.expires_at <= now || it.stock <= 0)) {
+    refreshBlackMarket();
+    return getBlackMarket();
+  }
+  return items.map(it => ({ ...it, def: BLACK_MARKET_ITEMS.find(d => d.id === it.item_id) }));
+}
+
+function buyBlackMarketItem(userId, slot) {
+  const items = getBlackMarket();
+  const it = items.find(x => x.slot === slot);
+  if (!it || it.stock <= 0) return { ok: false, reason: 'gone' };
+  const u = ensureUser(userId);
+  if (!u || u.balance < it.price) return { ok: false, reason: 'coins' };
+  addBalance(userId, -it.price);
+  it.def.grant(userId);
+  db.run(`UPDATE blackmarket SET stock = stock - 1 WHERE slot = ${slot}`);
+  save();
+  return { ok: true, item: it.def, price: it.price };
+}
+
 // ---------- One-time notification flags (DB-backed — survives ephemeral Render FS) ----------
 
 function wasNotified(key) {
@@ -1484,6 +1621,8 @@ module.exports = {
   rollEggDrop, getEggs, addEgg, hatchEgg, transferAnimal, EGG_DROP_CHANCE, EGG_HATCH_RARITY,
   getQuest, addQuestProgress, claimQuest, getBounty, addBountyProgress, claimBounty,
   getVault, vaultDeposit, vaultWithdraw, getVaultTop,
+  getAchievements, checkAchievements, getAchievementList,
+  getBlackMarket, buyBlackMarketItem,
   SPECIES, RARITY_WEIGHTS, RARITY_ORDER, randomRarity, randomSpecies, randomStats, expForLevel,
   getEssence, addEssence, getTraits, traitCost, upgradeTrait, randomRarityWithEff,
   huntCapacity, huntYield, rollGemDrop, sacrificeAnimals, addXpRaw,

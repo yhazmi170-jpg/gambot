@@ -84,6 +84,43 @@ function buildShop() {
 
 const pendingShops = new Map();
 
+const CATEGORY_EMOJI = ['🛍️', '📅', '🛠️', '👥'];
+const CATEGORY_SHORT = ['One-Time', 'Monthly Subs', 'Server Tools', 'Social'];
+
+function buildMenuEmbed() {
+  const lines = SHOP.map((cat, idx) => `${CATEGORY_EMOJI[idx]} **${CATEGORY_SHORT[idx]}** — ${cat.items.length} item${cat.items.length > 1 ? 's' : ''}`).join('\n');
+  return new EmbedBuilder().setColor(0x2b2d31).setTitle('🛒 Shop').setDescription(`pick a category to browse items\n\n${lines}`);
+}
+
+function buildMenuRow() {
+  return new ActionRowBuilder().addComponents(SHOP.map((cat, idx) =>
+    new ButtonBuilder().setCustomId(`shop_cat_${idx}`).setLabel(CATEGORY_SHORT[idx]).setEmoji(CATEGORY_EMOJI[idx]).setStyle(ButtonStyle.Secondary)
+  ));
+}
+
+function buildCategoryEmbed(cat, idx) {
+  const lines = cat.items.map(it => `\`${priceStr(it.price)}\` ${it.name}${it.monthly ? ' /mo' : ''} — ${it.desc}`).join('\n');
+  return new EmbedBuilder().setColor(0x2b2d31).setTitle(`${CATEGORY_EMOJI[idx]} ${cat.category}`).setDescription(`${lines}\n\nclick a button to purchase — confirm on the next screen`);
+}
+
+function buildCategoryRows(idx) {
+  const cat = SHOP[idx];
+  const rows = [];
+  let row = [];
+  for (const it of cat.items) {
+    row.push(new ButtonBuilder()
+      .setCustomId(`shop_${it.id}`)
+      .setLabel(`${it.name.split('(')[0].trim()} - ${priceStr(it.price)}${it.monthly ? '/mo' : ''}`)
+      .setStyle(ButtonStyle.Secondary));
+    if (row.length === 5) { rows.push(new ActionRowBuilder().addComponents(row)); row = []; }
+  }
+  if (row.length) rows.push(new ActionRowBuilder().addComponents(row));
+  rows.push(new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('shop_back').setLabel('◀ Back').setStyle(ButtonStyle.Secondary)
+  ));
+  return rows;
+}
+
 function errEmbed(text) {
   return new EmbedBuilder().setColor(0xed4245).setDescription(text);
 }
@@ -98,6 +135,17 @@ async function handleInteraction(i) {
   try {
     const id = i.customId;
     if (id.startsWith('shop_buy_') || id.startsWith('shop_no_')) { await handleConfirm(i); return; }
+
+    if (id.startsWith('shop_cat_')) {
+      const idx = parseInt(id.replace('shop_cat_', ''), 10);
+      if (isNaN(idx) || !SHOP[idx]) return;
+      await i.update({ embeds: [buildCategoryEmbed(SHOP[idx], idx)], components: buildCategoryRows(idx) });
+      return;
+    }
+    if (id === 'shop_back') {
+      await i.update({ embeds: [buildMenuEmbed()], components: [buildMenuRow()] });
+      return;
+    }
 
     await i.deferUpdate();
 
@@ -201,6 +249,6 @@ module.exports = { buildShop, postShop, handleInteraction, SHOP, allShopItems, g
   description: 'browse and buy perks',
   aliases: ['store', 'market'],
   execute(message, args) {
-    postShop(message.channel);
+    message.channel.send({ embeds: [buildMenuEmbed()], components: [buildMenuRow()] });
   },
 };
