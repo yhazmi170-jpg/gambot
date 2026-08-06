@@ -106,6 +106,10 @@ async function init() {
     next_grant INTEGER NOT NULL,
     cycles_done INTEGER NOT NULL DEFAULT 0
   )`);
+  db.run(`CREATE TABLE IF NOT EXISTS notifications (
+    key TEXT PRIMARY KEY,
+    value INTEGER NOT NULL DEFAULT 1
+  )`);
   save();
 }
 
@@ -899,6 +903,7 @@ function sacrificeAnimals(userId, query, count) {
   const team = getTeam(userId);
   const teamIds = team ? new Set([team.slot1, team.slot2, team.slot3].filter(Boolean)) : new Set();
   const matches = animals.filter(a => {
+    if (q === 'all') return true;
     if (RARITY_ORDER.includes(q)) return a.rarity === q;
     return a.species.toLowerCase() === q || a.species.toLowerCase().startsWith(q);
   });
@@ -1091,6 +1096,20 @@ function sellSnails(userId, count) {
   db.run(`UPDATE users SET balance = balance + ${coins}, snails = snails - ${actual} WHERE user_id = '${userId}'`);
   save();
   return { ok: true, sold: actual, coins };
+}
+
+// ---------- One-time notification flags (DB-backed — survives ephemeral Render FS) ----------
+
+function wasNotified(key) {
+  const safe = key.replace(/'/g, "''");
+  const rows = db.exec(`SELECT value FROM notifications WHERE key = '${safe}'`);
+  return rows.length > 0 && rows[0].values.length > 0;
+}
+
+function markNotified(key) {
+  const safe = key.replace(/'/g, "''");
+  db.run(`INSERT OR REPLACE INTO notifications (key, value) VALUES ('${safe}', 1)`);
+  save();
 }
 
 module.exports = {

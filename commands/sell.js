@@ -5,8 +5,8 @@ const config = require('../config');
 module.exports = {
   name: 'sell',
   helpCategory: 'Pets',
-  helpArgs: '<id|species|rarity> [count]',
-  description: 'sell an animal by id, or sell a species/rarity from your zoo',
+  helpArgs: '<id|species|rarity|all> [count]',
+  description: 'sell an animal by id, or sell a species/rarity (or everything) from your zoo',
   execute(message, args) {
     const userId = message.author.id;
     const raw = args[0];
@@ -43,6 +43,7 @@ module.exports = {
     const teamIds = team ? new Set([team.slot1, team.slot2, team.slot3].filter(Boolean)) : new Set();
     const rarities = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
     const matches = animals.filter(a => {
+      if (query === 'all') return true;
       if (rarities.includes(query)) return a.rarity === query;
       return a.species.toLowerCase() === query || a.species.toLowerCase().startsWith(query);
     });

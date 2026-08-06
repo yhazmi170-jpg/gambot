@@ -6,7 +6,7 @@ const RARITY_EMOJIS = { common: '⚪', uncommon: '🟢', rare: '🔵', epic: '�
 module.exports = {
   name: 'sacrifice',
   helpCategory: 'Pets',
-  helpArgs: '<species|rarity> [count]',
+  helpArgs: '<species|rarity|all> [count]',
   aliases: ['sac'],
   description: 'sacrifice animals for essence (common 1 · uncommon 3 · rare 8 · epic 25 · legendary 100)',
   execute(message, args) {
@@ -14,7 +14,7 @@ module.exports = {
     const query = (args[0] || '').toLowerCase();
     if (!query) {
       const values = Object.entries(db.ESSENCE_VALUES).map(([r, v]) => `${RARITY_EMOJIS[r]} ${r} = ${v} essence`).join(' · ');
-      return message.channel.send({ embeds: [error(`usage: \`v sacrifice <species|rarity> [count]\`\n\n${values}\n\n\`v sacrifice rabbit\` sacrifices all your rabbits\n\`v sacrifice common\` sacrifices all common animals\n\`v sacrifice wolf 2\` sacrifices just 2 wolves\n\nanimals on your battle team are always skipped`)] });
+      return message.channel.send({ embeds: [error(`usage: \`v sacrifice <species|rarity|all> [count]\`\n\n${values}\n\n\`v sacrifice rabbit\` sacrifices all your rabbits\n\`v sacrifice common\` sacrifices all common animals\n\`v sacrifice wolf 2\` sacrifices just 2 wolves\n\`v sacrifice all\` sacrifices every animal you own\n\nanimals on your battle team are always skipped`)] });
     }
 
     let count = null;

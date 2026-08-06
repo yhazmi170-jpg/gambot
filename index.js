@@ -85,8 +85,9 @@ client.on('ready', () => {
   });
 
   const { backup } = require('./backup');
-  setInterval(() => backup().catch(() => {}), 3600000);
-  setTimeout(() => backup().catch(() => {}), 10000);
+  const doBackup = () => backup().catch(e => console.error('BACKUP FAILED:', e && e.message, e && e.stack || ''));
+  setInterval(doBackup, 3600000);
+  setTimeout(doBackup, 10000);
 
   setInterval(() => {
     const expired = db.getExpiredSubs();
@@ -97,8 +98,7 @@ client.on('ready', () => {
 
   const fs = require('fs');
   const ver = version || '1.0.0';
-  const verFlag = path.join(__dirname, `.notified_v${ver}`);
-  if (!fs.existsSync(verFlag)) {
+  if (!db.wasNotified(`v${ver}`)) {
     let updateMsg = '';
     try { updateMsg = fs.readFileSync(path.join(__dirname, 'update_msg.txt'), 'utf8').trim(); } catch {}
     if (updateMsg) {
@@ -112,18 +112,17 @@ client.on('ready', () => {
         ], 0x5865f2)] }).catch(() => {});
       }
     }
-    fs.writeFileSync(verFlag, 'done');
+    db.markNotified(`v${ver}`);
   }
 
-  const crFlag = path.join(__dirname, '.notified_cr_update');
-  if (!fs.existsSync(crFlag)) {
+  if (!db.wasNotified('custom_role_update')) {
     const crHolders = db.getPerkHolders('custom_role');
     for (const uid of crHolders) {
       client.users.fetch(uid).then(u => {
         u.send('**Custom Role perk updated!**\nYou can now set your role yourself:\n`v customrole name | #hexcolor`\n\nExample: `v customrole Cool Guy | #ff0000`\n\nYour existing role will update, or a new one will be created.').catch(() => {});
       }).catch(() => {});
     }
-    fs.writeFileSync(crFlag, 'done');
+    db.markNotified('custom_role_update');
   }
 
   setInterval(() => {
