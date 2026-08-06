@@ -8,7 +8,7 @@
 - **Host**: Render (free tier) — Blueprint from `render.yaml`. Replit retired as primary host (tab-close slept the repl). Local `keepalive.ps1` pings the Render URL to beat the 15-min idle spin-down.
 - **DB**: SQLite via sql.js at `DB_PATH` (env, default `./data` on Render; ephemeral on free tier → hourly GitHub backup + boot-restore is the data safety net). Backed up to GitHub every hour.
 - **Repo**: https://github.com/yhazmi170-jpg/gambot (branch `master`)
-- **Current version**: see `package.json` (as of last docs sync: **1.2.7**)
+- **Current version**: see `package.json` (as of last docs sync: **1.3.0**)
 
 ## Agent docs (mandatory)
 - **Always keep markdown in sync** after meaningful work:

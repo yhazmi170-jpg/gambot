@@ -5,8 +5,8 @@
 
 ## Status
 - **Branch**: `master`
-- **Version**: `1.2.23`
-- **Last update_msg**: Moved to a faster, more reliable host. Uptime should be way better now.
+- **Version**: `1.3.0`
+- **Last update_msg**: BIG UPDATE: moved to a brand new, faster host. Way better uptime, stays online even when the tab is closed.
 - **Host migration**: Replit → Render (free, Blueprint from `render.yaml`). Replit repl was stopped by user. **Render URL: `https://gambot-o2o4.onrender.com`** — keepalive pinger repointed to it.
 - **Keepalive**: `keepalive.ps1` pings every 240s; registered as Windows scheduled task `GambotKeepalive` (runs at logon). Pinger must be running on yazan's PC for this to work (now pinging the Render URL).
 
@@ -34,7 +34,7 @@
 - [x] Help descriptions on all cmds + gamehelp poker/bj + standing “always update help” rule
 
 ## Next / open
-- [ ] Confirm bot live on Render (`v version` / DM restart message) — HTTP 200 confirmed; awaiting Discord-side confirm
+- [x] Confirm bot live on Render — DONE (`logged in as ovo#7700`), v1.3.0 deploy pushes update embed
 - [ ] Repoint `keepalive.ps1` URL — DONE (`https://gambot-o2o4.onrender.com`), pinger restarted
 - [ ] **Do NOT restart the Replit repl** (double instance = double responses)
 

@@ -1,1 +1,1 @@
-v1.2.23 -- Moved to a faster, more reliable host. Uptime should be way better now.
+v1.3.0 -- BIG UPDATE: moved to a brand new, faster host. Way better uptime, and the bot stays online even when the tab is closed.
