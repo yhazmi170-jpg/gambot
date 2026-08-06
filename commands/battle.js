@@ -93,6 +93,7 @@ async function runBattle(message, target) {
 async function handleInteraction(i) {
   try {
     if (!i.customId.startsWith('battle_')) return;
+    const isNo = i.customId.endsWith('_no');
     const id = i.customId.replace('battle_', '').replace(/_(yes|no)$/, '');
     const pending = pendingBattles.get(id);
     if (!pending) {
@@ -106,7 +107,7 @@ async function handleInteraction(i) {
     pendingBattles.delete(id);
     clearTimeout(pending.timeout);
 
-    if (id.endsWith('_no')) {
+    if (isNo) {
       await i.update({ embeds: [okEmbed(`Battle request declined.`)], components: [] });
       return;
     }
