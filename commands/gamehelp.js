@@ -117,6 +117,13 @@ module.exports = {
         play: `\`${prefix} dex\` — full collection\n\`${prefix} dex rare\` — one rarity`,
         tips: 'Bold = owned. Crossed out = missing. Collect all 35 species!',
       },
+      animal: {
+        name: 'Animal Stats',
+        aliases: 'pet, info, stats',
+        desc: 'View an animal\'s full combat stats — HP, attack, defense, and XP progress.',
+        play: `\`${prefix} animal <id>\` — by id from \`v zoo\`\n\`${prefix} animal dragon\` — by species\n\`${prefix} animal rex\` — by custom name`,
+        tips: 'Matches by id, species, or your custom name. Shows the progress bar to its next level.',
+      },
       quest: {
         name: 'Daily Quest',
         aliases: 'q',
