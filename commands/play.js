@@ -186,7 +186,7 @@ module.exports = {
         channelId: voice.id,
         guildId,
         adapterCreator: message.guild.voiceAdapterCreator,
-        selfDeaf: true,
+        selfDeaf: false,
       });
       q.connection = connection;
       const player = setupPlayer(guildId);
