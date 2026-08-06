@@ -1011,6 +1011,12 @@ function sellStock(userId, symbol, shares) {
   return { price, shares: actual, proceeds };
 }
 
+function getStockShares(userId, symbol) {
+  const rows = db.exec(`SELECT shares FROM stocks WHERE user_id = '${userId}' AND symbol = '${symbol}'`);
+  if (!rows.length || !rows[0].values.length) return 0;
+  return rows[0].values[0][0];
+}
+
 function getPortfolio(userId) {
   const rows = db.exec(`SELECT symbol, shares FROM stocks WHERE user_id = '${userId}' AND shares > 0`);
   if (!rows.length) return [];
@@ -1663,7 +1669,7 @@ module.exports = {
   xpForLevel, levelInfo, grantXp,
   bankDeposit, bankWithdraw, takeLoan, payLoan, LOAN_INTEREST, MAX_LOAN_MULT,
   sharkLoan, SHARK_INTEREST, SHARK_MAX,
-  stockPrice, getStockPrices, buyStock, sellStock, getPortfolio, STOCKS,
+  stockPrice, getStockPrices, buyStock, sellStock, getStockShares, getPortfolio, STOCKS,
   rollEggDrop, getEggs, addEgg, hatchEgg, transferAnimal, EGG_DROP_CHANCE, EGG_HATCH_RARITY,
   getQuest, addQuestProgress, claimQuest, getBounty, addBountyProgress, claimBounty,
   getVault, vaultDeposit, vaultWithdraw, getVaultTop,

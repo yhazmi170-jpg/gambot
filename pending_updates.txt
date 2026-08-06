@@ -7,3 +7,4 @@ then push (the boot announcement posts it once).
 Format: one line per change, terse, no AI fluff.
 - fixed update announcements skipping the channel (marked 'sent' before actually posting) — now fetches channels properly + Aovo announce to force re-post
 - Fixed update announcements failing with 400 (long messages >1024 chars in one embed field) - now split across fields
+- Achievement unlocks now batch into one embed instead of spamming one per achievement; v stocks sell <symbol> all sells everything and v stocks sell <symbol> no longer errors; new v perkhelp command

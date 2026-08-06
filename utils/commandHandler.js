@@ -147,9 +147,8 @@ function handleMessage(message) {
   try {
     const unlocked = db.checkAchievements(message.author.id);
     if (unlocked.length) {
-      for (const ach of unlocked) {
-        message.channel.send({ embeds: [require('./embed').embed('🏅 Achievement Unlocked!', [['', `${ach.name} — ${ach.desc}\n+**${ach.reward.toLocaleString()}** ${config.currency}`]], 0xf1c40f)] }).catch(() => {});
-      }
+      const fields = unlocked.map(ach => [ach.name, `${ach.desc}\n+**${ach.reward.toLocaleString()}** ${config.currency}`]);
+      message.channel.send({ embeds: [require('./embed').embed('🏅 Achievements Unlocked!', fields, 0xf1c40f)] }).catch(() => {});
     }
   } catch (err) {
     console.error('checkAchievements error:', err);

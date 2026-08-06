@@ -16,14 +16,19 @@ module.exports = {
 
     if (sub === 'buy' || sub === 'sell') {
       const symbol = (args[1] || '').toUpperCase();
-      const shares = parseInt(args[2], 10);
-      if (!db.STOCKS[symbol] || isNaN(shares) || shares <= 0) {
-        return message.channel.send({ embeds: [error('usage: `v stocks buy <SYMBOL> <shares>` — symbols: ' + Object.keys(db.STOCKS).join(', '))] });
+      const shares = (args[2] || '').toLowerCase() === 'all' ? Infinity : parseInt(args[2], 10);
+      if (!db.STOCKS[symbol] || (sub === 'buy' && (isNaN(shares) || shares <= 0))) {
+        return message.channel.send({ embeds: [error(`usage: \`v stocks ${sub} <SYMBOL> <shares|all>\` — symbols: ` + Object.keys(db.STOCKS).join(', '))] });
       }
       if (sub === 'buy') {
         const r = db.buyStock(uid, symbol, shares);
         if (!r) return message.channel.send({ embeds: [error(`you can't afford **${shares}** ${symbol} @ **${db.stockPrice(symbol).toLocaleString()}** each`)] });
         return message.channel.send({ embeds: [success(`bought **${r.shares}** ${symbol} @ **${r.price.toLocaleString()}** for **${r.cost.toLocaleString()}** ${config.currency}`)] });
+      }
+      if (isNaN(shares) || shares <= 0) {
+        const held = db.getStockShares(uid, symbol);
+        if (held <= 0) return message.channel.send({ embeds: [error(`you don't own any ${symbol} shares`)] });
+        return message.channel.send({ embeds: [error(`you own **${held}** ${symbol} — \`v stocks sell ${symbol} all\` to sell them all`)] });
       }
       const r = db.sellStock(uid, symbol, shares);
       if (!r) return message.channel.send({ embeds: [error(`you don't own that many ${symbol} shares`)] });
