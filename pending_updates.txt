@@ -17,3 +17,4 @@ Format: one line per change, terse, no AI fluff.
 - Shop cleaned up — removed the emojis
 - v help is now paginated like the shop — pick a category, no more message flood
 - v slots now celebrates a jackpot when you hit triple 7s (50x)
+- v rob now DMs the victim when robbed (and when an attempt fails); reminder: bank money can't be robbed — keep cash in the bank
