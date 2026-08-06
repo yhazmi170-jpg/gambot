@@ -10,3 +10,4 @@ Format: one line per change, terse, no AI fluff.
 - Achievement unlocks now batch into one embed instead of spamming one per achievement; v stocks sell <symbol> all sells everything and v stocks sell <symbol> no longer errors; new v perkhelp command
 - Achievements now pay out BEFORE being marked unlocked (could previously record unlock without the money if a grant failed)
 - Loan shark exploit fixed: can't give/rob/rain/duel/trade money away while a loan is outstanding, and gambling wins now auto-repay the loan first (no more free 2M per alt)
+- Fixed misleading balance-cut warning in crash: showed mult*factor (e.g. 1.3x -> 0.52x) but real payout is 1 + (mult-1)*factor (1.12x); the cut applies to profit only, not the whole stake
