@@ -138,6 +138,13 @@ module.exports = {
         play: `\`${prefix} bounty\` — view\n\`${prefix} bounty claim\` — claim when done`,
         tips: 'Resets every week. Same tasks as the daily quest but bigger. Double Quest Rewards perk applies.',
       },
+      music: {
+        name: 'Music',
+        aliases: 'play, song, music',
+        desc: 'Play music in your voice channel. Join a voice channel first, then play a song by name, YouTube link, or Spotify link.',
+        play: `\`${prefix} play <song or url>\` — play/queue\n\`${prefix} play skip\` — skip\n\`${prefix} play stop\` — leave + clear\n\`${prefix} play queue\` — see queue\n\`${prefix} play pause\` / \`${prefix} play resume\`\n\`${prefix} play volume <0-100>\`\n\`${prefix} play np\` — now playing`,
+        tips: 'Spotify links are matched to a YouTube track. The bot leaves the channel automatically after the queue empties.',
+      },
     };
 
     // alias map

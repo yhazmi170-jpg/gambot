@@ -1,5 +1,4 @@
-const { Client, GatewayIntentBits, Partials } = require('discord.js');
-const { loadCommands, handleMessage } = require('./utils/commandHandler');
+const { Client, GatewayIntentBits, Partials } = require('discord.js');const { loadCommands, handleMessage } = require('./utils/commandHandler');
 const config = require('./config');
 const db = require('./db');
 const { embed, updateEmbed } = require('./utils/embed');
@@ -57,6 +56,7 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildVoiceStates,
   ],
   partials: [Partials.Message, Partials.Channel, Partials.Reaction],
 });

@@ -1,13 +1,15 @@
 {
   "name": "gambot",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "private": true,
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
+    "@discordjs/voice": "^0.19.2",
     "discord.js": "^14.16.0",
+    "play-dl": "^1.9.7",
     "sql.js": "^1.14.1"
   }
 }

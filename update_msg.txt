@@ -1,26 +1,16 @@
-v1.5.0
+v1.6.0
 
 NEW:
-`v stocks` -- buy & sell stocks, market drifts every hour
-`v bank shark` -- take a loan, pay it back
-`v hatch` -- open pet eggs (eggs drop while hunting!)
-`v trade` -- trade animals with other players
-`v heist <fee>` -- start a heist, crew joins, roll for the payout
-`v race <fee>` -- race your best pet against others
-`v tournament <fee>` -- bracket tourney, winner takes 90% of the pot
-`v quest` / `v bounty` -- daily + weekly challenges with coin rewards
-`v vault deposit/withdraw` -- shared server vault
-`v achievements` -- unlock badges for milestones
-`v blackmarket` -- rotating limited deals, refresh every 6h
-`v dex` -- see which species you own vs missing
-`v animal <id|species|name>` -- full stats (hp, attack, defense, xp)
-
-SHOP:
-Insurance upgrades II/III/IV (30/40/50% loss refund)
-Egg Luck (2x egg drop chance)
-Double Quest Rewards (2x quest + bounty payout)
-Shop revamped into categories
+ play <song> -- bot joins your voice channel and plays the song; works with YouTube links, Spotify links, or just a name; queue, skip, stop, pause, resume, volume
+ disable <cmd> #channel /  enable <cmd> #channel -- turn commands off per-channel
 
 FIXES:
-custom role bug fixed -- role now sits below the bot's role so name/color edits work, plus `v customrole name` / `v customrole color` subcommands
-crash & mines now show your real payout after the balance cut
+- Update announcements no longer skip channels or fail with 400 (split across fields)
+- Achievements pay out BEFORE being marked unlocked (never a recorded-but-unpaid unlock)
+- Loan shark exploit fixed: can't give/rob/rain/duel/trade money away while a loan is outstanding; wins auto-repay the loan first
+- Fixed misleading balance-cut warning in crash (showed mult*factor, real payout is 1+(mult-1)*factor)
+- Battle requests survive restarts -- pending duels are saved to the DB
+- v team add no longer wipes your other slots
+- v rob now DMs the victim
+- v help is paginated like the shop; shop cleaned up (no more emojis); slots celebrates triple-7 jackpots
+- Achievements batch into one embed; v stocks sell all fixed; new v perkhelp
