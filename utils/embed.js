@@ -60,4 +60,4 @@ function parseAmount(str) {
   return Math.floor(num);
 }
 
-module.exports = { embed, error, success, parseAmount, setSponsored, getSponsored };
+module.exports = { embed, error, success, parseAmount, setSponsored, getSponsored, chunkText, updateEmbed };
