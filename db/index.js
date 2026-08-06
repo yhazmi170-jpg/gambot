@@ -1165,6 +1165,7 @@ module.exports = {
   setVipRole,
   setAutoReactEmoji,
   getAutoReactEmoji, setBadgeEmoji, getBadgeEmoji, setLbEmoji, getLbEmoji,
+  wasNotified, markNotified,
   START_BALANCE,
   addAnimal, getUserAnimals, getAnimal, removeAnimal, addExp, renameAnimal,
   setTeam, removeFromTeam, getTeam, setHuntCooldown, getHuntCooldown, sellPrice, getAnimalCount,

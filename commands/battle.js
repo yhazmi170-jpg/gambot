@@ -93,7 +93,7 @@ async function runBattle(message, target) {
 async function handleInteraction(i) {
   try {
     if (!i.customId.startsWith('battle_')) return;
-    const id = i.customId.replace('battle_', '');
+    const id = i.customId.replace('battle_', '').replace(/_(yes|no)$/, '');
     const pending = pendingBattles.get(id);
     if (!pending) {
       await i.update({ embeds: [errEmbed('This battle request has expired.')], components: [] });
@@ -156,7 +156,7 @@ module.exports = {
         pendingBattles.delete(id);
         try { await sent.edit({ embeds: [errEmbed('Battle request expired.')], components: [] }); } catch (_) {}
       }
-    }, 30000);
+    }, 60000);
 
     pendingBattles.set(id, { challenger: message.author, target, message, timeout });
   },

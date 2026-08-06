@@ -1,1 +1,1 @@
-v1.4.5 -- recovery: on boot the bot scans ALL cloud backups and restores the newest one that actually has your data — a bad/empty backup can no longer block recovery · backups every 1 minute
+v1.4.6 -- battle requests now last a full minute and actually work when accepted · auto-react now handles custom server emojis · fixed bot update notifications not being sent after updates

@@ -183,11 +183,28 @@ client.on('messageCreate', (message) => {
     const ar = perks.find(p => p.perk === 'auto_react');
     if (ar) {
       const emoji = db.getAutoReactEmoji(message.author.id) || '⭐';
-      try { message.react(emoji); } catch {}
+      const resolved = resolveEmoji(message, emoji);
+      if (resolved) {
+        message.react(resolved).catch(err => console.error(`autoreact failed (${emoji}):`, err.message));
+      } else {
+        console.error(`autoreact: could not resolve emoji "${emoji}" for ${message.author.id} — using ⭐`);
+        message.react('⭐').catch(() => {});
+      }
     }
-
   }
 });
+
+// Resolve a stored emoji to something message.react() accepts: unicode passes through,
+// custom <:name:id> / <a:name:id> is looked up in the guild's emoji cache (fallback: id).
+function resolveEmoji(message, emoji) {
+  if (!emoji) return '⭐';
+  const m = String(emoji).match(/^<a?:([^:]+):(\d+)>$/);
+  if (m) {
+    const g = message.guild && message.guild.emojis.cache.get(m[2]);
+    return g || m[2];
+  }
+  return emoji;
+}
 
 function logCrash(tag, err) {
   const line = `${new Date().toISOString()} [${tag}] ${(err && (err.stack || err.message)) || err}\n`;
