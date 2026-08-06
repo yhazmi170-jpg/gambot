@@ -9,7 +9,7 @@
 - **DB**: SQLite via sql.js at `DB_PATH` (env, default `./data` on Render; ephemeral on free tier → hourly GitHub backup + boot-restore is the data safety net). Backed up to GitHub every hour.
 - **Backups**: `backup.js` writes timestamped snapshots (`backups/gambot-<ts>.db`, never overwritten) + a mirror at `gambot.db`. Restore scans ALL snapshots newest→oldest and restores the first one with >0 users (`countUsers` via sql.js) — a bad/empty backup can never block recovery. Backup **refuses to upload** a 0-user DB (prevents an empty/corrupt instance from clobbering history). `index.js` logs backup failures loudly. Backups run **every 1 min** + on **SIGTERM/SIGINT shutdown** (Render free tier wipes `./data` on every deploy — shutdown backup caps loss at 1 min).
 - **Repo**: https://github.com/yhazmi170-jpg/gambot (branch `master`)
-- **Current version**: see `package.json` (as of last docs sync: **1.4.6**)
+- **Current version**: see `package.json` (as of last docs sync: **1.5.0**)
 
 ## Agent docs (mandatory)
 - **Always keep markdown in sync** after meaningful work:
@@ -33,6 +33,7 @@
 - Games using `payWin`: coinflip, blackjack, slots, crash, dice, roulette, poker, mines, lottery, battle
 - Losses stay full; PvP transfers (duel/rob/give/rain) are **not** scaled
 - Owner ID always factor `1`
+- v1.5.0: crash + mines now display the real effective multiplier after the cut (`db.effectiveMult`) — upfront warning in crash, inline notes in mines — so players see the true payout instead of feeling "rigged"
 
 ## Shop
 - Prices live in `commands/shop.js` (`SHOP` array)
@@ -47,6 +48,12 @@
 - **Snail garden** (`v garden`): buy snails 500 coins each, daily limit 20 (`SNAIL_DAILY_LIMIT`), breed 1 baby/snail/24h up to **100** capacity (`SNAIL_CAPACITY`), sell 400 each. Breeding catch-up in `db.breedSnails`, also hooked into commandHandler.
 - `v huntbot` = OwO-style panel (essence, traits + progress bars, autohunt bot status, hunt yield). `v hunt` embed shows gems/coins/xp gained. Gems+essence shown in `v bal`, `v zoo`, `v profile`.
 - `v sell <id|species|rarity|all> [count]` — sells by id, or a whole species/rarity, or everything (`all`), team animals always skipped.
+- **Eggs & trading (v1.5.0):** `v hunt`/autohunt have an 8% egg drop per animal (`db.rollEggDrop`, doubled by `egg_luck` perk); `v hatch [all]` opens eggs (`db.hatchEgg` — captures `last_insert_rowid()` BEFORE `save()`, since `save()` resets it; also increments `hatched`). `v trade @user <id> [price]` transfers animals with confirm buttons (`db.transferAnimal` auto-removes from team slots).
+- **Heist / race / tournament (v1.5.0):** `v heist <fee>` (crew joins, success roll, no house cut), `v race <fee>` (best pet vs others, pot split), `v tournament <fee>` (up to 16, bracket sim, winner 90% / house 10%). All use join buttons + 60s window, refund if <2 joiners.
+- **Quests / bounties / vault (v1.5.0):** `v quest` daily + `v bounty` weekly (`quests`/`bounties` tables, progress via `addQuestProgress`/`addBountyProgress` hooked into hunt/sacrifice/work/give/battle; `double_quest` perk = 2x reward). `v vault deposit/withdraw` = per-guild shared pot (`vaults` + `vault_deposits`, withdraw only your own deposited amount).
+- **Achievements / black market (v1.5.0):** `v achievements` + auto-unlock check hooked into `utils/commandHandler.js` after every command (19 in `db.ACHIEVEMENTS`). `v blackmarket` = 4 rotating slots refreshed every 6h (`db.refreshBlackMarket`), 6 item types.
+- **Animal dex:** `v dex [rarity]` shows all 35 species bold=owned / struck=missing via `db.getOwnedSpecies`.
+- **Insurance tiers (v1.5.0):** base `insurance` = 20% loss refund; shop upgrades `insurance2/3/4` = 30/40/50% (highest owned wins, `db.getInsuranceLevel`). Auto-applied in all games via `db.getInsuranceRefund`.
 
 ## Cards / UI
 - Blackjack uses owo-style board: `Dealer [10+?]` + card back, `Name [19]` + cards (description embed, not field grid)
