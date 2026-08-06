@@ -4,9 +4,9 @@
 > Read `AGENTS.md` first, then this.
 
 ## Status
-- **Branch**: `master` (remote HEAD `669a01f`)
-- **Version**: `1.5.0` (PUSHED — remote caught up; post-v1.5.0 fixes shipped as small updates, see pending_updates.txt)
-- **Last update_msg**: `v1.5.0 -- the BIG one` (stocks, loan shark, eggs/hatch/trade, heist, race, tournament, quests, bounties, vault, achievements, black market, dex, insurance tiers, customrole + crash/mines fixes)
+- **Branch**: `master` (remote HEAD `335c063`)
+- **Version**: `1.6.0` (PUSHED -- music + per-channel disable + July fix batch; pending_updates flushed into this)
+- **Last update_msg**: `v1.6.0` -- `v play` music command (YouTube/Spotify links or names), `v disable/enable` per-channel, and the post-v1.5.0 fix batch (announcements, achievements, loan exploit, crash warning, battle persistence, team add, rob DM, help pagination, shop cleanup, slots jackpot)
 - **Host migration**: Replit → Render (free, Blueprint from `render.yaml`). Replit repl was stopped by user. **Render URL: `https://gambot-o2o4.onrender.com`** — keepalive pinger repointed to it.
 - **Keepalive**: `keepalive.ps1` pings every 240s; registered as Windows scheduled task `GambotKeepalive` (runs at logon). Pinger must be running on yazan's PC for this to work (now pinging the Render URL).
 
@@ -20,6 +20,7 @@
 - [x] **Secrets check.** `config.json`, `gambot.db`, `.env` are all `.gitignore`d; only `config.example.json` is tracked (verified via `git ls-files`). Bot token stays out of the repo; Render uses `TOKEN` env var.
 
 ## Done recently
+- [x] **v1.6.0 music command (`335c063`):** `v play`/`v music`/`v song` -- join a voice channel, then play by name, YouTube link, or Spotify link. Spotify links resolve via the Spotify embed page (`resolveSpotify` in `commands/play.js` -- og:title/og:description, no API key needed since play-dl `spotify()` requires Spotify credentials and `stream()` throws on Spotify URLs) then search YouTube for a match. Subcommands: skip/next, stop/leave/dc, queue/q, pause, resume/unpause, volume/vol <0-100>, np/now. Queue is per-guild (`Map`), auto-advances on `AudioPlayerStatus.Idle`, auto-leaves 30s after queue empties. Deps: `@discordjs/voice` + `play-dl` installed; `index.js` intents += `GuildVoiceStates`; `render.yaml` buildCommand now `apt-get update && apt-get install -y ffmpeg && npm install`. New Music category in `v help` (via helpCategory) + `v gamehelp music`. Sim-tested all 3 input types (name/YouTube/Spotify) with mocked deps. Version bumped 1.5.0 -> 1.6.0; update_msg.txt rewritten; pending_updates flushed (13 lines folded into the 1.6.0 announcement).
 - [x] **Battle requests survive restarts (`9d9f707`):** `pendingBattles` was an in-memory `Map` — wiped on every Render redeploy, so in-flight `v battle` requests always read as "expired" (the v1.4.6 `_yes/_no` suffix fix was already in place; restart was the real cause). Now persisted in a new `pending_battles` DB table (`setPendingBattle/getPendingBattle/deletePendingBattle/cleanupPendingBattles`, exported). battle.js stores via `db.setPendingBattle`, `handleInteraction` reads `db.getPendingBattle` + deletes on resolve/decline/expiry, 60s window, `cleanupPendingBattles()` runs at boot (index.js). Interaction now uses `i.message`/`i.user` (button message + target) instead of the Map's stored message. Sim-tested: stored/not-expired/cleanup-keeps-live/deletes-expired.
 - [x] **`v team add` wiped slots 2/3 (`9d9f707`):** `setTeam` merged with `existing[s]` (numeric keys) but `getTeam` returns `slot1/slot2/slot3` — every add reset the other two slots to NULL, so you could never keep 3 animals. Fixed to `existing[\`slot${s}\`]`. Sim-tested: 3 adds → all 3 slots populated.
 - [x] **Per-channel command disable (`9d9f707`):** new `channel_disabled (guild_id, channel_id, commands)` table + `disableChannelCommand/enableChannelCommand/getChannelDisabled`; `isCommandDisabled(guildId, cmdName, channelId)` checks guild-level then channel-level; `commandHandler.js:108` passes `message.channel.id`; `disable.js`/`enable.js` rewritten with `parseChannelId` — `v disable <cmd> #channel` / `v enable <cmd> #channel` (server-wide is still the default with no channel arg).
@@ -53,9 +54,8 @@
 - [x] Help descriptions on all cmds + gamehelp poker/bj + standing “always update help” rule
 
 ## Next / open
-- [ ] **Slots jackpot flair — DONE (`0497a8b`):** triple 7s (50x) → 💰 JACKPOT 💰 gold embed. If more flair wanted later (global announcements, sound) it's an easy add in `commands/slots.js`.
-- [ ] **MUSIC COMMAND — ON HOLD per user** ("don't add the music cmd yet"). When greenlit: `@discordjs/voice` + `play-dl`/`ytdl-core` + ffmpeg on Render (check render.yaml for ffmpeg — free tier may need an apt install step in the build command). Caveat: sandbox bash egress blocks youtube.com so local download tests may fail; Render egress is separate. Subcommands: play/queue/skip/stop/leave.
-- [ ] **Update policy active (v1.5.0 rule):** big updates = version bump + `update_msg.txt` + announce; small updates = push silently + append to `pending_updates.txt`, flush together after ~10. See AGENTS.md. Current pending_updates count: 12 lines (announcement fix ×2, achievements batching, stocks, perkhelp, grant-before-mark, loan exploit, effectiveMult, battle persistence, team add, per-channel disable, shop emoji, help pagination, slots jackpot, rob DM).
+- [ ] **MUSIC COMMAND — DONE (`335c063`, v1.6.0):** shipped with YouTube/Spotify/name support. If more flair wanted later (full Spotify playlist queueing — currently first track only), easy add in `commands/play.js`. Verify on live deploy: bot joins VC, streams, auto-leaves after queue empties.
+- [ ] **Update policy active (v1.5.0 rule):** big updates = version bump + `update_msg.txt` + announce; small updates = push silently + append to `pending_updates.txt`, flush together after ~10. See AGENTS.md. Current pending_updates count: 0 (flushed into v1.6.0).
 - [ ] **Friend has no `auto_react` perk** (confirmed 2026-08-06) — if @伤害 is supposed to auto-react, either they buy it (`v shop`) + `v autoreact <emoji>`, or grant via admin. The "self react" report is still unexplained — user hasn't described the exact symptom.
 - [ ] **Do NOT restart the Replit repl** (double instance = double responses).
 

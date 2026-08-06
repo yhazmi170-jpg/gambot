@@ -5,16 +5,3 @@ flush: move them into update_msg.txt as ONE combined log + bump package.json ver
 then push (the boot announcement posts it once).
 
 Format: one line per change, terse, no AI fluff.
-- fixed update announcements skipping the channel (marked 'sent' before actually posting) — now fetches channels properly + Aovo announce to force re-post
-- Fixed update announcements failing with 400 (long messages >1024 chars in one embed field) - now split across fields
-- Achievement unlocks now batch into one embed instead of spamming one per achievement; v stocks sell <symbol> all sells everything and v stocks sell <symbol> no longer errors; new v perkhelp command
-- Achievements now pay out BEFORE being marked unlocked (could previously record unlock without the money if a grant failed)
-- Loan shark exploit fixed: can't give/rob/rain/duel/trade money away while a loan is outstanding, and gambling wins now auto-repay the loan first (no more free 2M per alt)
-- Fixed misleading balance-cut warning in crash: showed mult*factor (e.g. 1.3x -> 0.52x) but real payout is 1 + (mult-1)*factor (1.12x); the cut applies to profit only, not the whole stake
-- Battle requests no longer expire on restart — pending duels are saved to the DB so they survive redeploys (v battle stays valid for the full 60s)
-- Fixed v team add wiping your other slots — adding 3 animals now keeps all 3 on your team
-- New: v disable <cmd> #channel / v enable <cmd> #channel — turn commands off per-channel (server-wide remains the default)
-- Shop cleaned up — removed the emojis
-- v help is now paginated like the shop — pick a category, no more message flood
-- v slots now celebrates a jackpot when you hit triple 7s (50x)
-- v rob now DMs the victim when robbed (and when an attempt fails); reminder: bank money can't be robbed — keep cash in the bank
