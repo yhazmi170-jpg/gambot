@@ -105,7 +105,7 @@ function handleMessage(message) {
   }
 
   const ALWAYS_ALLOWED = ['help', 'enable', 'disable'];
-  if (message.guild && !ALWAYS_ALLOWED.includes(cmd.name) && db.isCommandDisabled(message.guild.id, cmd.name)) {
+  if (message.guild && !ALWAYS_ALLOWED.includes(cmd.name) && db.isCommandDisabled(message.guild.id, cmd.name, message.channel.id)) {
     message.channel.send({ embeds: [error(`\`${cmd.name}\` is disabled in this server`)] }).then(m => setTimeout(() => m.delete().catch(() => {}), 4000)).catch(() => {});
     return;
   }

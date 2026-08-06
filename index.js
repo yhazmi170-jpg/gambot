@@ -83,6 +83,7 @@ async function start() {
   const { restore } = require('./backup');
   await restore();
   await db.init();
+  db.cleanupPendingBattles();
   await client.login(config.token);
 }
 

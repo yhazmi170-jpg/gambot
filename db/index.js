@@ -36,6 +36,12 @@ async function init() {
       guild_id TEXT PRIMARY KEY,
       disabled_commands TEXT NOT NULL DEFAULT '[]'
     );
+    CREATE TABLE IF NOT EXISTS channel_disabled (
+      guild_id TEXT NOT NULL,
+      channel_id TEXT NOT NULL,
+      commands TEXT NOT NULL DEFAULT '[]',
+      PRIMARY KEY (guild_id, channel_id)
+    );
   `);
   try { db.run(`ALTER TABLE users ADD COLUMN daily_streak INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   try { db.run(`ALTER TABLE users ADD COLUMN lucky INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
@@ -71,6 +77,12 @@ async function init() {
   db.run(`CREATE TABLE IF NOT EXISTS log_channels (guild_id TEXT PRIMARY KEY, channel_id TEXT NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS cmd_log_channels (guild_id TEXT PRIMARY KEY, channel_id TEXT NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS update_channels (guild_id TEXT PRIMARY KEY, channel_id TEXT NOT NULL)`);
+  db.run(`CREATE TABLE IF NOT EXISTS pending_battles (
+    id TEXT PRIMARY KEY,
+    challenger_id TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    expires_at INTEGER NOT NULL
+  )`);
   db.run(`CREATE TABLE IF NOT EXISTS vip_roles (guild_id TEXT PRIMARY KEY, role_id TEXT NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS animals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -442,10 +454,72 @@ function enableCommand(guildId, cmdName) {
   save();
 }
 
-function isCommandDisabled(guildId, cmdName) {
+function isCommandDisabled(guildId, cmdName, channelId) {
   if (!guildId) return false;
   const guild = getGuild(guildId);
-  return guild.disabled_commands.includes('all') || guild.disabled_commands.includes(cmdName);
+  if (guild.disabled_commands.includes('all') || guild.disabled_commands.includes(cmdName)) return true;
+  if (!channelId) return false;
+  const rows = db.exec(`SELECT commands FROM channel_disabled WHERE guild_id = '${guildId}' AND channel_id = '${channelId}'`);
+  if (!rows.length || !rows[0].values.length) return false;
+  const list = JSON.parse(rows[0].values[0][0] || '[]');
+  return list.includes('all') || list.includes(cmdName);
+}
+
+function disableChannelCommand(guildId, channelId, cmdName) {
+  if (!guildId || !channelId) return;
+  const rows = db.exec(`SELECT commands FROM channel_disabled WHERE guild_id = '${guildId}' AND channel_id = '${channelId}'`);
+  let list = [];
+  if (rows.length && rows[0].values.length) list = JSON.parse(rows[0].values[0][0] || '[]');
+  if (cmdName === 'all') {
+    list = ['all'];
+  } else if (!list.includes(cmdName) && !list.includes('all')) {
+    list.push(cmdName);
+  }
+  db.run(`INSERT OR REPLACE INTO channel_disabled (guild_id, channel_id, commands) VALUES ('${guildId}', '${channelId}', '${JSON.stringify(list)}')`);
+  save();
+}
+
+function enableChannelCommand(guildId, channelId, cmdName) {
+  if (!guildId || !channelId) return;
+  const rows = db.exec(`SELECT commands FROM channel_disabled WHERE guild_id = '${guildId}' AND channel_id = '${channelId}'`);
+  if (!rows.length || !rows[0].values.length) return;
+  let list = JSON.parse(rows[0].values[0][0] || '[]');
+  list = list.filter(c => c !== cmdName && c !== 'all');
+  if (list.length === 0) {
+    db.run(`DELETE FROM channel_disabled WHERE guild_id = '${guildId}' AND channel_id = '${channelId}'`);
+  } else {
+    db.run(`UPDATE channel_disabled SET commands = '${JSON.stringify(list)}' WHERE guild_id = '${guildId}' AND channel_id = '${channelId}'`);
+  }
+  save();
+}
+
+function getChannelDisabled(guildId, channelId) {
+  const rows = db.exec(`SELECT commands FROM channel_disabled WHERE guild_id = '${guildId}' AND channel_id = '${channelId}'`);
+  if (!rows.length || !rows[0].values.length) return [];
+  return JSON.parse(rows[0].values[0][0] || '[]');
+}
+
+// ---- Pending battles: persisted so requests survive bot restarts/deploys ----
+function setPendingBattle(id, challengerId, targetId, expiresAt) {
+  db.run(`INSERT OR REPLACE INTO pending_battles (id, challenger_id, target_id, expires_at) VALUES ('${id}', '${challengerId}', '${targetId}', ${expiresAt})`);
+  save();
+}
+
+function getPendingBattle(id) {
+  const rows = db.exec(`SELECT challenger_id, target_id, expires_at FROM pending_battles WHERE id = '${id}'`);
+  if (!rows.length || !rows[0].values.length) return null;
+  const v = rows[0].values[0];
+  return { challenger_id: v[0], target_id: v[1], expires_at: v[2] };
+}
+
+function deletePendingBattle(id) {
+  db.run(`DELETE FROM pending_battles WHERE id = '${id}'`);
+  save();
+}
+
+function cleanupPendingBattles() {
+  db.run(`DELETE FROM pending_battles WHERE expires_at < ${Math.floor(Date.now() / 1000)}`);
+  save();
 }
 
 function setLogChannel(guildId, channelId) {
@@ -800,7 +874,7 @@ function renameAnimal(id, name) {
 function setTeam(userId, slot, animalId) {
   const existing = getTeam(userId);
   const slots = {};
-  for (const s of [1, 2, 3]) slots[`slot${s}`] = (existing || {})[s] || null;
+  for (const s of [1, 2, 3]) slots[`slot${s}`] = existing ? existing[`slot${s}`] : null;
   slots[`slot${slot}`] = animalId;
   if (existing) {
     db.run(`UPDATE teams SET slot1 = ${slots.slot1 || 'NULL'}, slot2 = ${slots.slot2 || 'NULL'}, slot3 = ${slots.slot3 || 'NULL'} WHERE user_id = '${userId}'`);
@@ -1656,6 +1730,13 @@ module.exports = {
   disableCommand,
   enableCommand,
   isCommandDisabled,
+  disableChannelCommand,
+  enableChannelCommand,
+  getChannelDisabled,
+  setPendingBattle,
+  getPendingBattle,
+  deletePendingBattle,
+  cleanupPendingBattles,
   toggleLucky,
   toggleInsurance,
   setLogChannel,

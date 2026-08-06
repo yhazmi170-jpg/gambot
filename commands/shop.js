@@ -89,23 +89,22 @@ function buildShop() {
 
 const pendingShops = new Map();
 
-const CATEGORY_EMOJI = ['🛍️', '📅', '🛠️', '👥'];
 const CATEGORY_SHORT = ['One-Time', 'Monthly Subs', 'Server Tools', 'Social'];
 
 function buildMenuEmbed() {
-  const lines = SHOP.map((cat, idx) => `${CATEGORY_EMOJI[idx]} **${CATEGORY_SHORT[idx]}** — ${cat.items.length} item${cat.items.length > 1 ? 's' : ''}`).join('\n');
-  return new EmbedBuilder().setColor(0x2b2d31).setTitle('🛒 Shop').setDescription(`pick a category to browse items\n\n${lines}`);
+  const lines = SHOP.map((cat, idx) => `**${CATEGORY_SHORT[idx]}** — ${cat.items.length} item${cat.items.length > 1 ? 's' : ''}`).join('\n');
+  return new EmbedBuilder().setColor(0x2b2d31).setTitle('Shop').setDescription(`pick a category to browse items\n\n${lines}`);
 }
 
 function buildMenuRow() {
   return new ActionRowBuilder().addComponents(SHOP.map((cat, idx) =>
-    new ButtonBuilder().setCustomId(`shop_cat_${idx}`).setLabel(CATEGORY_SHORT[idx]).setEmoji(CATEGORY_EMOJI[idx]).setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId(`shop_cat_${idx}`).setLabel(CATEGORY_SHORT[idx]).setStyle(ButtonStyle.Secondary)
   ));
 }
 
 function buildCategoryEmbed(cat, idx) {
   const lines = cat.items.map(it => `\`${priceStr(it.price)}\` ${it.name}${it.monthly ? ' /mo' : ''} — ${it.desc}`).join('\n');
-  return new EmbedBuilder().setColor(0x2b2d31).setTitle(`${CATEGORY_EMOJI[idx]} ${cat.category}`).setDescription(`${lines}\n\nclick a button to purchase — confirm on the next screen`);
+  return new EmbedBuilder().setColor(0x2b2d31).setTitle(cat.category).setDescription(`${lines}\n\nclick a button to purchase — confirm on the next screen`);
 }
 
 function buildCategoryRows(idx) {

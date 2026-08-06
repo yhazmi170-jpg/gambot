@@ -3,13 +3,15 @@ const { embed, error } = require('../utils/embed');
 const { renderBattleImage } = require('../utils/battleImage');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 
-const pendingBattles = new Map();
-
 function errEmbed(text) {
   return new EmbedBuilder().setColor(0xed4245).setDescription(text);
 }
 function okEmbed(text) {
   return new EmbedBuilder().setColor(0x57f287).setDescription(text);
+}
+
+function pendingKey(authorId, targetId, ts) {
+  return `${authorId}_${targetId}_${ts}`;
 }
 
 async function runBattle(message, target) {
@@ -97,17 +99,17 @@ async function handleInteraction(i) {
     if (!i.customId.startsWith('battle_')) return;
     const isNo = i.customId.endsWith('_no');
     const id = i.customId.replace('battle_', '').replace(/_(yes|no)$/, '');
-    const pending = pendingBattles.get(id);
-    if (!pending) {
+    const pending = db.getPendingBattle(id);
+    if (!pending || pending.expires_at < Math.floor(Date.now() / 1000)) {
+      if (pending) db.deletePendingBattle(id);
       await i.update({ embeds: [errEmbed('This battle request has expired.')], components: [] });
       return;
     }
-    if (i.user.id !== pending.target.id) {
+    if (i.user.id !== pending.target_id) {
       await i.deferUpdate().catch(() => {});
       return;
     }
-    pendingBattles.delete(id);
-    clearTimeout(pending.timeout);
+    db.deletePendingBattle(id);
 
     if (isNo) {
       await i.update({ embeds: [okEmbed(`Battle request declined.`)], components: [] });
@@ -115,7 +117,7 @@ async function handleInteraction(i) {
     }
 
     await i.update({ embeds: [okEmbed('⚔️ Starting battle...')], components: [] });
-    await runBattle(pending.message, pending.target);
+    await runBattle(i.message, i.user);
   } catch (e) {
     console.error('battle interaction err:', e);
     try { await i.deferUpdate().catch(() => {}); } catch (_) {}
@@ -139,7 +141,7 @@ module.exports = {
     if (!myTeam || (!myTeam.slot1 && !myTeam.slot2 && !myTeam.slot3)) return message.channel.send({ embeds: [error('your team is empty — use `v team add`')] });
     if (!theirTeam || (!theirTeam.slot1 && !theirTeam.slot2 && !theirTeam.slot3)) return message.channel.send({ embeds: [error(`${target.username}'s team is empty`) ] });
 
-    const id = `${message.author.id}_${target.id}_${Date.now()}`;
+    const id = pendingKey(message.author.id, target.id, Date.now());
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`battle_${id}_yes`).setLabel('⚔️ Fight').setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId(`battle_${id}_no`).setLabel('Cancel').setStyle(ButtonStyle.Danger),
@@ -154,13 +156,14 @@ module.exports = {
       components: [row],
     });
 
-    const timeout = setTimeout(async () => {
-      if (pendingBattles.has(id)) {
-        pendingBattles.delete(id);
+    db.setPendingBattle(id, message.author.id, target.id, Math.floor(Date.now() / 1000) + 60);
+
+    setTimeout(async () => {
+      const p = db.getPendingBattle(id);
+      if (p) {
+        db.deletePendingBattle(id);
         try { await sent.edit({ embeds: [errEmbed('Battle request expired.')], components: [] }); } catch (_) {}
       }
     }, 60000);
-
-    pendingBattles.set(id, { challenger: message.author, target, message, timeout });
   },
 };
