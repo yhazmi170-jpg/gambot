@@ -1,5 +1,6 @@
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, NoSubscriberBehavior, StreamType, getVoiceConnection } = require('@discordjs/voice');
 const play = require('play-dl');
+const ytdl = require('@distube/ytdl-core');
 const { embed, error } = require('../utils/embed');
 const config = require('../config');
 
@@ -59,7 +60,23 @@ async function playTrack(guildId) {
   q.current = track;
 
   try {
-    const stream = await play.stream(track.url, { discordPlayerCompatibility: true });
+    let stream;
+    try {
+      stream = await play.stream(track.url, { discordPlayerCompatibility: true });
+    } catch (playErr) {
+      if (!ytdl.validateURL(track.url)) throw playErr;
+      const ytStream = ytdl(track.url, { filter: 'audioonly', highWaterMark: 1 << 25 });
+      const resource = createAudioResource(ytStream, {
+        inputType: StreamType.Arbitrary,
+        inlineVolume: true,
+      });
+      resource.volume.setVolume(q.volume ?? 1);
+      q.player.play(resource);
+      if (q.channel) {
+        q.channel.send({ embeds: [embed('🎵 Now Playing', [['Song', track.title], ['Requested by', `<@${track.requestedBy}>`]], 0x57f287)] }).catch(() => {});
+      }
+      return;
+    }
     const resource = createAudioResource(stream.stream, {
       inputType: stream.type === 'opus' ? StreamType.Opus : StreamType.Arbitrary,
       inlineVolume: true,
