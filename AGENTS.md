@@ -8,7 +8,7 @@
 - **Host**: Render (free tier) — Blueprint from `render.yaml`. Replit retired as primary host (tab-close slept the repl). Local `keepalive.ps1` pings the Render URL to beat the 15-min idle spin-down.
 - **DB**: SQLite via sql.js at `DB_PATH` (env, default `./data` on Render; ephemeral on free tier → hourly GitHub backup + boot-restore is the data safety net). Backed up to GitHub every hour.
 - **Repo**: https://github.com/yhazmi170-jpg/gambot (branch `master`)
-- **Current version**: see `package.json` (as of last docs sync: **1.3.0**)
+- **Current version**: see `package.json` (as of last docs sync: **1.4.0**)
 
 ## Agent docs (mandatory)
 - **Always keep markdown in sync** after meaningful work:
@@ -20,7 +20,7 @@
 ## Rules
 1. Never lose user data — restore from GitHub backup only if DB doesn't exist
 2. Owner has infinite bet cap, hidden from leaderboard, **no** balance-factor cut on rewards/wins
-3. Pet/hunt/battle system (`v hunt`, `v zoo`, `v team`, `v battle`, `v sell`, `v rename`)
+3. Pet/hunt/battle system (`v hunt`, `v zoo`, `v team`, `v battle`, `v sell`, `v rename`) — see "Pets / hunt economy" below
 4. Perk customization: `v setbadge`, `v setlb`, `v autoreact`
 5. Shop purchase log only if log channel is set (`Aovo log #channel`) — do not flood with every command
 6. Admin: `Aovo add`, `Aovo remove`, `Aovo bal`, `Areward`, `Aremovereward`, `Arestart`, `Aovo shop add #channel`, `Aovo cmds`, `Aovo shutdown`
@@ -36,6 +36,16 @@
 ## Shop
 - Prices live in `commands/shop.js` (`SHOP` array)
 - Perks were bumped ~35% in v1.2.1, then ~2x more in v1.2.7 — adjust there if changing again
+
+## Pets / hunt economy (v1.4.0, OwO-style)
+- **Gems = hunt capacity.** `v hunt` hunts `1 + floor(gems / 5)` animals (cap **10**). No gem cost to multi-hunt — gems ARE the capacity. `v hunt <count>` caps at your capacity. Hunt costs **5 coins per animal** (`db.HUNT_COST_BASE`).
+- **Essence** comes from `v sacrifice <species|rarity> [count]` — converts matching animals (team animals are always skipped). Values: common 1 / uncommon 3 / rare 8 / epic 25 / legendary 100 (`db.ESSENCE_VALUES`).
+- **Traits** (`v upgrade <trait>`): Efficiency (rare+ rarity weight), Gain (+2 coins/animal/level), Radar (+50% gem drop chance/level), Experience (+2 xp/animal/level). Costs `db.traitCost(level)` = `floor(20 * (level+1)^1.5)` essence. Trait columns on `users`: `hunt_eff/hunt_gain/hunt_radar/hunt_xp`.
+- **Autohunt bot** (`v autohunt [mins]`, `v autohuntbot`): starts behind a math captcha (message collector, 45s), costs **50 coins/min**, grants 1 cycle/min. `autohunt_level` upgrade costs `db.autohuntUpgradeCost` = `floor(25*(level+1)^1.6)` essence → +1 animal/cycle, +15 min max run (base 30m), rank Bronze→Legend (`db.autohuntRank`).
+- **Autohunt is lazy/passive** — cycles are granted in `db.catchUpAutohunt(userId)`, called from `utils/commandHandler.js` on every command (and `v huntbot`/`v autohunt`). It computes backlog from `autohunts` table timestamps, so it survives bot sleeps/restarts (grants all missed cycles, incl. after expiry). Run cadence: `AUTOHUNT_CYCLE = 60`s.
+- **Snail garden** (`v garden`): buy snails 500 coins each, daily limit 20 (`SNAIL_DAILY_LIMIT`), breed 1 baby/snail/24h up to **100** capacity (`SNAIL_CAPACITY`), sell 400 each. Breeding catch-up in `db.breedSnails`, also hooked into commandHandler.
+- `v huntbot` = OwO-style panel (essence, traits + progress bars, autohunt bot status, hunt yield). `v hunt` embed shows gems/coins/xp gained. Gems+essence shown in `v bal`, `v zoo`, `v profile`.
+- `v sell <id|species|rarity> [count]` — sells by id, or a whole species/rarity (team skipped).
 
 ## Cards / UI
 - Blackjack uses owo-style board: `Dealer [10+?]` + card back, `Name [19]` + cards (description embed, not field grid)
@@ -68,8 +78,9 @@ git add -A; git commit -m "..."; git push origin master   # Render auto-redeploy
 - `index.js` — entry, lock, HTTP ping server, lottery draw, interaction routing
 - `config.js` / `config.json` — token + settings
 - `backup.js` — GitHub backup/restore
-- `db/index.js` — schema, CRUD, `getBalanceFactor`, `payWin`
+- `db/index.js` — schema, CRUD, `getBalanceFactor`, `payWin`, essence/traits/autohunt/snail-garden functions
 - `commands/shop.js` — shop prices + purchase flow
+- `commands/hunt.js` / `sacrifice.js` / `upgrade.js` / `autohunt.js` / `autohuntbot.js` / `huntbot.js` / `garden.js` — hunting + OwO-style upgrades
 - `commands/poker.js` / `blackjack.js` — card games
 - `utils/commandHandler.js` — routing, TOS, cooldowns
 - `utils/logger.js` — Discord logging

@@ -5,8 +5,8 @@
 
 ## Status
 - **Branch**: `master`
-- **Version**: `1.3.0`
-- **Last update_msg**: BIG UPDATE: moved to a brand new, faster host. Way better uptime, stays online even when the tab is closed.
+- **Version**: `1.4.0`
+- **Last update_msg**: `v1.4.0 -- gems = more animals per hunt (1 per 5 gems, max 10) · sacrifice animals for essence · upgrade hunt traits (efficiency/gain/radar/experience) · autohunt bot hunts for you while offline (answer a captcha to start) · snail garden (buy snails, they breed, sell for profit) · v sell now accepts species/rarity names`
 - **Host migration**: Replit → Render (free, Blueprint from `render.yaml`). Replit repl was stopped by user. **Render URL: `https://gambot-o2o4.onrender.com`** — keepalive pinger repointed to it.
 - **Keepalive**: `keepalive.ps1` pings every 240s; registered as Windows scheduled task `GambotKeepalive` (runs at logon). Pinger must be running on yazan's PC for this to work (now pinging the Render URL).
 
@@ -20,6 +20,7 @@
 - [x] **Secrets check.** `config.json`, `gambot.db`, `.env` are all `.gitignore`d; only `config.example.json` is tracked (verified via `git ls-files`). Bot token stays out of the repo; Render uses `TOKEN` env var.
 
 ## Done recently
+- [x] **v1.4.0 OwO-style hunting build (2026-08-06):** gems are now hunt capacity (1 + 1 per 5 gems held, max 10) — `v hunt` uses your full capacity, no gem cost to multi-hunt; `v sacrifice <species|rarity> [count]` turns animals into essence (common 1 / uncommon 3 / rare 8 / epic 25 / legendary 100, skips team animals); `v upgrade <trait>` spends essence on hunt traits (Efficiency = rare+ weight, Gain = coins/animal, Radar = gem drop ×(1+0.5·lvl), Experience = xp/animal); `v autohunt [mins]` starts auto-hunting behind a math captcha (collector, 45s), grants 1 cycle/min and catch-up grants backlog even after bot sleep/offline; `v autohuntbot` upgrades it with essence (level → +1 animal/cycle, +15m max run, Bronze→Legend ranks); `v huntbot` is the OwO-style panel; `v garden` = snail garden (buy 500 coins, daily limit 20, breed 1/snail/24h up to 100 cap, sell 400 each). Gems+essence shown in `v bal`/`v zoo`/`v profile`/hunt embed; `v autoreact` with no args shows current emoji; `v sell` accepts species/rarity names + count.
 - [x] Host migration prep: `render.yaml` free-safe (`plan: free`, no disk, `DB_PATH=./data`, `TOKEN` + `GITHUB_TOKEN` slots), DB-dir mkdir fix, docs synced, version bumped 1.2.22 → 1.2.23.
 - [x] Keepalive fix — pinger wasn't running at all (no scheduled task / no process). Lowered interval to 240s, registered `GambotKeepalive` task, started it live.
 - [x] Shop perks raised ~2x (v1.2.7) — custom_role 1.5M, rob 15M, double_work 6M, bet_cap 2M, lottery_ticket 7M, vip_games 8M, vip_role_sub 1M/mo, insurance 300k/mo, daily_cap 600k/mo, auto_react 1.5M, sponsored_footer 2.5M, rain 3M, duel 2M, colored_lb 750k, badge 500k, profile 600k, rep 300k
@@ -35,7 +36,8 @@
 
 ## Next / open
 - [x] Confirm bot live on Render — DONE (`logged in as ovo#7700`), v1.3.0 deploy pushes update embed
-- [ ] Repoint `keepalive.ps1` URL — DONE (`https://gambot-o2o4.onrender.com`), pinger restarted
+- [x] Repoint `keepalive.ps1` URL — DONE (`https://gambot-o2o4.onrender.com`), pinger restarted
+- [ ] Confirm v1.4.0 deploy live on Render (update embed in `v version`)
 - [ ] **Do NOT restart the Replit repl** (double instance = double responses)
 
 ## Agent prefs (Cursor)

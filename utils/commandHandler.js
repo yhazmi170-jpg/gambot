@@ -92,6 +92,9 @@ function handleMessage(message) {
   const cmd = getCommand(cmdName);
   if (!cmd) return;
 
+  try { db.catchUpAutohunt(message.author.id); } catch (err) {}
+  try { db.breedSnails(message.author.id); } catch (err) {}
+
   if (prefix === 'A') {
     if (message.author.id !== config.ownerId) return;
     try { cmd.execute(message, args); } catch (err) {

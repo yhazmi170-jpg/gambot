@@ -29,6 +29,7 @@ module.exports = {
       ['Total Gambled', `**${user.total_gambled.toLocaleString()}** ${config.currency}`],
       ['Total Won', `**${user.total_won.toLocaleString()}** ${config.currency}`],
       ['Reputation', `**${user.reputation}** rep`],
+      ['Gems & Essence', `**${user.gems}** gems · **${user.essence}** essence`],
     ];
 
     if (marriage) {

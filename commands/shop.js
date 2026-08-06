@@ -13,8 +13,8 @@ const SHOP = [
       { id: 'bet_cap', name: 'Higher bet cap (500k)', price: 2000000, desc: 'all-in up to 500k instead of 250k', use: 'Use v <game> all to bet up to 500k' },
       { id: 'lottery_ticket', name: 'Free lottery ticket/draw', price: 7000000, desc: 'get a free ticket every lottery draw', use: 'You will auto-get 1 free ticket each lottery draw' },
       { id: 'vip_games', name: 'VIP game modes access', price: 8000000, desc: 'unlocks exclusive games (poker)', use: 'Use v poker <amount> to play video poker' },
-      { id: 'gem', name: 'Gem', price: 2000000, gems: 1, desc: 'spend gems to hunt multiple animals at once (v hunt <count>)', use: 'Use v hunt 3 to hunt 3 animals at once' },
-      { id: 'gems5', name: 'Gem Pack (x5)', price: 9000000, gems: 5, desc: '5 gems to hunt up to 5 animals at once', use: 'Use v hunt 5 to hunt 5 animals at once' },
+      { id: 'gem', name: 'Gem', price: 2000000, gems: 1, desc: 'every 5 gems you hold = +1 extra animal per hunt (v hunt)', use: 'v hunt — more gems = more animals per hunt' },
+      { id: 'gems5', name: 'Gem Pack (x5)', price: 9000000, gems: 5, desc: '5 gems = +1 extra animal per hunt', use: 'v hunt — more gems = more animals per hunt' },
     ],
   },
   {

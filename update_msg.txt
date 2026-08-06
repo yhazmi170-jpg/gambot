@@ -1,1 +1,1 @@
-v1.3.0 -- BIG UPDATE: moved to a brand new, faster host. Way better uptime, and the bot stays online even when the tab is closed.
+v1.4.0 -- gems = more animals per hunt (1 per 5 gems, max 10) · sacrifice animals for essence · upgrade hunt traits (efficiency/gain/radar/experience) · autohunt bot hunts for you while offline (answer a captcha to start) · snail garden (buy snails, they breed, sell for profit) · v sell now accepts species/rarity names

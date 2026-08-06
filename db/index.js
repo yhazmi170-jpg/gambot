@@ -52,6 +52,16 @@ async function init() {
   try { db.run(`ALTER TABLE users ADD COLUMN xp INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   try { db.run(`ALTER TABLE users ADD COLUMN xp_time INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   try { db.run(`ALTER TABLE users ADD COLUMN gems INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN essence INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN hunt_eff INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN hunt_gain INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN hunt_radar INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN hunt_xp INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN autohunt_level INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN snails INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN snail_time INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN snail_bought INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN snail_buy_day INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   db.run(`CREATE TABLE IF NOT EXISTS marriages (user_id TEXT PRIMARY KEY, partner_id TEXT NOT NULL, married_at INTEGER NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS adoption (parent_id TEXT, child_id TEXT, PRIMARY KEY (parent_id, child_id))`);
   db.run(`CREATE TABLE IF NOT EXISTS purchases (user_id TEXT, perk TEXT, expires_at INTEGER, PRIMARY KEY (user_id, perk))`);
@@ -88,6 +98,13 @@ async function init() {
     guild_id TEXT NOT NULL,
     role_id TEXT NOT NULL,
     PRIMARY KEY (user_id, guild_id)
+  )`);
+  db.run(`CREATE TABLE IF NOT EXISTS autohunts (
+    user_id TEXT PRIMARY KEY,
+    started_at INTEGER NOT NULL,
+    end_at INTEGER NOT NULL,
+    next_grant INTEGER NOT NULL,
+    cycles_done INTEGER NOT NULL DEFAULT 0
   )`);
   save();
 }
@@ -130,6 +147,16 @@ function ensureUser(userId) {
       xp: vals[21] || 0,
       xp_time: vals[22] || 0,
       gems: vals[23] || 0,
+      essence: vals[24] || 0,
+      hunt_eff: vals[25] || 0,
+      hunt_gain: vals[26] || 0,
+      hunt_radar: vals[27] || 0,
+      hunt_xp: vals[28] || 0,
+      autohunt_level: vals[29] || 0,
+      snails: vals[30] || 0,
+      snail_time: vals[31] || 0,
+      snail_bought: vals[32] || 0,
+      snail_buy_day: vals[33] || 0,
     };
   }
   return null;
@@ -603,8 +630,8 @@ function grantXp(userId, amount) {
   return leveledUp ? { leveledUp, newLevel: level, reward, xp, needed: xpForLevel(level) } : { leveledUp: false, newLevel: level, reward: 0, xp, needed: xpForLevel(level) };
 }
 
-function addAnimal(userId) {
-  const rarity = randomRarity();
+function addAnimal(userId, effLevel) {
+  const rarity = effLevel > 0 ? randomRarityWithEff(effLevel) : randomRarity();
   const species = randomSpecies(rarity);
   const stats = randomStats(rarity);
   db.run(`INSERT INTO animals (user_id, species, rarity, hp, max_hp, attack, defense) VALUES ('${userId}', '${species}', '${rarity}', ${stats.hp}, ${stats.hp}, ${stats.attack}, ${stats.defense})`);
@@ -772,6 +799,300 @@ function getPerkHolders(perk) {
   return rows[0].values.map(v => v[0]);
 }
 
+// ---------- Essence / traits / autohunt ----------
+
+const ESSENCE_VALUES = { common: 1, uncommon: 3, rare: 8, epic: 25, legendary: 100 };
+const MAX_HUNT_CAP = 10;
+const HUNT_GEM_DIVISOR = 5;
+const HUNT_COST_BASE = 5;
+const GEM_DROP_BASE = { common: 0, uncommon: 0.04, rare: 0.10, epic: 0.20, legendary: 0.40 };
+const GEM_AMOUNT = { common: 0, uncommon: 1, rare: 1, epic: 2, legendary: 3 };
+
+const TRAIT_COLUMNS = { efficiency: 'hunt_eff', gain: 'hunt_gain', radar: 'hunt_radar', experience: 'hunt_xp' };
+const AUTOHUNT_RANKS = [
+  { max: 2, name: 'Bronze' },
+  { max: 5, name: 'Silver' },
+  { max: 8, name: 'Gold' },
+  { max: 11, name: 'Diamond' },
+  { max: 14, name: 'Master' },
+  { max: Infinity, name: 'Legend' },
+];
+const AUTOHUNT_BASE_MIN = 30;
+const AUTOHUNT_MIN_PER_LEVEL = 15;
+const AUTOHUNT_COST_PER_MIN = 50;
+const AUTOHUNT_CYCLE = 60;
+
+function getEssence(userId) {
+  const u = ensureUser(userId);
+  return u ? u.essence : 0;
+}
+
+function addEssence(userId, amount) {
+  db.run(`UPDATE users SET essence = essence + ${amount} WHERE user_id = '${userId}'`);
+  save();
+}
+
+function getTraits(userId) {
+  const u = ensureUser(userId);
+  return {
+    efficiency: u ? u.hunt_eff : 0,
+    gain: u ? u.hunt_gain : 0,
+    radar: u ? u.hunt_radar : 0,
+    experience: u ? u.hunt_xp : 0,
+  };
+}
+
+function traitCost(level) { return Math.floor(20 * Math.pow(level + 1, 1.5)); }
+
+function upgradeTrait(userId, trait) {
+  const u = ensureUser(userId);
+  const column = TRAIT_COLUMNS[trait];
+  if (!u || !column) return null;
+  const level = u[column] || 0;
+  const cost = traitCost(level);
+  if (u.essence < cost) return { cost, essence: u.essence, ok: false };
+  db.run(`UPDATE users SET essence = essence - ${cost}, ${column} = ${column} + 1 WHERE user_id = '${userId}'`);
+  save();
+  return { cost, level: level + 1, ok: true };
+}
+
+function randomRarityWithEff(effLevel) {
+  const w = {
+    common: Math.max(10, 50 - 3 * effLevel),
+    uncommon: Math.max(10, 25 - effLevel),
+    rare: 15 + 2 * effLevel,
+    epic: 8 + 1.5 * effLevel,
+    legendary: 2 + 0.5 * effLevel,
+  };
+  const total = Object.values(w).reduce((a, b) => a + b, 0);
+  let roll = Math.random() * total;
+  for (const r of RARITY_ORDER) {
+    roll -= w[r];
+    if (roll <= 0) return r;
+  }
+  return 'common';
+}
+
+function huntCapacity(userId) {
+  return Math.min(MAX_HUNT_CAP, 1 + Math.floor(getGems(userId) / HUNT_GEM_DIVISOR));
+}
+
+function huntYield(userId) {
+  const t = getTraits(userId);
+  return {
+    capacity: huntCapacity(userId),
+    coins: t.gain * 2,
+    xp: 2 + t.experience * 2,
+    radarMult: 1 + t.radar * 0.5,
+  };
+}
+
+function rollGemDrop(rarity, radarMult) {
+  const chance = Math.min(GEM_DROP_BASE[rarity] * (radarMult || 1), 0.95);
+  if (Math.random() < chance) return GEM_AMOUNT[rarity];
+  return 0;
+}
+
+function sacrificeAnimals(userId, query, count) {
+  const animals = getUserAnimals(userId);
+  const q = (query || '').toLowerCase();
+  const team = getTeam(userId);
+  const teamIds = team ? new Set([team.slot1, team.slot2, team.slot3].filter(Boolean)) : new Set();
+  const matches = animals.filter(a => {
+    if (RARITY_ORDER.includes(q)) return a.rarity === q;
+    return a.species.toLowerCase() === q || a.species.toLowerCase().startsWith(q);
+  });
+  const targets = count ? matches.slice(0, count) : matches;
+  let essence = 0;
+  let sacrificed = 0;
+  let skipped = 0;
+  for (const a of targets) {
+    if (teamIds.has(a.id)) { skipped++; continue; }
+    essence += ESSENCE_VALUES[a.rarity];
+    removeAnimal(a.id);
+    sacrificed++;
+  }
+  if (sacrificed > 0) addEssence(userId, essence);
+  return { essence, sacrificed, skipped };
+}
+
+function addXpRaw(userId, amount) {
+  let u = ensureUser(userId);
+  if (!u) { db.run(`INSERT INTO users (user_id, balance) VALUES ('${userId}', 0)`); u = ensureUser(userId); }
+  let level = u.level;
+  let xp = u.xp + amount;
+  let leveledUp = false;
+  let reward = 0;
+  while (xp >= xpForLevel(level)) {
+    xp -= xpForLevel(level);
+    level++;
+    leveledUp = true;
+    reward += Math.floor(LEVEL_REWARD * level * getBalanceFactor(userId));
+  }
+  db.run(`UPDATE users SET xp = ${xp}, level = ${level} WHERE user_id = '${userId}'`);
+  save();
+  if (reward > 0) addBalance(userId, reward);
+  return leveledUp ? { leveledUp, newLevel: level, reward, xp, needed: xpForLevel(level) } : { leveledUp: false, newLevel: level, reward: 0, xp, needed: xpForLevel(level) };
+}
+
+function autohuntRank(level) {
+  for (const r of AUTOHUNT_RANKS) if (level <= r.max) return r.name;
+  return 'Legend';
+}
+
+function autohuntUpgradeCost(level) { return Math.floor(25 * Math.pow(level + 1, 1.6)); }
+
+function autohuntAnimalsPerCycle(level) { return 1 + level; }
+
+function autohuntMaxMinutes(level) { return AUTOHUNT_BASE_MIN + AUTOHUNT_MIN_PER_LEVEL * level; }
+
+function getAutohunt(userId) {
+  const rows = db.exec(`SELECT * FROM autohunts WHERE user_id = '${userId}'`);
+  if (!rows.length || !rows[0].values.length) return null;
+  const v = rows[0].values[0];
+  return { user_id: v[0], started_at: v[1], end_at: v[2], next_grant: v[3], cycles_done: v[4] };
+}
+
+function getAutohuntProgress(userId) {
+  const ah = getAutohunt(userId);
+  if (!ah) return null;
+  const now = Math.floor(Date.now() / 1000);
+  const total = ah.end_at - ah.started_at;
+  const elapsed = Math.min(Math.max(now - ah.started_at, 0), total);
+  return { remaining: Math.max(ah.end_at - now, 0), percent: total > 0 ? elapsed / total : 0, cycles_done: ah.cycles_done };
+}
+
+function startAutohunt(userId, minutes) {
+  const now = Math.floor(Date.now() / 1000);
+  const cost = minutes * AUTOHUNT_COST_PER_MIN;
+  const u = ensureUser(userId);
+  if (!u || u.balance < cost) return { ok: false, cost };
+  addBalance(userId, -cost);
+  db.run(`INSERT OR REPLACE INTO autohunts (user_id, started_at, end_at, next_grant, cycles_done) VALUES ('${userId}', ${now}, ${now + minutes * 60}, ${now + AUTOHUNT_CYCLE}, 0)`);
+  save();
+  return { ok: true, cost };
+}
+
+function catchUpAutohunt(userId) {
+  const ah = getAutohunt(userId);
+  if (!ah) return null;
+  const now = Math.floor(Date.now() / 1000);
+  const level = (ensureUser(userId) || {}).autohunt_level || 0;
+  const traits = getTraits(userId);
+  const perCycle = autohuntAnimalsPerCycle(level);
+  const coinsPerAnimal = traits.gain * 2;
+  const xpPerAnimal = 2 + traits.experience * 2;
+  const radarMult = 1 + traits.radar * 0.5;
+  const cap = Math.min(now, ah.end_at);
+  let cycles = 0;
+  let animals = 0;
+  let gems = 0;
+  let coins = 0;
+  let xp = 0;
+  while (ah.next_grant <= cap) {
+    for (let i = 0; i < perCycle; i++) {
+      const a = addAnimal(userId, traits.efficiency);
+      animals++;
+      const g = rollGemDrop(a.rarity, radarMult);
+      if (g > 0) { addGems(userId, g); gems += g; }
+      coins += coinsPerAnimal;
+      xp += xpPerAnimal;
+    }
+    cycles++;
+    ah.next_grant += AUTOHUNT_CYCLE;
+  }
+  if (cycles > 0) {
+    if (coins > 0) addBalance(userId, coins);
+    if (xp > 0) addXpRaw(userId, xp);
+    db.run(`UPDATE autohunts SET next_grant = ${ah.next_grant}, cycles_done = ${ah.cycles_done + cycles} WHERE user_id = '${userId}'`);
+    save();
+  }
+  if (now >= ah.end_at) {
+    db.run(`DELETE FROM autohunts WHERE user_id = '${userId}'`);
+    save();
+    return { ended: true, cycles, animals, gems, coins, xp };
+  }
+  return { ended: false, cycles, animals, gems, coins, xp };
+}
+
+function upgradeAutohunt(userId) {
+  const u = ensureUser(userId);
+  if (!u) return null;
+  const level = u.autohunt_level || 0;
+  const cost = autohuntUpgradeCost(level);
+  if (u.essence < cost) return { cost, essence: u.essence, ok: false };
+  db.run(`UPDATE users SET essence = essence - ${cost}, autohunt_level = autohunt_level + 1 WHERE user_id = '${userId}'`);
+  save();
+  return { cost, level: level + 1, ok: true };
+}
+
+// ---------- Snail garden ----------
+
+const SNAIL_CAPACITY = 100;
+const SNAIL_PRICE = 500;
+const SNAIL_SELL_PRICE = 400;
+const SNAIL_DAILY_LIMIT = 20;
+const SNAIL_BREED_SECONDS = 86400;
+
+function dayNumber(ts) { return Math.floor((ts || Date.now() / 1000) / 86400); }
+
+function getSnailInfo(userId) {
+  const u = ensureUser(userId);
+  if (!u) return null;
+  const today = dayNumber();
+  const boughtToday = u.snail_buy_day === today ? u.snail_bought : 0;
+  return {
+    snails: u.snails,
+    capacity: SNAIL_CAPACITY,
+    boughtToday,
+    buyLimitToday: Math.max(0, SNAIL_DAILY_LIMIT - boughtToday),
+    lastTick: u.snail_time,
+  };
+}
+
+function breedSnails(userId) {
+  const u = ensureUser(userId);
+  if (!u || u.snails <= 0) return { bred: 0, snails: u ? u.snails : 0 };
+  const now = Math.floor(Date.now() / 1000);
+  let tick = u.snail_time;
+  if (!tick) tick = now;
+  const elapsed = now - tick;
+  if (elapsed < SNAIL_BREED_SECONDS) return { bred: 0, snails: u.snails };
+  const grown = Math.min(Math.floor(u.snails * elapsed / SNAIL_BREED_SECONDS), SNAIL_CAPACITY - u.snails);
+  if (grown <= 0) return { bred: 0, snails: u.snails };
+  db.run(`UPDATE users SET snails = snails + ${grown}, snail_time = ${now - (elapsed % SNAIL_BREED_SECONDS)} WHERE user_id = '${userId}'`);
+  save();
+  return { bred: grown, snails: u.snails + grown };
+}
+
+function buySnails(userId, count) {
+  const u = ensureUser(userId);
+  if (!u || count <= 0) return { ok: false, reason: 'invalid' };
+  const today = dayNumber();
+  const boughtToday = u.snail_buy_day === today ? u.snail_bought : 0;
+  const remaining = SNAIL_DAILY_LIMIT - boughtToday;
+  if (count > remaining) return { ok: false, reason: 'limit', remaining, limit: SNAIL_DAILY_LIMIT };
+  if (u.snails + count > SNAIL_CAPACITY) return { ok: false, reason: 'capacity', capacity: SNAIL_CAPACITY };
+  const cost = count * SNAIL_PRICE;
+  if (u.balance < cost) return { ok: false, reason: 'coins', cost, balance: u.balance };
+  const now = Math.floor(Date.now() / 1000);
+  const tick = u.snail_time || now;
+  db.run(`UPDATE users SET balance = balance - ${cost}, snails = snails + ${count}, snail_bought = ${boughtToday + count}, snail_buy_day = ${today}, snail_time = ${tick} WHERE user_id = '${userId}'`);
+  save();
+  return { ok: true, cost, bought: count, remaining: remaining - count };
+}
+
+function sellSnails(userId, count) {
+  const u = ensureUser(userId);
+  if (!u || count <= 0) return { ok: false, reason: 'invalid' };
+  const actual = Math.min(count, u.snails);
+  if (actual <= 0) return { ok: false, reason: 'none' };
+  const coins = actual * SNAIL_SELL_PRICE;
+  db.run(`UPDATE users SET balance = balance + ${coins}, snails = snails - ${actual} WHERE user_id = '${userId}'`);
+  save();
+  return { ok: true, sold: actual, coins };
+}
+
 module.exports = {
   init,
   ensureUser,
@@ -834,4 +1155,10 @@ module.exports = {
   xpForLevel, levelInfo, grantXp,
   bankDeposit, bankWithdraw, takeLoan, payLoan, LOAN_INTEREST, MAX_LOAN_MULT,
   SPECIES, RARITY_WEIGHTS, RARITY_ORDER, randomRarity, randomSpecies, randomStats, expForLevel,
+  getEssence, addEssence, getTraits, traitCost, upgradeTrait, randomRarityWithEff,
+  huntCapacity, huntYield, rollGemDrop, sacrificeAnimals, addXpRaw,
+  startAutohunt, getAutohunt, getAutohuntProgress, catchUpAutohunt, upgradeAutohunt,
+  autohuntRank, autohuntUpgradeCost, autohuntAnimalsPerCycle, autohuntMaxMinutes,
+  ESSENCE_VALUES, MAX_HUNT_CAP, HUNT_COST_BASE, AUTOHUNT_COST_PER_MIN, AUTOHUNT_CYCLE,
+  getSnailInfo, breedSnails, buySnails, sellSnails, SNAIL_PRICE, SNAIL_SELL_PRICE, SNAIL_DAILY_LIMIT, SNAIL_CAPACITY,
 };

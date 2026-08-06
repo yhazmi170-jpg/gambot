@@ -33,8 +33,9 @@ module.exports = {
     message.channel.send({
       embeds: [embed(`🐾 Zoo (${total})`, [
         ['Summary', summary || 'none'],
+        ['Gems & Essence', `**${db.getGems(message.author.id)}** gems · **${db.getEssence(message.author.id)}** essence`],
         ['', pages[0]],
-        ['', '`v team` to view battle team · `v sell <id>` to sell'],
+        ['', '`v team` to view battle team · `v sell <id|species>` to sell · `v sacrifice <rarity>` for essence'],
       ], 0x57f287)],
     });
   },
