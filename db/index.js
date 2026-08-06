@@ -1518,8 +1518,8 @@ function checkAchievements(userId) {
   const unlocked = [];
   for (const ach of ACHIEVEMENTS) {
     if (!owned.has(ach.key) && ach.test(state)) {
-      db.run(`INSERT INTO achievements (user_id, key) VALUES ('${userId}', '${ach.key}')`);
       addBalance(userId, ach.reward);
+      db.run(`INSERT INTO achievements (user_id, key) VALUES ('${userId}', '${ach.key}')`);
       unlocked.push(ach);
     }
   }
