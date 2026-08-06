@@ -5,3 +5,4 @@ flush: move them into update_msg.txt as ONE combined log + bump package.json ver
 then push (the boot announcement posts it once).
 
 Format: one line per change, terse, no AI fluff.
+- fixed update announcements skipping the channel (marked 'sent' before actually posting) — now fetches channels properly + Aovo announce to force re-post

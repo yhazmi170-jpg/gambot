@@ -2,6 +2,7 @@ const db = require('../db');
 const { embed, error, success, parseAmount } = require('../utils/embed');
 const config = require('../config');
 const logger = require('../utils/logger');
+const { version } = require('../package.json');
 
 module.exports = {
   name: 'admin',
@@ -151,6 +152,7 @@ module.exports = {
           ['Aovo shutdown', 'fully stop the bot'],
           ['Aovo restart', 'pull updates + restart'],
           ['Aovo pupd <message>', 'view/set push update message'],
+          ['Aovo announce', 're-post the update message to update channels'],
         ])] });
       } else if (sub === 'pupd' || sub === 'pushupdate') {
         const fs = require('fs');
@@ -167,6 +169,26 @@ module.exports = {
         }
         fs.writeFileSync(msgPath, msg);
         message.channel.send({ embeds: [success(`update message set to:\n${msg}`)] });
+      } else if (sub === 'announce') {
+        const fs = require('fs');
+        const path = require('path');
+        let msg = '';
+        try { msg = fs.readFileSync(path.join(__dirname, '..', 'update_msg.txt'), 'utf8').trim(); } catch {}
+        if (!msg) return message.channel.send({ embeds: [error('update message is empty — set one with `Aovo pupd <message>` first')] });
+        const channels = db.getAllUpdateChannels();
+        if (!channels.length) return message.channel.send({ embeds: [error('no update channel set — use `Aovo updates #channel` first')] });
+        let sent = 0;
+        for (const { channel_id } of channels) {
+          message.client.channels.fetch(channel_id).then(ch => {
+            if (!ch || typeof ch.send !== 'function') return;
+            ch.send({ embeds: [embed('📢 Bot Update', [
+              ['Version', `v${version}`],
+              ['What\'s New', msg],
+              ['Uptime', 'Manual re-announce'],
+            ], 0x5865f2)] }).then(() => { sent++; if (sent === channels.length) message.channel.send({ embeds: [success(`announced to ${sent} update channel${sent > 1 ? 's' : ''}`)] }); }).catch(() => {});
+          }).catch(() => {});
+        }
+        message.channel.send({ embeds: [success(`re-announcing to ${channels.length} update channel${channels.length > 1 ? 's' : ''}...`)] });
       } else if (sub === 'addrole') {
       if (!message.guild) return message.channel.send({ embeds: [error('must be in a server')] });
       const roleTarget = message.mentions.users.first();
@@ -193,7 +215,8 @@ module.exports = {
          ['Aovo addrole @user name | #color', 'create custom role'],
          ['Aovo shutdown', 'fully stop the bot'],
          ['Aovo restart', 'pull updates + restart'],
-        ['Aovo pupd <message>', 'view/set push update message'],
+         ['Aovo pupd <message>', 'view/set push update message'],
+         ['Aovo announce', 're-post the update message to update channels'],
       ])] });
     }
   },

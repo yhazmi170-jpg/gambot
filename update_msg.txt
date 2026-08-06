@@ -1,4 +1,4 @@
-v1.5.0 -- the BIG one.
+v1.5.0
 
 NEW:
 `v stocks` -- buy & sell stocks, market drifts every hour
@@ -13,6 +13,7 @@ NEW:
 `v achievements` -- unlock badges for milestones
 `v blackmarket` -- rotating limited deals, refresh every 6h
 `v dex` -- see which species you own vs missing
+`v animal <id|species|name>` -- full stats (hp, attack, defense, xp)
 
 SHOP:
 Insurance upgrades II/III/IV (30/40/50% loss refund)
@@ -22,4 +23,4 @@ Shop revamped into categories
 
 FIXES:
 custom role bug fixed -- role now sits below the bot's role so name/color edits work, plus `v customrole name` / `v customrole color` subcommands
-crash & mines now show your real payout after the balance cut -- no more mystery "rigged" feel
+crash & mines now show your real payout after the balance cut

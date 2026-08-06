@@ -61,6 +61,26 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction],
 });
 
+/** Post an update announcement to every configured update channel. Returns # channels that got it. */
+async function postUpdateAnnouncement(client, updateMsg, ver) {
+  const channels = db.getAllUpdateChannels();
+  let sent = 0;
+  for (const { channel_id } of channels) {
+    try {
+      const ch = await client.channels.fetch(channel_id).catch(() => null);
+      if (ch && typeof ch.send === 'function') {
+        await ch.send({ embeds: [embed('📢 Bot Update', [
+          ['Version', ver],
+          ['What\'s New', updateMsg],
+          ['Uptime', 'Fresh deploy — check `v version` for details'],
+        ], 0x5865f2)] });
+        sent++;
+      }
+    } catch (e) { console.error('update announcement send failed:', channel_id, e && e.message); }
+  }
+  return sent;
+}
+
 loadCommands();
 
 async function start() {
@@ -102,17 +122,14 @@ client.on('ready', () => {
     let updateMsg = '';
     try { updateMsg = fs.readFileSync(path.join(__dirname, 'update_msg.txt'), 'utf8').trim(); } catch {}
     if (updateMsg) {
-      const channels = db.getAllUpdateChannels();
-      for (const { guild_id, channel_id } of channels) {
-        const ch = client.channels.cache.get(channel_id);
-        if (ch) ch.send({ embeds: [embed('📢 Bot Update', [
-          ['Version', `v${ver}`],
-          ['What\'s New', updateMsg],
-          ['Uptime', 'Fresh deploy — check `v version` for details'],
-        ], 0x5865f2)] }).catch(() => {});
-      }
+      postUpdateAnnouncement(client, updateMsg, `v${ver}`).then(sent => {
+        const channels = db.getAllUpdateChannels();
+        if (sent === channels.length) db.markNotified(`v${ver}`);
+        else console.error(`update announcement partially sent (${sent}/${channels.length}) — will retry next boot`);
+      });
+    } else {
+      db.markNotified(`v${ver}`);
     }
-    db.markNotified(`v${ver}`);
   }
 
   if (!db.wasNotified('custom_role_update')) {
