@@ -43,8 +43,9 @@
 - [x] Help descriptions on all cmds + gamehelp poker/bj + standing “always update help” rule
 
 ## Next / open
-- [ ] **PUSH v1.5.0 — AWAITING USER APPROVAL (do NOT push without the go-ahead):** all work is committed locally (`3a8bf5c`..`beb1b65`, 7 commits); a push triggers Render redeploy. After push, verify deploy snapshot (new tables: quests/bounties/vaults/blackmarket/achievements/stocks) + that update embed posts (v1.5.0).
+- [ ] **PUSH v1.5.0 — DONE (pushed `3a8bf5c`..`cf2659d`).** Deploy verify: new tables (quests/bounties/vaults/blackmarket/achievements/stocks) + update embed posts (v1.5.0).
 - [ ] **AFTER ts ships:** slots jackpot effects — big win announcements (e.g. `777` → JACKPOTTTT-style text/flair) in `commands/slots.js`.
+- [ ] **Update policy active (v1.5.0 rule):** big updates = version bump + `update_msg.txt` + announce; small updates = push silently + append to `pending_updates.txt`, flush together after ~10. See AGENTS.md.
 - [ ] **Restore friend's lost ~30m** (`554257220523655199`, @伤害): live bal **2,445,528** (gems 0). Re-run `Aovo add @伤害 29774999` (target 32,220,527 from snapshot `1802448`, 2026-08-05T22:50:48Z). NOW SAFE: 1-min backups + empty-DB guard + shutdown backup + scan-all restore protect it.
 - [ ] **Friend has no `auto_react` perk** (confirmed 2026-08-06) — if @伤害 is supposed to auto-react, either they buy it (`v shop`) + `v autoreact <emoji>`, or grant via admin. `v1.4.6` fixed custom-emoji resolution in the code path, so only the perk is now the blocker.
 - [ ] **Do NOT restart the Replit repl** (double instance = double responses)

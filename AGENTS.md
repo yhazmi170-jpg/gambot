@@ -98,12 +98,17 @@ git add -A; git commit -m "..."; git push origin master   # Render auto-redeploy
 - `HANDOFF.md` — cross-tool session state (keep current)
 - `keepalive.ps1` + `keepalive.vbs` — uptime pinger
 
+## Update announcement policy (v1.5.0 rule)
+- **Big updates** (new game / major feature / rework / bug that players noticed): bump `package.json` version + write `update_msg.txt` + push → the boot announcement posts it once (gated by the `notifications` table).
+- **Small updates** (minor fixes, tiny tweaks, internal changes): commit + push WITHOUT bumping the version and WITHOUT touching `update_msg.txt`. Instead append a one-line note to `pending_updates.txt`. Only when ~10 small updates have piled up (or the user asks), flush them all at once: merge into `update_msg.txt` as ONE combined log + one version bump + push. This keeps versions from jumping fast.
+- The boot announcement only fires when `db.wasNotified('v<ver>')` is false — so small pushes with the same version stay silent automatically.
+
 ## Important
 - `getMaxBet` returns Infinity for owner
 - `getTop` excludes owner from leaderboard
 - `addBalance` auto-creates users
 - Restore only if DB file is missing/empty (not every restart)
-- **EVERY PUSH (mandatory, do not skip):** bump `package.json` version, update `update_msg.txt` with a user-facing summary, verify new commands have `helpCategory` + `description` so they auto-appear in `v help`, update `gamehelp.js` when game rules/UI change, update `AGENTS.md` / `HANDOFF.md` if behavior or status changed
+- **EVERY PUSH (mandatory, do not skip):** bump `package.json` version, update `update_msg.txt` with a user-facing summary, verify new commands have `helpCategory` + `description` so they auto-appear in `v help`, update `gamehelp.js` when game rules/UI change, update `AGENTS.md` / `HANDOFF.md` if behavior or status changed. **Exception:** small updates skip the version bump + `update_msg.txt` and go into `pending_updates.txt` instead (see "Update announcement policy").
 
 ## Help (mandatory)
 - `v help` auto-lists any command with `helpCategory` + `description` (+ optional `helpArgs`)
