@@ -206,8 +206,15 @@ module.exports = {
       });
     }
 
-    message.channel.send({ embeds: [bjEmbed(board({ name, player, dealer, reveal: false, bet: amount }))] }).then(msg => {
+    const initialButtons = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('bj_hit').setLabel('Hit').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId('bj_stand').setLabel('Stand').setStyle(ButtonStyle.Danger),
+    );
+    message.channel.send({
+      embeds: [bjEmbed(board({ name, player, dealer, reveal: false, bet: amount }))],
+      components: [initialButtons],
+    }).then(msg => {
       playLoop(msg, player, dealer, deck, amount, message.author.id, name);
-    });
+    }).catch(() => {});
   },
 };

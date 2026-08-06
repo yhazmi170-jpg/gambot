@@ -1,1 +1,1 @@
-v1.4.1 -- v sacrifice / v sell now accept "all" to convert or sell every animal at once · v sacrifice parrot correctly gives 3 essence per parrot (parrots are uncommon) · fixed version/custom-role announcements being re-sent on every restart · backups are now timestamped snapshots so your data is never overwritten by an old copy
+v1.4.2 -- v help no longer crashes (too many pets commands · better layout) · v zoo now shows ALL your animals with ◀ ▶ page buttons (rarer pets sort first) · v blackjack now shows Hit/Stand buttons immediately

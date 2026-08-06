@@ -18,6 +18,22 @@ const perkCmdMap = {
 
 const CATEGORY_ORDER = ['Economy', 'Games', 'Pets', 'Social', 'Shop'];
 
+// Discord caps a single embed field at 1024 chars — chunk long lists across fields.
+function chunkFields(name, lines) {
+  const fields = [];
+  let cur = '';
+  for (const line of lines) {
+    if (cur.length + line.length + 1 > 1024) {
+      fields.push([name, cur]);
+      cur = line;
+    } else {
+      cur = cur ? cur + '\n' + line : line;
+    }
+  }
+  if (cur) fields.push([name, cur]);
+  return fields;
+}
+
 module.exports = {
   name: 'help',
   aliases: ['h', 'commands', 'cmds'],
@@ -57,14 +73,19 @@ module.exports = {
       sections.push(['Your Perk Commands', perkLines.join('\n')]);
     }
 
-    sections.push(['Tips', [
+    const finalFields = [];
+    for (const [name, value] of sections) {
+      const lines = String(value).split('\n');
+      finalFields.push(...chunkFields(name, lines));
+    }
+    finalFields.push(['Tips', [
       `\`${prefix} gamehelp <game>\` — rules for each game`,
       `\`${prefix} version\` — bot version (v${version})`,
       'Higher balance = slightly lower rewards/wins (caps at 30% less)',
     ].join('\n')]);
 
     message.channel.send({
-      embeds: [embed(`Gambot v${version}`, sections)],
+      embeds: [embed(`Gambot v${version}`, finalFields)],
     });
   },
 };
