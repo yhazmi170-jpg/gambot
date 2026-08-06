@@ -5,8 +5,8 @@
 
 ## Status
 - **Branch**: `master`
-- **Version**: `1.4.3`
-- **Last update_msg**: `v1.4.3 -- fixed data loss on restarts: the bot now saves your progress to the cloud BEFORE shutting down, and backs up every 10 minutes instead of every hour — so updates no longer wipe recent balance/pets/essence`
+- **Version**: `1.4.4`
+- **Last update_msg**: `v1.4.4 -- the bot now refuses to overwrite your cloud save with an empty/corrupted one, so restarts can no longer wipe your data · backups run every 1 minute`
 - **Host migration**: Replit → Render (free, Blueprint from `render.yaml`). Replit repl was stopped by user. **Render URL: `https://gambot-o2o4.onrender.com`** — keepalive pinger repointed to it.
 - **Keepalive**: `keepalive.ps1` pings every 240s; registered as Windows scheduled task `GambotKeepalive` (runs at logon). Pinger must be running on yazan's PC for this to work (now pinging the Render URL).
 
@@ -20,6 +20,7 @@
 - [x] **Secrets check.** `config.json`, `gambot.db`, `.env` are all `.gitignore`d; only `config.example.json` is tracked (verified via `git ls-files`). Bot token stays out of the repo; Render uses `TOKEN` env var.
 
 ## Done recently
+- [x] **v1.4.4 corruption recovery + guards (2026-08-06):** A local `backup()` test accidentally pushed an EMPTY test DB as the newest snapshot → the v1.4.3 deploy restored it, wiping all data (users hit "accept terms again"). RECOVERED: deleted the empty snapshots (11:31, 11:32, 11:36) + restored the `gambot.db` mirror + pushed good 11:15 data as newest snapshot (11:40). Added **permanent guards** in `backup.js`: never upload a 0-user DB, and never restore one (`countUsers` via sql.js). Backup interval now **1 min**. **CRITICAL LESSON: never run `backup()` against a throwaway test DB — it becomes the newest snapshot.**
 - [x] **v1.4.3 data-loss fix (2026-08-06):** Render free tier wipes `./data` on every deploy/restart, and backups only ran hourly — so any deploy rolled back everything newer than the last backup (confirmed: @伤害's `Aovo add` restore got reverted by the v1.4.2 deploy). Fixed by (1) a **SIGTERM/SIGINT shutdown handler** in `index.js` that backs up the live DB to GitHub before exiting (15s cap), and (2) interval backup **1h → 10 min**. Shutdown handler must be re-verified after deploy.
 - [x] **v1.4.2 UI fixes (2026-08-06):** `v help` crashed with "an error occurred" because the Pets category exceeded Discord's 1024-char per-field limit — help now chunks long categories across multiple fields. `v zoo` only showed the first 10 of N animals (no pagination, worse-sorted) — now sorts by rarity (legendary → common) and adds ◀ ▶ pagination buttons (10/page). `v blackjack` buttons were only attached via a second `msg.edit` — now the initial deal message already includes Hit/Stand buttons so they can't be missing.
 - [x] **v1.4.1 safety patch (2026-08-06):** `v sacrifice` / `v sell` accept `all`; one-time announcements moved from ephemeral flag FILES to the `notifications` table (`db.wasNotified`/`markNotified`) so the custom-role DM / version embed stop re-firing on every Render restart; backup errors now log loudly instead of silent `.catch`; `backup.js` rewritten to timestamped snapshots (`backups/gambot-<ts>.db`) + restore guard (only replaces a local DB OLDER than the newest snapshot).
@@ -40,8 +41,8 @@
 ## Next / open
 - [x] Confirm bot live on Render — DONE (`logged in as ovo#7700`), v1.3.0 deploy pushes update embed
 - [x] Repoint `keepalive.ps1` URL — DONE (`https://gambot-o2o4.onrender.com`), pinger restarted
-- [ ] Confirm v1.4.3 deploy live on Render (update embed in `v version`)
-- [ ] **Restore friend's lost ~30m** (`554257220523655199`, @伤害): the v1.4.2 deploy REVERTED any restore — live bal back at **2,445,528** (gems 0). Re-run `Aovo add @伤害 <diff>` AFTER v1.4.3 deploys (shutdown+10-min backups will then protect it). Target: 32,220,527 (snapshot `1802448`, 2026-08-05T22:50:48Z). Diff from 2,445,528 = **29,774,999** — recheck `v bal @伤害` first.
+- [ ] **CONFIRM v1.4.4 deploy recovery** — the deploy should restore the good 11:40 snapshot (31 users). Verify: `v version` shows 1.4.4, update embed posts, `v bal @伤害` = 2,445,528, and the next backups/ commit has real data. If a new EMPTY snapshot appears, the running bot is STILL on the empty DB — delete it from gambot-data and check.
+- [ ] **Restore friend's lost ~30m** (`554257220523655199`, @伤害): live bal should be **2,445,528** (gems 0) after recovery. Re-run `Aovo add @伤害 29774999` (target 32,220,527 from snapshot `1802448`, 2026-08-05T22:50:48Z). NOW SAFE: 1-min backups + empty-DB guard + shutdown backup protect it.
 - [ ] **Do NOT restart the Replit repl** (double instance = double responses)
 - [ ] "Self react" report from user is still unexplained — user hasn't described the exact symptom yet; last known: `auto_react` perk reacts with the user's set emoji or ⭐ (index.js:183-187), autoreact costs 1.5M in shop.
 

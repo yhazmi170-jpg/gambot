@@ -14,9 +14,25 @@ function snapshotName() {
   return `gambot-${new Date().toISOString().replace(/[:.]/g, '-')}.db`;
 }
 
+// Count rows in `users` inside an SQLite buffer (0 = empty/corrupt DB we must never push or restore)
+async function countUsers(buf) {
+  try {
+    const initSqlJs = require('sql.js');
+    const SQL = await initSqlJs();
+    const db = new SQL.Database(new Uint8Array(buf));
+    const res = db.exec('SELECT COUNT(*) FROM users');
+    db.close();
+    return (res[0] && res[0].values[0][0]) || 0;
+  } catch { return -1; }
+}
+
 async function backup() {
   if (!fs.existsSync(DB_PATH)) { console.log('backup: no db file, skipping'); return; }
-  const content = fs.readFileSync(DB_PATH).toString('base64');
+  const buf = fs.readFileSync(DB_PATH);
+  // Guard: never upload an empty/corrupt DB as the newest snapshot — it would clobber good data on next restore
+  const users = await countUsers(buf);
+  if (users === 0) { console.error('backup: SKIPPED — local DB has 0 users (empty/corrupt); not overwriting cloud backups'); return; }
+  const content = buf.toString('base64');
 
   try {
     await request('GET', `/repos/${OWNER}/${REPO}`).catch(async () => {
@@ -86,12 +102,13 @@ async function restore() {
     }
     try {
       const buf = await download(newest.path);
-      if (buf) {
+      if (buf && (await countUsers(buf)) > 0) {
         fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
         fs.writeFileSync(DB_PATH, buf);
         console.log(`restored db from github backup (${newest.path})`);
         return true;
       }
+      if (buf) console.error(`restore: SKIPPED empty/corrupt snapshot ${newest.path} (0 users)`);
     } catch (e) {
       console.error('restore: snapshot download failed:', e.message);
     }
@@ -100,12 +117,13 @@ async function restore() {
   // Fallback: legacy single-file backup
   try {
     const buf = await download('gambot.db');
-    if (buf) {
+    if (buf && (await countUsers(buf)) > 0) {
       fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
       fs.writeFileSync(DB_PATH, buf);
       console.log('restored db from github backup (gambot.db mirror)');
       return true;
     }
+    if (buf) console.error('restore: SKIPPED empty/corrupt mirror gambot.db (0 users)');
   } catch (e) {
     console.log('no backup to restore:', e.message);
   }

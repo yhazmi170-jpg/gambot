@@ -7,9 +7,9 @@
 - **Owner ID**: 536278876247162882
 - **Host**: Render (free tier) — Blueprint from `render.yaml`. Replit retired as primary host (tab-close slept the repl). Local `keepalive.ps1` pings the Render URL to beat the 15-min idle spin-down.
 - **DB**: SQLite via sql.js at `DB_PATH` (env, default `./data` on Render; ephemeral on free tier → hourly GitHub backup + boot-restore is the data safety net). Backed up to GitHub every hour.
-- **Backups**: `backup.js` writes timestamped snapshots (`backups/gambot-<ts>.db`, never overwritten) + a mirror at `gambot.db`. Restore prefers the newest snapshot and only replaces a local DB that is OLDER than the snapshot (protects against a stale instance clobbering newer data). `index.js` logs backup failures loudly (no silent `.catch`). Backups run **every 10 min** + on **SIGTERM/SIGINT shutdown** (Render free tier wipes `./data` on every deploy — the shutdown backup ensures nothing newer than 10 min is lost).
+- **Backups**: `backup.js` writes timestamped snapshots (`backups/gambot-<ts>.db`, never overwritten) + a mirror at `gambot.db`. Restore prefers the newest snapshot and only replaces a local DB that is OLDER than the snapshot (protects against a stale instance clobbering newer data). **Guard: a DB with 0 users is never backed up nor restored** (`countUsers` via sql.js) — prevents an empty/corrupt instance from clobbering cloud history. `index.js` logs backup failures loudly (no silent `.catch`). Backups run **every 1 min** + on **SIGTERM/SIGINT shutdown** (Render free tier wipes `./data` on every deploy — the shutdown backup ensures nothing newer than 1 min is lost).
 - **Repo**: https://github.com/yhazmi170-jpg/gambot (branch `master`)
-- **Current version**: see `package.json` (as of last docs sync: **1.4.3**)
+- **Current version**: see `package.json` (as of last docs sync: **1.4.4**)
 
 ## Agent docs (mandatory)
 - **Always keep markdown in sync** after meaningful work:

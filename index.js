@@ -86,7 +86,7 @@ client.on('ready', () => {
 
   const { backup } = require('./backup');
   const doBackup = () => backup().catch(e => console.error('BACKUP FAILED:', e && e.message, e && e.stack || ''));
-  setInterval(doBackup, 600000);
+  setInterval(doBackup, 60000);
   setTimeout(doBackup, 10000);
 
   setInterval(() => {

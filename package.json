@@ -1,6 +1,6 @@
 {
   "name": "gambot",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "private": true,
   "main": "index.js",
   "scripts": {
