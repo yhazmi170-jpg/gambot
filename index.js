@@ -119,7 +119,7 @@ client.on('ready', () => {
     const crHolders = db.getPerkHolders('custom_role');
     for (const uid of crHolders) {
       client.users.fetch(uid).then(u => {
-        u.send('**Custom Role perk updated!**\nYou can now set your role yourself:\n`v customrole name | #hexcolor`\n\nExample: `v customrole Cool Guy | #ff0000`\n\nYour existing role will update, or a new one will be created.').catch(() => {});
+        u.send('**Custom Role perk updated!**\nYou can now set your role yourself:\n`v customrole name <name>` · `v customrole color #hex` · `v customrole name | #hex`\n\nExample: `v customrole Cool Guy | #ff0000`\n\nYour existing role will update, or a new one will be created.').catch(() => {});
       }).catch(() => {});
     }
     db.markNotified('custom_role_update');
