@@ -62,6 +62,7 @@ async function init() {
   try { db.run(`ALTER TABLE users ADD COLUMN snail_time INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   try { db.run(`ALTER TABLE users ADD COLUMN snail_bought INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   try { db.run(`ALTER TABLE users ADD COLUMN snail_buy_day INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN eggs INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   db.run(`CREATE TABLE IF NOT EXISTS marriages (user_id TEXT PRIMARY KEY, partner_id TEXT NOT NULL, married_at INTEGER NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS adoption (parent_id TEXT, child_id TEXT, PRIMARY KEY (parent_id, child_id))`);
   db.run(`CREATE TABLE IF NOT EXISTS purchases (user_id TEXT, perk TEXT, expires_at INTEGER, PRIMARY KEY (user_id, perk))`);
@@ -167,6 +168,7 @@ function ensureUser(userId) {
       snail_time: vals[31] || 0,
       snail_bought: vals[32] || 0,
       snail_buy_day: vals[33] || 0,
+      eggs: vals[34] || 0,
     };
   }
   return null;
@@ -744,6 +746,55 @@ function getAnimalCount(userId) {
   return rows[0].values[0][0];
 }
 
+// ---- Egg drop chance (per animal) + hatching ----
+const EGG_DROP_CHANCE = 0.08;
+const EGG_HATCH_RARITY = { common: 0.4, uncommon: 0.3, rare: 0.18, epic: 0.09, legendary: 0.03 };
+
+function rollEggDrop() {
+  return Math.random() < EGG_DROP_CHANCE;
+}
+
+function getEggs(userId) {
+  const u = ensureUser(userId);
+  return u ? (u.eggs || 0) : 0;
+}
+
+function addEgg(userId, n = 1) {
+  db.run(`UPDATE users SET eggs = eggs + ${n} WHERE user_id = '${userId}'`);
+  save();
+}
+
+function hatchEgg(userId) {
+  if (getEggs(userId) <= 0) return null;
+  db.run(`UPDATE users SET eggs = eggs - 1 WHERE user_id = '${userId}'`);
+  const r = Math.random();
+  let rarity = 'common';
+  let acc = 0;
+  for (const [rar, w] of Object.entries(EGG_HATCH_RARITY)) { acc += w; if (r < acc) { rarity = rar; break; } }
+  const species = randomSpecies(rarity);
+  const stats = randomStats(rarity);
+  db.run(`INSERT INTO animals (user_id, species, rarity, hp, max_hp, attack, defense) VALUES ('${userId}', '${species}', '${rarity}', ${stats.hp}, ${stats.hp}, ${stats.attack}, ${stats.defense})`);
+  const rows = db.exec('SELECT last_insert_rowid() AS id');
+  const id = rows[0].values[0][0];
+  save();
+  return { id, species, rarity, ...stats, level: 1, exp: 0, name: 'Unnamed' };
+}
+
+// ---- Transfer an animal to another user (trading) ----
+function transferAnimal(animalId, fromUserId, toUserId) {
+  const a = getAnimal(animalId);
+  if (!a || a.user_id !== fromUserId) return null;
+  const team = getTeam(fromUserId);
+  if (team) {
+    for (const s of [1, 2, 3]) {
+      if (team[`slot${s}`] === animalId) removeFromTeam(fromUserId, s);
+    }
+  }
+  db.run(`UPDATE animals SET user_id = '${toUserId}' WHERE id = ${animalId}`);
+  save();
+  return getAnimal(animalId);
+}
+
 const LOAN_INTEREST = 0.3;
 const MAX_LOAN_MULT = 2;
 
@@ -1099,12 +1150,14 @@ function catchUpAutohunt(userId) {
   let gems = 0;
   let coins = 0;
   let xp = 0;
+  let eggs = 0;
   while (ah.next_grant <= cap) {
     for (let i = 0; i < perCycle; i++) {
       const a = addAnimal(userId, traits.efficiency);
       animals++;
       const g = rollGemDrop(a.rarity, radarMult);
       if (g > 0) { addGems(userId, g); gems += g; }
+      if (rollEggDrop()) { addEgg(userId, 1); eggs++; }
       coins += coinsPerAnimal;
       xp += xpPerAnimal;
     }
@@ -1281,6 +1334,7 @@ module.exports = {
   bankDeposit, bankWithdraw, takeLoan, payLoan, LOAN_INTEREST, MAX_LOAN_MULT,
   sharkLoan, SHARK_INTEREST, SHARK_MAX,
   stockPrice, getStockPrices, buyStock, sellStock, getPortfolio, STOCKS,
+  rollEggDrop, getEggs, addEgg, hatchEgg, transferAnimal, EGG_DROP_CHANCE, EGG_HATCH_RARITY,
   SPECIES, RARITY_WEIGHTS, RARITY_ORDER, randomRarity, randomSpecies, randomStats, expForLevel,
   getEssence, addEssence, getTraits, traitCost, upgradeTrait, randomRarityWithEff,
   huntCapacity, huntYield, rollGemDrop, sacrificeAnimals, addXpRaw,

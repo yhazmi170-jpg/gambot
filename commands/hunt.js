@@ -43,6 +43,7 @@ module.exports = {
     const results = [];
     let gemsEarned = 0;
     let coinsEarned = 0;
+    let eggsFound = 0;
     for (let i = 0; i < count; i++) {
       const animal = db.addAnimal(userId, traits.efficiency);
       const g = db.rollGemDrop(animal.rarity, yieldInfo.radarMult);
@@ -50,6 +51,10 @@ module.exports = {
         db.addGems(userId, g);
         gemsEarned += g;
         animal.gemDrop = g;
+      }
+      if (db.rollEggDrop()) {
+        db.addEgg(userId, 1);
+        eggsFound++;
       }
       results.push(animal);
     }
@@ -70,6 +75,7 @@ module.exports = {
     summary.push(`spent **${coins}** coins`);
     if (coinsEarned > 0) summary.push(`gain trait: **+${coinsEarned}** coins`);
     if (gemsEarned > 0) summary.push(`💎 found **${gemsEarned} gem${gemsEarned > 1 ? 's' : ''}**!`);
+    if (eggsFound > 0) summary.push(`🥚 found **${eggsFound} egg${eggsFound > 1 ? 's' : ''}**! (\`v hatch\` to open)`);
     summary.push(`💎 gems: **${db.getGems(userId)}**`);
     if (xpResult) summary.push(`**+${yieldInfo.xp * count}** xp`);
     if (xpResult && xpResult.leveledUp) summary.push(`leveled up to **${xpResult.newLevel}**!`);
