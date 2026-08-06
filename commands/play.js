@@ -60,12 +60,9 @@ async function playTrack(guildId) {
   q.current = track;
 
   try {
-    let stream;
-    try {
-      stream = await play.stream(track.url, { discordPlayerCompatibility: true });
-    } catch (playErr) {
-      if (!ytdl.validateURL(track.url)) throw playErr;
-      const ytStream = ytdl(track.url, { filter: 'audioonly', highWaterMark: 1 << 25 });
+    const ytUrl = /youtube\.com|youtu\.be/.test(track.url) ? track.url : null;
+    if (ytUrl && ytdl.validateURL(ytUrl)) {
+      const ytStream = ytdl(ytUrl, { filter: 'audioonly', highWaterMark: 1 << 25 });
       const resource = createAudioResource(ytStream, {
         inputType: StreamType.Arbitrary,
         inlineVolume: true,
@@ -77,6 +74,7 @@ async function playTrack(guildId) {
       }
       return;
     }
+    const stream = await play.stream(track.url, { discordPlayerCompatibility: true });
     const resource = createAudioResource(stream.stream, {
       inputType: stream.type === 'opus' ? StreamType.Opus : StreamType.Arbitrary,
       inlineVolume: true,
