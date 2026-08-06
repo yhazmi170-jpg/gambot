@@ -64,6 +64,8 @@ async function runBattle(message, target) {
   if (winner) {
     const reward = 50 + myPets.length * 10;
     db.payWin(winner.id, reward);
+    db.addQuestProgress(winner.id, 'battle', 1);
+    db.addBountyProgress(winner.id, 'battle', 1);
     for (const pet of myPets) {
       const survived = myCopy.find(p => p.id === pet.id);
       if (survived && survived.hp > 0) db.addExp(pet.id, 20);

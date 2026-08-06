@@ -117,6 +117,34 @@ async function init() {
     shares INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (user_id, symbol)
   )`);
+  db.run(`CREATE TABLE IF NOT EXISTS quests (
+    user_id TEXT PRIMARY KEY,
+    day INTEGER NOT NULL DEFAULT 0,
+    quest_key TEXT NOT NULL DEFAULT '',
+    progress INTEGER NOT NULL DEFAULT 0,
+    target INTEGER NOT NULL DEFAULT 1,
+    reward INTEGER NOT NULL DEFAULT 0,
+    claimed INTEGER NOT NULL DEFAULT 0
+  )`);
+  db.run(`CREATE TABLE IF NOT EXISTS bounties (
+    user_id TEXT PRIMARY KEY,
+    week INTEGER NOT NULL DEFAULT 0,
+    quest_key TEXT NOT NULL DEFAULT '',
+    progress INTEGER NOT NULL DEFAULT 0,
+    target INTEGER NOT NULL DEFAULT 1,
+    reward INTEGER NOT NULL DEFAULT 0,
+    claimed INTEGER NOT NULL DEFAULT 0
+  )`);
+  db.run(`CREATE TABLE IF NOT EXISTS vaults (
+    guild_id TEXT PRIMARY KEY,
+    balance INTEGER NOT NULL DEFAULT 0
+  )`);
+  db.run(`CREATE TABLE IF NOT EXISTS vault_deposits (
+    guild_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    deposited INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (guild_id, user_id)
+  )`);
   save();
 }
 
@@ -1256,6 +1284,125 @@ function sellSnails(userId, count) {
   return { ok: true, sold: actual, coins };
 }
 
+// ---------- Quests (daily) + Bounties (weekly) ----------
+
+const QUEST_POOL = [
+  { key: 'hunt', target: 10, reward: 20000 },
+  { key: 'hunt', target: 20, reward: 50000 },
+  { key: 'sacrifice', target: 3, reward: 30000 },
+  { key: 'sacrifice', target: 5, reward: 60000 },
+  { key: 'win', target: 50000, reward: 25000 },
+  { key: 'work', target: 3, reward: 30000 },
+  { key: 'give', target: 50000, reward: 35000 },
+  { key: 'battle', target: 3, reward: 45000 },
+];
+
+const BOUNTY_POOL = [
+  { key: 'hunt', target: 60, reward: 200000 },
+  { key: 'hunt', target: 100, reward: 400000 },
+  { key: 'sacrifice', target: 10, reward: 250000 },
+  { key: 'win', target: 300000, reward: 200000 },
+  { key: 'work', target: 10, reward: 200000 },
+  { key: 'give', target: 250000, reward: 350000 },
+  { key: 'battle', target: 10, reward: 300000 },
+];
+
+function getQuest(userId) {
+  const rows = db.exec(`SELECT * FROM quests WHERE user_id = '${userId}'`);
+  const today = dayNumber();
+  let q = rows.length && rows[0].values.length ? rows[0].values[0] : null;
+  if (!q || q[1] !== today) {
+    const roll = QUEST_POOL[Math.floor(Math.random() * QUEST_POOL.length)];
+    db.run(`INSERT OR REPLACE INTO quests (user_id, day, quest_key, progress, target, reward, claimed) VALUES ('${userId}', ${today}, '${roll.key}', 0, ${roll.target}, ${roll.reward}, 0)`);
+    save();
+    q = db.exec(`SELECT * FROM quests WHERE user_id = '${userId}'`)[0].values[0];
+  }
+  return { day: q[1], key: q[2], progress: q[3], target: q[4], reward: q[5], claimed: q[6] === 1 };
+}
+
+function addQuestProgress(userId, key, amount) {
+  const q = getQuest(userId);
+  if (q.claimed || q.key !== key) return;
+  db.run(`UPDATE quests SET progress = MIN(progress + ${amount}, target) WHERE user_id = '${userId}'`);
+  save();
+}
+
+function claimQuest(userId) {
+  const q = getQuest(userId);
+  if (q.claimed || q.progress < q.target) return null;
+  db.run(`UPDATE quests SET claimed = 1 WHERE user_id = '${userId}'`);
+  addBalance(userId, q.reward);
+  save();
+  return q;
+}
+
+function getBounty(userId) {
+  const rows = db.exec(`SELECT * FROM bounties WHERE user_id = '${userId}'`);
+  const week = Math.floor(dayNumber() / 7);
+  let b = rows.length && rows[0].values.length ? rows[0].values[0] : null;
+  if (!b || b[1] !== week) {
+    const roll = BOUNTY_POOL[Math.floor(Math.random() * BOUNTY_POOL.length)];
+    db.run(`INSERT OR REPLACE INTO bounties (user_id, week, quest_key, progress, target, reward, claimed) VALUES ('${userId}', ${week}, '${roll.key}', 0, ${roll.target}, ${roll.reward}, 0)`);
+    save();
+    b = db.exec(`SELECT * FROM bounties WHERE user_id = '${userId}'`)[0].values[0];
+  }
+  return { week: b[1], key: b[2], progress: b[3], target: b[4], reward: b[5], claimed: b[6] === 1 };
+}
+
+function addBountyProgress(userId, key, amount) {
+  const b = getBounty(userId);
+  if (b.claimed || b.key !== key) return;
+  db.run(`UPDATE bounties SET progress = MIN(progress + ${amount}, target) WHERE user_id = '${userId}'`);
+  save();
+}
+
+function claimBounty(userId) {
+  const b = getBounty(userId);
+  if (b.claimed || b.progress < b.target) return null;
+  db.run(`UPDATE bounties SET claimed = 1 WHERE user_id = '${userId}'`);
+  addBalance(userId, b.reward);
+  save();
+  return b;
+}
+
+// ---------- Clan vault (per-guild shared pot) ----------
+
+function getVault(guildId) {
+  const rows = db.exec(`SELECT * FROM vaults WHERE guild_id = '${guildId}'`);
+  return rows.length && rows[0].values.length ? { guild_id: rows[0].values[0][0], balance: rows[0].values[0][1] } : { guild_id: guildId, balance: 0 };
+}
+
+function vaultDeposit(guildId, userId, amount) {
+  if (amount <= 0) return false;
+  const u = ensureUser(userId);
+  if (!u || u.balance < amount) return false;
+  db.run(`INSERT INTO vaults (guild_id, balance) VALUES ('${guildId}', 0) ON CONFLICT(guild_id) DO NOTHING`);
+  db.run(`UPDATE vaults SET balance = balance + ${amount} WHERE guild_id = '${guildId}'`);
+  db.run(`INSERT INTO vault_deposits (guild_id, user_id, deposited) VALUES ('${guildId}', '${userId}', ${amount}) ON CONFLICT(guild_id, user_id) DO UPDATE SET deposited = deposited + ${amount}`);
+  db.run(`UPDATE users SET balance = balance - ${amount} WHERE user_id = '${userId}'`);
+  save();
+  return true;
+}
+
+function vaultWithdraw(guildId, userId, amount) {
+  const v = getVault(guildId);
+  const rows = db.exec(`SELECT deposited FROM vault_deposits WHERE guild_id = '${guildId}' AND user_id = '${userId}'`);
+  const deposited = rows.length && rows[0].values.length ? rows[0].values[0][0] : 0;
+  const actual = Math.min(amount, v.balance, deposited);
+  if (actual <= 0) return 0;
+  db.run(`UPDATE vaults SET balance = balance - ${actual} WHERE guild_id = '${guildId}'`);
+  db.run(`UPDATE vault_deposits SET deposited = deposited - ${actual} WHERE guild_id = '${guildId}' AND user_id = '${userId}'`);
+  addBalance(userId, actual);
+  save();
+  return actual;
+}
+
+function getVaultTop(guildId, limit = 10) {
+  const rows = db.exec(`SELECT user_id, deposited FROM vault_deposits WHERE guild_id = '${guildId}' AND deposited > 0 ORDER BY deposited DESC LIMIT ${limit}`);
+  if (!rows.length) return [];
+  return rows[0].values.map(v => ({ user_id: v[0], deposited: v[1] }));
+}
+
 // ---------- One-time notification flags (DB-backed — survives ephemeral Render FS) ----------
 
 function wasNotified(key) {
@@ -1335,6 +1482,8 @@ module.exports = {
   sharkLoan, SHARK_INTEREST, SHARK_MAX,
   stockPrice, getStockPrices, buyStock, sellStock, getPortfolio, STOCKS,
   rollEggDrop, getEggs, addEgg, hatchEgg, transferAnimal, EGG_DROP_CHANCE, EGG_HATCH_RARITY,
+  getQuest, addQuestProgress, claimQuest, getBounty, addBountyProgress, claimBounty,
+  getVault, vaultDeposit, vaultWithdraw, getVaultTop,
   SPECIES, RARITY_WEIGHTS, RARITY_ORDER, randomRarity, randomSpecies, randomStats, expForLevel,
   getEssence, addEssence, getTraits, traitCost, upgradeTrait, randomRarityWithEff,
   huntCapacity, huntYield, rollGemDrop, sacrificeAnimals, addXpRaw,

@@ -63,6 +63,8 @@ module.exports = {
       coinsEarned = yieldInfo.coins * count;
     }
     const xpResult = yieldInfo.xp > 0 ? db.addXpRaw(userId, yieldInfo.xp * count) : null;
+    db.addQuestProgress(userId, 'hunt', count);
+    db.addBountyProgress(userId, 'hunt', count);
 
     const fields = results.map((a, i) => [
       `#${i + 1}`,

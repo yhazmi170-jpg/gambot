@@ -51,6 +51,8 @@ module.exports = {
         }
         db.addBalance(message.author.id, -amount);
         db.addBalance(target.id, amount);
+        db.addQuestProgress(message.author.id, 'give', amount);
+        db.addBountyProgress(message.author.id, 'give', amount);
         await i.update({
           embeds: [success(`gave **${amount.toLocaleString()}** ${config.currency} to <@${target.id}>`)],
           components: [],
