@@ -6,3 +6,4 @@ config.json
 .notified_*
 .notified_v*
 bot.err
+.gambot.lock
