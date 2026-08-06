@@ -2,7 +2,7 @@ const { Client, GatewayIntentBits, Partials } = require('discord.js');
 const { loadCommands, handleMessage } = require('./utils/commandHandler');
 const config = require('./config');
 const db = require('./db');
-const { embed } = require('./utils/embed');
+const { embed, updateEmbed } = require('./utils/embed');
 const http = require('http');
 const path = require('path');
 const { version } = require('./package.json');
@@ -69,11 +69,7 @@ async function postUpdateAnnouncement(client, updateMsg, ver) {
     try {
       const ch = await client.channels.fetch(channel_id).catch(() => null);
       if (ch && typeof ch.send === 'function') {
-        await ch.send({ embeds: [embed('📢 Bot Update', [
-          ['Version', ver],
-          ['What\'s New', updateMsg],
-          ['Uptime', 'Fresh deploy — check `v version` for details'],
-        ], 0x5865f2)] });
+        await ch.send({ embeds: [updateEmbed(ver, updateMsg, 'Fresh deploy — check `v version` for details')] });
         sent++;
       }
     } catch (e) { console.error('update announcement send failed:', channel_id, e && e.message); }

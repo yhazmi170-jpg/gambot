@@ -1,5 +1,5 @@
 const db = require('../db');
-const { embed, error, success, parseAmount } = require('../utils/embed');
+const { embed, error, success, parseAmount, updateEmbed } = require('../utils/embed');
 const config = require('../config');
 const logger = require('../utils/logger');
 const { version } = require('../package.json');
@@ -183,11 +183,7 @@ module.exports = {
             try {
               const ch = await message.client.channels.fetch(channel_id);
               if (!ch || typeof ch.send !== 'function') { lines.push(`<#${channel_id}> — not a text channel`); continue; }
-              await ch.send({ embeds: [embed('📢 Bot Update', [
-                ['Version', `v${version}`],
-                ['What\'s New', msg],
-                ['Uptime', 'Manual re-announce'],
-              ], 0x5865f2)] });
+              await ch.send({ embeds: [updateEmbed(`v${version}`, msg, 'Manual re-announce')] });
               lines.push(`<#${channel_id}> — posted ✅`);
             } catch (e) {
               lines.push(`<#${channel_id}> — FAILED (${(e && e.message || 'unknown').slice(0, 80)})`);

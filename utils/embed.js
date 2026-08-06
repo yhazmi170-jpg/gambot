@@ -22,6 +22,31 @@ function success(msg) {
   return embed('Success', [['message', msg]], 0x57f287);
 }
 
+const FIELD_VALUE_LIMIT = 1024;
+function chunkText(text, limit = FIELD_VALUE_LIMIT) {
+  const str = String(text || '');
+  if (!str) return [''];
+  const chunks = [];
+  let rest = str;
+  while (rest.length > limit) {
+    let cut = rest.lastIndexOf('\n', limit);
+    if (cut < 1) cut = limit;
+    chunks.push(rest.slice(0, cut).replace(/\n+$/, ''));
+    rest = rest.slice(cut).replace(/^\n+/, '');
+  }
+  if (rest) chunks.push(rest);
+  return chunks;
+}
+
+function updateEmbed(ver, msg, uptime, color = 0x5865f2) {
+  const e = embed('📢 Bot Update', [], color);
+  e.addFields({ name: 'Version', value: String(ver) });
+  const chunks = chunkText(msg);
+  chunks.forEach((c, i) => e.addFields({ name: i === 0 ? 'What\'s New' : 'What\'s New (cont.)', value: c }));
+  e.addFields({ name: 'Uptime', value: String(uptime) });
+  return e;
+}
+
 function parseAmount(str) {
   if (!str || typeof str !== 'string') return NaN;
   const lower = str.toLowerCase().replace(/,/g, '');

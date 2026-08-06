@@ -6,3 +6,4 @@ then push (the boot announcement posts it once).
 
 Format: one line per change, terse, no AI fluff.
 - fixed update announcements skipping the channel (marked 'sent' before actually posting) — now fetches channels properly + Aovo announce to force re-post
+- Fixed update announcements failing with 400 (long messages >1024 chars in one embed field) - now split across fields
