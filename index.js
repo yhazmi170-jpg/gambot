@@ -182,7 +182,8 @@ client.on('messageCreate', (message) => {
   if (message.channel.type === 0) {
     const ar = perks.find(p => p.perk === 'auto_react');
     if (ar) {
-      const emoji = db.getAutoReactEmoji(message.author.id) || '⭐';
+      const emoji = db.getAutoReactEmoji(message.author.id);
+      if (!emoji) return;
       const resolved = resolveEmoji(message, emoji);
       if (resolved) {
         message.react(resolved).catch(err => console.error(`autoreact failed (${emoji}):`, err.message));

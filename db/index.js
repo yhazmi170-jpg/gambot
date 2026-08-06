@@ -519,6 +519,11 @@ function setAutoReactEmoji(userId, emoji) {
   save();
 }
 
+function clearAutoReactEmoji(userId) {
+  db.run(`UPDATE users SET auto_react_emoji = '' WHERE user_id = '${userId}'`);
+  save();
+}
+
 function getAutoReactEmoji(userId) {
   const u = ensureUser(userId);
   return u ? u.auto_react_emoji : '';
@@ -1163,7 +1168,7 @@ module.exports = {
   addRep,
   getVipRole,
   setVipRole,
-  setAutoReactEmoji,
+  setAutoReactEmoji, clearAutoReactEmoji,
   getAutoReactEmoji, setBadgeEmoji, getBadgeEmoji, setLbEmoji, getLbEmoji,
   wasNotified, markNotified,
   START_BALANCE,
