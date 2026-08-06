@@ -478,9 +478,25 @@ function getMaxBet(userId) {
   return hasPerk(userId, 'bet_cap') ? 500000 : 250000;
 }
 
+const INSURANCE_TIERS = [
+  { perk: 'insurance',  refund: 0.20 },
+  { perk: 'insurance2', refund: 0.30 },
+  { perk: 'insurance3', refund: 0.40 },
+  { perk: 'insurance4', refund: 0.50 },
+];
+
+function getInsuranceLevel(userId) {
+  let level = 0;
+  for (let i = 0; i < INSURANCE_TIERS.length; i++) {
+    if (hasPerk(userId, INSURANCE_TIERS[i].perk)) level = i + 1;
+  }
+  return level;
+}
+
 function getInsuranceRefund(userId, lossAmount) {
-  if (!hasPerk(userId, 'insurance')) return 0;
-  return Math.floor(lossAmount * 0.2);
+  const level = getInsuranceLevel(userId);
+  if (!level) return 0;
+  return Math.floor(lossAmount * INSURANCE_TIERS[level - 1].refund);
 }
 
 function toggleInsurance(userId) {
@@ -1600,6 +1616,7 @@ module.exports = {
   getBalanceFactor,
   effectiveMult,
   getOwnedSpecies,
+  getInsuranceLevel,
   addTicket,
   resetLottery,
   totalTickets,

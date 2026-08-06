@@ -22,6 +22,9 @@ const SHOP = [
     items: [
       { id: 'vip_role_sub', name: 'VIP Role', price: 1000000, desc: 'keeps your VIP role while subscribed', monthly: true, use: 'The VIP role is kept while your sub is active' },
       { id: 'insurance', name: 'Insurance (20% loss refund)', price: 300000, desc: '20% of losses refunded', monthly: true, use: 'Losses are auto-refunded 20% — no command needed' },
+      { id: 'insurance2', name: 'Insurance Upgrade II (30% refund)', price: 500000, desc: 'raises your loss refund to 30%', monthly: true, use: 'Overrides the base — losses auto-refund 30%' },
+      { id: 'insurance3', name: 'Insurance Upgrade III (40% refund)', price: 800000, desc: 'raises your loss refund to 40%', monthly: true, use: 'Overrides lower tiers — losses auto-refund 40%' },
+      { id: 'insurance4', name: 'Insurance Upgrade IV (50% refund)', price: 1200000, desc: 'raises your loss refund to 50%', monthly: true, use: 'Overrides lower tiers — losses auto-refund 50%' },
       { id: 'daily_cap', name: 'Higher daily/weekly cap', price: 600000, desc: 'daily cap raised to 15k, weekly to 25k', monthly: true, use: 'Use v daily and v weekly normally — caps are higher' },
     ],
   },
