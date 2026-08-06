@@ -1,1 +1,1 @@
-v1.4.6 -- battle requests now last a full minute and actually work when accepted · auto-react now handles custom server emojis · fixed bot update notifications not being sent after updates
+v1.4.7 -- NEW: `v giveaway <time> <prize>` — host giveaways with an entry button, random winner gets the prize when time runs out (e.g. `v giveaway 10m 500k`) · `v autoreact remove` to turn off auto-react · `v zoo green` filters your animals by color · `v sacrifice gray/green/blue/purple/yellow` sacrifices by rarity color
