@@ -70,6 +70,7 @@ async function restore() {
     const data = await request('GET', `/repos/${OWNER}/${REPO}/contents/gambot.db`);
     if (data && data.content) {
       const buf = Buffer.from(data.content, 'base64');
+      fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
       fs.writeFileSync(DB_PATH, buf);
       console.log('restored db from github backup');
       return true;

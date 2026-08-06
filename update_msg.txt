@@ -1,1 +1,1 @@
-v1.2.22 -- v battle now asks the opponent to accept (Fight/Cancel) before starting.
+v1.2.23 -- Moved to a faster, more reliable host. Uptime should be way better now.

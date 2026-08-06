@@ -94,6 +94,7 @@ async function init() {
 
 function save() {
   const data = db.export();
+  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
   fs.writeFileSync(DB_PATH, Buffer.from(data));
 }
 

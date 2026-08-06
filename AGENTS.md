@@ -5,8 +5,8 @@
 - **Bot**: Discord economy/gambling bot using discord.js v14
 - **Prefix**: `v` / `ovo` / `A` (admin, owner only)
 - **Owner ID**: 536278876247162882
-- **Host**: Replit (free, no credit card) + UptimeRobot / `keepalive.ps1` ping for 24/7
-- **DB**: SQLite via sql.js, backed up to GitHub every hour
+- **Host**: Render (free tier) — Blueprint from `render.yaml`. Replit retired as primary host (tab-close slept the repl). Local `keepalive.ps1` pings the Render URL to beat the 15-min idle spin-down.
+- **DB**: SQLite via sql.js at `DB_PATH` (env, default `./data` on Render; ephemeral on free tier → hourly GitHub backup + boot-restore is the data safety net). Backed up to GitHub every hour.
 - **Repo**: https://github.com/yhazmi170-jpg/gambot (branch `master`)
 - **Current version**: see `package.json` (as of last docs sync: **1.2.7**)
 
@@ -43,19 +43,26 @@
 - Poker uses Discord suit emojis + rank; hold buttons show the card
 - Keep game text clean — no AI-sounding fluff
 
-## Replit / single instance
-- Atomic lock: `.gambot.lock` in project root (`index.js` `acquireLock`)
-- **Do not** run Shell `node index.js` and Replit **Run** at the same time
-- Preferred flow: `bash update.sh` (pull + kill) → let **Run** restart the bot
-- Replit UI "not running" while Shell has the bot = expected (UI only tracks Run)
-- `update.sh` does **not** start the bot — it only pulls/kills
-- Local keepalive: `keepalive.ps1` pings `https://gambot--yhazmi170.replit.app`
+## Host / single instance
+- **Host: Render** (free web service, `plan: free` in `render.yaml`) — deploys from this repo via Blueprint. Auto-deploys on `git push` to `master`.
+- **Do NOT run on Replit anymore** — stop the Replit repl (press Stop / `Aovo shutdown`) so there's no double instance. The `.gambot.lock` is per-machine, so two hosts = two bots = double responses.
+- Free tier spins down after **15 min idle** → keepalive pinger must keep hitting the Render URL (`https://gambot.onrender.com`) every 4 min. It wakes on request (~30s).
+- Data persistence: free tier has **no persistent disk** — `./data` is ephemeral. `GITHUB_TOKEN` env enables hourly backup + boot restore to `yhazmi170-jpg/gambot-data`. Without it, a fresh instance starts an empty DB (max ~1h of player data lost).
+- `update.sh` is Replit-only legacy — **ignore it**. Deploy = `git push`.
 
-## Restart on Replit
+## Restart / deploy
 ```bash
-bash update.sh
-# then press Run  (or Arestart if bot is already online)
+git add -A; git commit -m "..."; git push origin master   # Render auto-redeploys
+# or in Discord: Arestart (if bot already online)
 ```
+
+## Known issues / lessons (learned the hard way)
+- **Replit free sleeps on tab-close; pings don't prevent it.** Only paid "Always On" or a different host fixes it. Do not move back to Replit free.
+- **render.yaml + disk = paid instance.** Render free has no persistent disks; any disk in the Blueprint forces paid ($7.25/mo). Keep `plan: free` and NO disk. Data persistence on free = GitHub backup via `GITHUB_TOKEN`.
+- **Blueprint reads render.yaml at creation time** — push render.yaml changes to GitHub BEFORE opening/refreshing the Blueprint, or the page shows the stale (paid) config.
+- **`db.save()` / `backup.restore()` must mkdir the DB dir first** (already fixed). Any future code writing to `DB_PATH` must `fs.mkdirSync(path.dirname(...), { recursive: true })` or it ENOENT-crashes on a fresh box.
+- **keepalive must actually be scheduled** — the .ps1/.vbs files do nothing until a scheduled task runs them. Registered task: `GambotKeepalive` (AtLogOn). Keep the ping interval under the host's sleep window (Render = 15 min, so 4 min is safe).
+- **Secrets are gitignored on purpose** — never `git add` `config.json`, `gambot.db`, or `.env`. Render secrets come from env vars.
 
 ## Key Files
 - `index.js` — entry, lock, HTTP ping server, lottery draw, interaction routing
