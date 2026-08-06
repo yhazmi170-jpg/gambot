@@ -9,3 +9,4 @@ Format: one line per change, terse, no AI fluff.
 - Fixed update announcements failing with 400 (long messages >1024 chars in one embed field) - now split across fields
 - Achievement unlocks now batch into one embed instead of spamming one per achievement; v stocks sell <symbol> all sells everything and v stocks sell <symbol> no longer errors; new v perkhelp command
 - Achievements now pay out BEFORE being marked unlocked (could previously record unlock without the money if a grant failed)
+- Loan shark exploit fixed: can't give/rob/rain/duel/trade money away while a loan is outstanding, and gambling wins now auto-repay the loan first (no more free 2M per alt)

@@ -16,6 +16,7 @@ module.exports = {
 
     const sender = db.ensureUser(message.author.id);
     if (sender.balance < amount) return message.channel.send({ embeds: [error('you dont have enough money')] });
+    if (db.hasOutstandingLoan(message.author.id)) return message.channel.send({ embeds: [error('repay your loan first — `v bank loan pay all`')] });
 
     const members = message.guild.members.cache.filter(m => !m.user.bot && m.id !== message.author.id);
     if (!members.size) return message.channel.send({ embeds: [error('no other members to rain on')] });

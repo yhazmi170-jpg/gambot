@@ -24,6 +24,9 @@ module.exports = {
     if (sender.balance < amount) {
       return message.channel.send({ embeds: [error('you dont have enough money')] });
     }
+    if (db.hasOutstandingLoan(message.author.id)) {
+      return message.channel.send({ embeds: [error('repay your loan first — `v bank loan pay all`')] });
+    }
 
     const confirmBtn = new ButtonBuilder().setCustomId('give_confirm').setLabel('Confirm').setStyle(ButtonStyle.Success).setEmoji('✅');
     const cancelBtn = new ButtonBuilder().setCustomId('give_cancel').setLabel('Cancel').setStyle(ButtonStyle.Danger).setEmoji('❌');

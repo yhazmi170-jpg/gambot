@@ -73,6 +73,10 @@ module.exports = {
             await i.update({ embeds: [error('buyer ran out of coins — trade cancelled')], components: [] }).catch(() => {});
             return;
           }
+          if (db.hasOutstandingLoan(target.id)) {
+            await i.update({ embeds: [error('buyer has an outstanding loan — repay it first (`v bank loan pay all`)')], components: [] }).catch(() => {});
+            return;
+          }
           db.addBalance(target.id, -price);
           db.addBalance(message.author.id, price);
         }

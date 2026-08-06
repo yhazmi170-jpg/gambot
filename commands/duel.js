@@ -19,8 +19,10 @@ module.exports = {
 
     const sender = db.ensureUser(message.author.id);
     if (sender.balance < amount) return message.channel.send({ embeds: [error("you don't have enough money")] });
+    if (db.hasOutstandingLoan(message.author.id)) return message.channel.send({ embeds: [error('repay your loan first — `v bank loan pay all`')] });
     const receiver = db.ensureUser(target.id);
     if (!receiver || receiver.balance < amount) return message.channel.send({ embeds: [error(`${target.username} doesn't have enough money to match`)] });
+    if (db.hasOutstandingLoan(target.id)) return message.channel.send({ embeds: [error(`${target.username} has an outstanding loan and can't duel`)] });
 
     const accept = new ButtonBuilder().setCustomId('duel_accept').setLabel('Accept').setStyle(ButtonStyle.Success).setEmoji('⚔️');
     const decline = new ButtonBuilder().setCustomId('duel_decline').setLabel('Decline').setStyle(ButtonStyle.Danger).setEmoji('✋');

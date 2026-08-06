@@ -324,9 +324,21 @@ function getBalanceFactor(userId) {
 /** Credit a gambling win: scales profit by balance factor. Optional stakeReturn (e.g. mines prepaid bet). Returns adjusted profit paid. */
 function payWin(userId, profit, stakeReturn = 0) {
   const paid = profit > 0 ? Math.floor(profit * getBalanceFactor(userId)) : 0;
-  const credit = stakeReturn + paid;
+  let credit = stakeReturn;
+  if (paid > 0) {
+    const u = ensureUser(userId);
+    const loan = u && u.loan > 0 ? u.loan : 0;
+    if (loan > 0) {
+      const toLoan = Math.min(paid, loan);
+      db.run(`UPDATE users SET loan = loan - ${toLoan} WHERE user_id = '${userId}'`);
+      save();
+      credit += paid - toLoan;
+    } else {
+      credit += paid;
+    }
+    addWon(userId, paid);
+  }
   if (credit > 0) addBalance(userId, credit);
-  if (paid > 0) addWon(userId, paid);
   return paid;
 }
 
@@ -943,6 +955,15 @@ function sharkLoan(userId, amount) {
   db.run(`UPDATE users SET balance = balance + ${actual}, loan = ${totalOwed}, loan_time = ${now} WHERE user_id = '${userId}'`);
   save();
   return { received: actual, owed: totalOwed, interest: SHARK_INTEREST };
+}
+
+function getLoan(userId) {
+  const u = ensureUser(userId);
+  return u ? u.loan : 0;
+}
+
+function hasOutstandingLoan(userId) {
+  return getLoan(userId) > 0;
 }
 
 function allowNegative(userId) {
@@ -1667,8 +1688,8 @@ module.exports = {
   getBalanceFactor,
   payWin,
   xpForLevel, levelInfo, grantXp,
-  bankDeposit, bankWithdraw, takeLoan, payLoan, LOAN_INTEREST, MAX_LOAN_MULT,
-  sharkLoan, SHARK_INTEREST, SHARK_MAX,
+  bankDeposit, bankWithdraw, takeLoan,   payLoan, LOAN_INTEREST, MAX_LOAN_MULT,
+  sharkLoan, SHARK_INTEREST, SHARK_MAX, getLoan, hasOutstandingLoan,
   stockPrice, getStockPrices, buyStock, sellStock, getStockShares, getPortfolio, STOCKS,
   rollEggDrop, getEggs, addEgg, hatchEgg, transferAnimal, EGG_DROP_CHANCE, EGG_HATCH_RARITY,
   getQuest, addQuestProgress, claimQuest, getBounty, addBountyProgress, claimBounty,

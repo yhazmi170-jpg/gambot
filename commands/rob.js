@@ -16,6 +16,7 @@ module.exports = {
     const victim = db.ensureUser(target.id);
     if (!victim || victim.balance < 1000000) return message.channel.send({ embeds: [error('they need at least 1,000,000 money to be worth robbing')] });
     if (robber.balance < 1000000) return message.channel.send({ embeds: [error('you need at least 1,000,000 money to attempt a robbery')] });
+    if (db.hasOutstandingLoan(message.author.id)) return message.channel.send({ embeds: [error('repay your loan first — `v bank loan pay all`')] });
 
     const successRoll = Math.random() < 0.5;
     if (successRoll) {
