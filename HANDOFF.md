@@ -5,8 +5,8 @@
 
 ## Status
 - **Branch**: `master`
-- **Version**: `1.4.5`
-- **Last update_msg**: `v1.4.5 -- recovery: on boot the bot scans ALL cloud backups and restores the newest one that actually has your data — a bad/empty backup can no longer block recovery · backups every 1 minute`
+- **Version**: `1.4.6`
+- **Last update_msg**: `v1.4.6 -- battle requests now last a full minute and actually work when accepted · auto-react now handles custom server emojis · fixed bot update notifications not being sent after updates`
 - **Host migration**: Replit → Render (free, Blueprint from `render.yaml`). Replit repl was stopped by user. **Render URL: `https://gambot-o2o4.onrender.com`** — keepalive pinger repointed to it.
 - **Keepalive**: `keepalive.ps1` pings every 240s; registered as Windows scheduled task `GambotKeepalive` (runs at logon). Pinger must be running on yazan's PC for this to work (now pinging the Render URL).
 
@@ -20,6 +20,8 @@
 - [x] **Secrets check.** `config.json`, `gambot.db`, `.env` are all `.gitignore`d; only `config.example.json` is tracked (verified via `git ls-files`). Bot token stays out of the repo; Render uses `TOKEN` env var.
 
 ## Done recently
+- [x] **v1.4.6 fixes (2026-08-06):** (1) Battle requests always said "expired" — `handleInteraction` only stripped the leading `battle_` prefix, leaving the trailing `_yes`/`_no` on the lookup key, so `pendingBattles.get(id)` never matched → fixed by stripping the suffix, and window bumped 30s → 60s (`commands/battle.js`). (2) `wasNotified`/`markNotified` were DEFINED but never added to `db/index.js` exports → `db.wasNotified` was `undefined` → the ready-handler throw every boot → **update announcements never sent after v1.4.0**. Added them to `module.exports`. (3) auto-react now resolves `<:name:id>`/`<a:name:id>` custom emojis via `resolveEmoji()` + `.catch` logging instead of silently swallowing. Also: **made `gambot` source repo private** (verified `gambot-data` already private); confirmed `config.json`/`gambot.db`/`.env` untracked; untracked + gitignored `.gambot.lock`. Commits `1c67022`, `0fea7d7`, pushed (`1eb1851..0fea7d7`).
+- [x] **Friend auto-react root cause (2026-08-06):** @伤害 `554257220523655199` has NO `auto_react` perk (purchases = only `bet_cap`) and empty `auto_react_emoji`. Bot handler (index.js:183) only reacts for perk holders → nothing to fix in code for them; they must buy the perk (`v shop`) + `v autoreact <emoji>` (or re-grant, if corruption lost it).
 - [x] **v1.4.5 recovery finalization (2026-08-06):** After the empty-DB corruption, the old bot instance (still alive on the empty DB) kept pushing empty snapshots (11:46, 11:48). **FIXED by making `restore()` scan ALL snapshots newest→oldest and restore the first with >0 users** (`allSnapshots()` + `countUsers`). Deploy verified: newest snapshot 11:53:27 has 31 users / 27 animals / friend 2,445,528, and backups now land every ~1 min with real data. Empty snapshots no longer block recovery.
 - [x] **v1.4.4 corruption recovery + guards (2026-08-06):** A local `backup()` test accidentally pushed an EMPTY test DB as the newest snapshot → the v1.4.3 deploy restored it, wiping all data (users hit "accept terms again"). RECOVERED: deleted the empty snapshots (11:31, 11:32, 11:36) + restored the `gambot.db` mirror + pushed good 11:15 data as newest snapshot (11:40). Added **permanent guards** in `backup.js`: never upload a 0-user DB, and never restore one (`countUsers` via sql.js). Backup interval now **1 min**. **CRITICAL LESSON: never run `backup()` against a throwaway test DB — it becomes the newest snapshot.**
 - [x] **v1.4.3 data-loss fix (2026-08-06):** Render free tier wipes `./data` on every deploy/restart, and backups only ran hourly — so any deploy rolled back everything newer than the last backup (confirmed: @伤害's `Aovo add` restore got reverted by the v1.4.2 deploy). Fixed by (1) a **SIGTERM/SIGINT shutdown handler** in `index.js` that backs up the live DB to GitHub before exiting (15s cap), and (2) interval backup **1h → 10 min**. Shutdown handler must be re-verified after deploy.
@@ -44,6 +46,7 @@
 - [x] Repoint `keepalive.ps1` URL — DONE (`https://gambot-o2o4.onrender.com`), pinger restarted
 - [x] **CONFIRM v1.4.5 deploy recovery — DONE (2026-08-06 ~11:53Z):** newest snapshot has 31 users / 27 animals / @伤害 2,445,528; backups land every ~1 min. Update embed posts (notifications table empty → v1.4.5 announcement fires). `v version` should show 1.4.5.
 - [ ] **Restore friend's lost ~30m** (`554257220523655199`, @伤害): live bal **2,445,528** (gems 0). Re-run `Aovo add @伤害 29774999` (target 32,220,527 from snapshot `1802448`, 2026-08-05T22:50:48Z). NOW SAFE: 1-min backups + empty-DB guard + shutdown backup + scan-all restore protect it.
+- [ ] **Friend has no `auto_react` perk** (confirmed 2026-08-06) — if @伤害 is supposed to auto-react, either they buy it (`v shop`) + `v autoreact <emoji>`, or grant via admin. `v1.4.6` fixed custom-emoji resolution in the code path, so only the perk is now the blocker.
 - [ ] **Do NOT restart the Replit repl** (double instance = double responses)
 - [ ] "Self react" report from user is still unexplained — user hasn't described the exact symptom yet; last known: `auto_react` perk reacts with the user's set emoji or ⭐ (index.js:183-187), autoreact costs 1.5M in shop.
 
