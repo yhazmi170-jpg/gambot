@@ -181,6 +181,10 @@ client.on('interactionCreate', (i) => {
     require('./commands/battle').handleInteraction(i);
     return;
   }
+  if (i.customId.startsWith('help_')) {
+    require('./commands/help').handleInteraction(i);
+    return;
+  }
   const fallback = setTimeout(() => i.deferUpdate().catch(() => {}), 2500);
   i._ackFallback = fallback;
 });

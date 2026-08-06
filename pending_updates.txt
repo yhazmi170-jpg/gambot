@@ -15,3 +15,5 @@ Format: one line per change, terse, no AI fluff.
 - Fixed v team add wiping your other slots — adding 3 animals now keeps all 3 on your team
 - New: v disable <cmd> #channel / v enable <cmd> #channel — turn commands off per-channel (server-wide remains the default)
 - Shop cleaned up — removed the emojis
+- v help is now paginated like the shop — pick a category, no more message flood
+- v slots now celebrates a jackpot when you hit triple 7s (50x)

@@ -89,12 +89,15 @@ module.exports = {
     if (winnings > 0) {
       const net = winnings - amount;
       const paid = db.payWin(message.author.id, net);
+      const jackpot = reels[0] === 6 && reels[1] === 6 && reels[2] === 6;
       await msg.edit({
         embeds: [embed('🎰 Slots', [
           ['___SLOTS___', `\`\`\`${slotLine(reels, 3)}\`\`\``],
           ['bet', `${amount} ${config.currency}`],
-          ['payout', `**${amount + paid}** ${config.currency} (+**${paid}**)`],
-        ], 0x57f287)],
+          ...(jackpot
+            ? [['💰 JACKPOT 💰', '**50x — you just hit the jackpot!**']]
+            : [['payout', `**${amount + paid}** ${config.currency} (+**${paid}**)`]]),
+        ], jackpot ? 0xfee75c : 0x57f287)],
       });
     } else {
       db.addBalance(message.author.id, -amount);
