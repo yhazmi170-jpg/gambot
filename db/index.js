@@ -834,8 +834,9 @@ function getAnimalCount(userId) {
 const EGG_DROP_CHANCE = 0.08;
 const EGG_HATCH_RARITY = { common: 0.4, uncommon: 0.3, rare: 0.18, epic: 0.09, legendary: 0.03 };
 
-function rollEggDrop() {
-  return Math.random() < EGG_DROP_CHANCE;
+function rollEggDrop(userId) {
+  const mult = hasPerk(userId, 'egg_luck') ? 2 : 1;
+  return Math.random() < EGG_DROP_CHANCE * mult;
 }
 
 function getEggs(userId) {
@@ -1241,7 +1242,7 @@ function catchUpAutohunt(userId) {
       animals++;
       const g = rollGemDrop(a.rarity, radarMult);
       if (g > 0) { addGems(userId, g); gems += g; }
-      if (rollEggDrop()) { addEgg(userId, 1); eggs++; }
+      if (rollEggDrop(userId)) { addEgg(userId, 1); eggs++; }
       coins += coinsPerAnimal;
       xp += xpPerAnimal;
     }
@@ -1387,9 +1388,10 @@ function claimQuest(userId) {
   const q = getQuest(userId);
   if (q.claimed || q.progress < q.target) return null;
   db.run(`UPDATE quests SET claimed = 1 WHERE user_id = '${userId}'`);
-  addBalance(userId, q.reward);
+  const reward = hasPerk(userId, 'double_quest') ? q.reward * 2 : q.reward;
+  addBalance(userId, reward);
   save();
-  return q;
+  return { ...q, reward };
 }
 
 function getBounty(userId) {
@@ -1416,9 +1418,10 @@ function claimBounty(userId) {
   const b = getBounty(userId);
   if (b.claimed || b.progress < b.target) return null;
   db.run(`UPDATE bounties SET claimed = 1 WHERE user_id = '${userId}'`);
-  addBalance(userId, b.reward);
+  const reward = hasPerk(userId, 'double_quest') ? b.reward * 2 : b.reward;
+  addBalance(userId, reward);
   save();
-  return b;
+  return { ...b, reward };
 }
 
 // ---------- Clan vault (per-guild shared pot) ----------

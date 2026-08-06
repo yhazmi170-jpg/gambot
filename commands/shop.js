@@ -15,6 +15,8 @@ const SHOP = [
       { id: 'vip_games', name: 'VIP game modes access', price: 8000000, desc: 'unlocks exclusive games (poker)', use: 'Use v poker <amount> to play video poker' },
       { id: 'gem', name: 'Gem', price: 2000000, gems: 1, desc: 'every 5 gems you hold = +1 extra animal per hunt (v hunt)', use: 'v hunt — more gems = more animals per hunt' },
       { id: 'gems5', name: 'Gem Pack (x5)', price: 9000000, gems: 5, desc: '5 gems = +1 extra animal per hunt', use: 'v hunt — more gems = more animals per hunt' },
+      { id: 'egg_luck', name: 'Egg Luck (2x egg drops)', price: 3500000, desc: 'double your chance of finding eggs while hunting', use: 'Eggs drop 2x as often from v hunt / autohunt — v hatch to open' },
+      { id: 'double_quest', name: 'Double Quest Rewards', price: 4000000, desc: 'daily quests and weekly bounties pay 2x', use: 'v quest claim / v bounty claim pay double' },
     ],
   },
   {

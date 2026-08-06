@@ -1,1 +1,25 @@
-v1.4.7 -- NEW: `v giveaway <time> <prize>` — host giveaways with an entry button, random winner gets the prize when time runs out (e.g. `v giveaway 10m 500k`) · `v autoreact remove` to turn off auto-react · `v zoo green` filters your animals by color · `v sacrifice gray/green/blue/purple/yellow` sacrifices by rarity color
+v1.5.0 -- the BIG one.
+
+NEW:
+`v stocks` -- buy & sell stocks, market drifts every hour
+`v bank shark` -- take a loan, pay it back
+`v hatch` -- open pet eggs (eggs drop while hunting!)
+`v trade` -- trade animals with other players
+`v heist <fee>` -- start a heist, crew joins, roll for the payout
+`v race <fee>` -- race your best pet against others
+`v tournament <fee>` -- bracket tourney, winner takes 90% of the pot
+`v quest` / `v bounty` -- daily + weekly challenges with coin rewards
+`v vault deposit/withdraw` -- shared server vault
+`v achievements` -- unlock badges for milestones
+`v blackmarket` -- rotating limited deals, refresh every 6h
+`v dex` -- see which species you own vs missing
+
+SHOP:
+Insurance upgrades II/III/IV (30/40/50% loss refund)
+Egg Luck (2x egg drop chance)
+Double Quest Rewards (2x quest + bounty payout)
+Shop revamped into categories
+
+FIXES:
+custom role bug fixed -- role now sits below the bot's role so name/color edits work, plus `v customrole name` / `v customrole color` subcommands
+crash & mines now show your real payout after the balance cut -- no more mystery "rigged" feel

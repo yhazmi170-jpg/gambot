@@ -52,7 +52,7 @@ module.exports = {
         gemsEarned += g;
         animal.gemDrop = g;
       }
-      if (db.rollEggDrop()) {
+      if (db.rollEggDrop(userId)) {
         db.addEgg(userId, 1);
         eggsFound++;
       }
