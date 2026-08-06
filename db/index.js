@@ -905,11 +905,13 @@ function rollGemDrop(rarity, radarMult) {
 function sacrificeAnimals(userId, query, count) {
   const animals = getUserAnimals(userId);
   const q = (query || '').toLowerCase();
+  const COLOR_TO_RARITY = { gray: 'common', grey: 'common', white: 'common', green: 'uncommon', blue: 'rare', purple: 'epic', yellow: 'legendary', gold: 'legendary' };
   const team = getTeam(userId);
   const teamIds = team ? new Set([team.slot1, team.slot2, team.slot3].filter(Boolean)) : new Set();
   const matches = animals.filter(a => {
     if (q === 'all') return true;
-    if (RARITY_ORDER.includes(q)) return a.rarity === q;
+    const rarityMatch = RARITY_ORDER.includes(q) ? a.rarity === q : COLOR_TO_RARITY[q] ? a.rarity === COLOR_TO_RARITY[q] : null;
+    if (rarityMatch !== null) return rarityMatch;
     return a.species.toLowerCase() === q || a.species.toLowerCase().startsWith(q);
   });
   const targets = count ? matches.slice(0, count) : matches;
