@@ -8,10 +8,12 @@ function getYouTubeCookies() {
   const cookieFile = path.join(__dirname, '..', 'cookies.txt');
   try {
     const txt = fs.readFileSync(cookieFile, 'utf8');
-    return txt.split('\n').filter(l => !l.startsWith('#') && l.includes('youtube.com')).map(l => {
-      const parts = l.split('\t');
-      return parts[4] + '=' + parts[5];
-    }).join('; ');
+    return txt.split('\n').filter(l => l.includes('youtube.com')).map(l => {
+      const line = l.startsWith('#HttpOnly_') ? l.slice(10) : l.replace(/^#/, '');
+      const parts = line.split('\t');
+      if (parts.length < 7) return null;
+      return parts[5] + '=' + parts[6];
+    }).filter(Boolean).join('; ');
   } catch {
     return '';
   }

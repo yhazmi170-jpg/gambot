@@ -65,10 +65,9 @@ async function playTrack(guildId) {
   try {
     const ytUrl = /youtube\.com|youtu\.be/.test(track.url) ? track.url : null;
     if (ytUrl && ytdl.validateURL(ytUrl)) {
-      console.log('[play] streaming via ytdl-core:', ytUrl);
       const headers = getYouTubeHeaders();
       const ytStream = ytdl(ytUrl, { 
-        filter: 'audioonly', 
+        filter: (format) => format.hasAudio,
         highWaterMark: 1 << 25,
         requestOptions: { headers },
       });
@@ -78,7 +77,6 @@ async function playTrack(guildId) {
       });
       resource.volume.setVolume(q.volume ?? 1);
       q.player.play(resource);
-      console.log('[play] player.play() called, state:', q.player.state.status);
       if (q.channel) {
         q.channel.send({ embeds: [embed('🎵 Now Playing', [['Song', track.title], ['Requested by', `<@${track.requestedBy}>`]], 0x57f287)] }).catch(() => {});
       }
