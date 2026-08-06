@@ -7,10 +7,7 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "@discordjs/voice": "^0.19.2",
-    "@distube/ytdl-core": "^4.16.12",
     "discord.js": "^14.16.0",
-    "play-dl": "^1.9.7",
     "sql.js": "^1.14.1"
   }
 }
