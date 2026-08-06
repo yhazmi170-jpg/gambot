@@ -55,7 +55,7 @@ async function playTrack(guildId) {
   q.current = track;
 
   try {
-    const stream = await play.stream(track.url);
+    const stream = await play.stream(track.url, { discordPlayerCompatibility: true });
     const resource = createAudioResource(stream.stream, {
       inputType: stream.type === 'opus' ? StreamType.Opus : StreamType.Arbitrary,
       inlineVolume: true,
@@ -66,8 +66,9 @@ async function playTrack(guildId) {
       q.channel.send({ embeds: [embed('🎵 Now Playing', [['Song', track.title], ['Requested by', `<@${track.requestedBy}>`]], 0x57f287)] }).catch(() => {});
     }
   } catch (err) {
-    console.error('playTrack error:', err.message);
-    if (q.channel) q.channel.send({ embeds: [error('could not play that track — skipping')] }).catch(() => {});
+    console.error('playTrack error:', err);
+    if (q.channel) q.channel.send({ embeds: [error(`could not play that track — \`${String(err.message).slice(0, 200)}\``)] }).catch(() => {});
+    q.current = null;
     playTrack(guildId);
   }
 }
