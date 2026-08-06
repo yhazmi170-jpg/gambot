@@ -138,7 +138,7 @@ function handleMessage(message) {
   try {
     const lvl = db.grantXp(message.author.id, 25);
     if (lvl && lvl.leveledUp) {
-      message.channel.send({ embeds: [require('./embed').embed('⬆️ Level Up!', [['', `you hit **level ${lvl.newLevel}** and got **${lvl.reward.toLocaleString()}** money!`]], 0x57f287)] }).catch(() => {});
+      message.channel.send({ content: `<@${message.author.id}>`, embeds: [require('./embed').embed('⬆️ Level Up!', [['', `you hit **level ${lvl.newLevel}** and got **${lvl.reward.toLocaleString()}** money!`]], 0x57f287)] }).catch(() => {});
     }
   } catch (err) {
     console.error('grantXp error:', err);

@@ -86,7 +86,7 @@ client.on('ready', () => {
 
   const { backup } = require('./backup');
   const doBackup = () => backup().catch(e => console.error('BACKUP FAILED:', e && e.message, e && e.stack || ''));
-  setInterval(doBackup, 3600000);
+  setInterval(doBackup, 600000);
   setTimeout(doBackup, 10000);
 
   setInterval(() => {
@@ -196,3 +196,22 @@ function logCrash(tag, err) {
 }
 process.on('unhandledRejection', (err) => logCrash('UNHANDLED_REJECTION', err));
 process.on('uncaughtException', (err) => logCrash('UNCAUGHT_EXCEPTION', err));
+
+// Render free tier has NO persistent disk — ./data is wiped on every deploy/restart.
+// Back up the live DB right before exit so nothing newer than the last interval backup is lost.
+let shuttingDown = false;
+async function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[${signal}] backing up before exit...`);
+  try {
+    const { backup } = require('./backup');
+    await Promise.race([backup(), new Promise(r => setTimeout(r, 15000))]);
+    console.log('[shutdown] backup done');
+  } catch (e) {
+    console.error('[shutdown] backup failed:', e && e.message);
+  }
+  process.exit(0);
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
