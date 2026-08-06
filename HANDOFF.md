@@ -7,8 +7,8 @@
 - **Branch**: `master`
 - **Version**: `1.2.23`
 - **Last update_msg**: Moved to a faster, more reliable host. Uptime should be way better now.
-- **Host migration**: Replit → Render (free, Blueprint from `render.yaml`). Replit repl was stopped by user. Keepalive pinger needs repointing to the Render URL once the service is live.
-- **Keepalive**: `keepalive.ps1` pings every 240s; registered as Windows scheduled task `GambotKeepalive` (runs at logon). Pinger must be running on yazan's PC for this to work (Render URL once deployed).
+- **Host migration**: Replit → Render (free, Blueprint from `render.yaml`). Replit repl was stopped by user. **Render URL: `https://gambot-o2o4.onrender.com`** — keepalive pinger repointed to it.
+- **Keepalive**: `keepalive.ps1` pings every 240s; registered as Windows scheduled task `GambotKeepalive` (runs at logon). Pinger must be running on yazan's PC for this to work (now pinging the Render URL).
 
 ## Errors & trials (2026-08-06)
 - [x] **Replit free tier sleeps on tab-close — pings don't help.** Reported: "close the tab → bot off after 5 min". Root cause: Replit free sleeps the repl ~5 min after the workspace closes; external HTTP pings do NOT prevent it anymore. Only Always On (paid) or moving hosts fixes this. Decided: move to Render.
@@ -34,9 +34,8 @@
 - [x] Help descriptions on all cmds + gamehelp poker/bj + standing “always update help” rule
 
 ## Next / open
-- [ ] Deploy on Render: Blueprint from `render.yaml`, set `TOKEN` + `GITHUB_TOKEN`, hit Deploy (should show **free**, NOT $7.25/mo)
-- [ ] After deploy: confirm bot live (`v version` / DM restart message)
-- [ ] Repoint `keepalive.ps1` URL from `gambot--yhazmi170.replit.app` → `https://gambot.onrender.com`
+- [ ] Confirm bot live on Render (`v version` / DM restart message) — HTTP 200 confirmed; awaiting Discord-side confirm
+- [ ] Repoint `keepalive.ps1` URL — DONE (`https://gambot-o2o4.onrender.com`), pinger restarted
 - [ ] **Do NOT restart the Replit repl** (double instance = double responses)
 
 ## Agent prefs (Cursor)

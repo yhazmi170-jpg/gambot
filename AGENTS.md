@@ -46,7 +46,7 @@
 ## Host / single instance
 - **Host: Render** (free web service, `plan: free` in `render.yaml`) — deploys from this repo via Blueprint. Auto-deploys on `git push` to `master`.
 - **Do NOT run on Replit anymore** — stop the Replit repl (press Stop / `Aovo shutdown`) so there's no double instance. The `.gambot.lock` is per-machine, so two hosts = two bots = double responses.
-- Free tier spins down after **15 min idle** → keepalive pinger must keep hitting the Render URL (`https://gambot.onrender.com`) every 4 min. It wakes on request (~30s).
+- Free tier spins down after **15 min idle** → keepalive pinger must keep hitting the Render URL (`https://gambot-o2o4.onrender.com`) every 4 min. It wakes on request (~30-50s).
 - Data persistence: free tier has **no persistent disk** — `./data` is ephemeral. `GITHUB_TOKEN` env enables hourly backup + boot restore to `yhazmi170-jpg/gambot-data`. Without it, a fresh instance starts an empty DB (max ~1h of player data lost).
 - `update.sh` is Replit-only legacy — **ignore it**. Deploy = `git push`.
 
