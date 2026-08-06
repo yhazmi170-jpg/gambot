@@ -27,6 +27,12 @@ module.exports = {
       return message.channel.send({ embeds: [error('set a cashout multiplier (min 1.1x)')] });
     }
 
+    const factor = db.getBalanceFactor(message.author.id);
+    const realMult = db.effectiveMult(message.author.id, target);
+    if (factor < 1) {
+      message.channel.send(`⚠️ **balance cut active** — at your balance, a **${target}x** cashout pays **${realMult}x**`).catch(() => {});
+    }
+
     const lucky = db.ensureUser(message.author.id).lucky;
     const crashPoint = lucky ? target + 10 + Math.random() * 20 : 0.99 / (1 - Math.random());
     const win = crashPoint >= target;
@@ -35,8 +41,8 @@ module.exports = {
 
     if (win) {
       const paid = db.payWin(message.author.id, net);
-      const realMult = ((amount + paid) / amount).toFixed(2);
-      const cut = paid < net ? ` (paid ${realMult}x after balance cut)` : '';
+      const gotMult = ((amount + paid) / amount).toFixed(2);
+      const cut = paid < net ? ` — got **${gotMult}x** (balance cut)` : '';
       message.channel.send(`📈 crashed at **${crashPoint.toFixed(2)}x** — cashed out at **${target}x** for **${amount + paid}** (+**${paid}**)${cut}`);
     } else {
       db.addBalance(message.author.id, -amount);

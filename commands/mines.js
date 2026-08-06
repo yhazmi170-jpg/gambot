@@ -58,12 +58,18 @@ function buildContainer(game, outcome) {
     lines.push('', outcome);
   } else {
     if (rc > 0) {
-      const curPayout = Math.floor(bet * mult(rc, b, game.lucky));
-      lines.push('', `Cash Out: \`${curPayout.toLocaleString()} (${mult(rc, b, game.lucky).toFixed(2)}×)\``);
+      const curMult = mult(rc, b, game.lucky);
+      const curPayout = Math.floor(game.bet * curMult);
+      const curPaid = Math.floor((curPayout - game.bet) * db.getBalanceFactor(game.userId)) + game.bet;
+      const cutNote = curPaid < curPayout ? ` (${(curPaid / game.bet).toFixed(2)}× after balance cut)` : '';
+      lines.push('', `Cash Out: \`${curPaid.toLocaleString()} (${curMult.toFixed(2)}×)\`${cutNote}`);
     }
     if (rc < ROWS * COLS - b) {
-      const nextPayout = Math.floor(bet * mult(rc + 1, b, game.lucky));
-      lines.push(`Next: \`${nextPayout.toLocaleString()} (${mult(rc + 1, b, game.lucky).toFixed(2)}×)\``);
+      const nextMult = mult(rc + 1, b, game.lucky);
+      const nextPayout = Math.floor(game.bet * nextMult);
+      const nextPaid = Math.floor((nextPayout - game.bet) * db.getBalanceFactor(game.userId)) + game.bet;
+      const cutNote = nextPaid < nextPayout ? ` (${(nextPaid / game.bet).toFixed(2)}× after balance cut)` : '';
+      lines.push(`Next: \`${nextPaid.toLocaleString()} (${nextMult.toFixed(2)}×)\`${cutNote}`);
     }
     if (rc >= ROWS * COLS - b) lines.push('All gems cleared!');
     lines.push(`Gems: **${rc}**`);
@@ -111,7 +117,7 @@ module.exports = {
       } else {
         bombCount = lucky ? 1 : BOMBS;
       }
-      const game = { bombs: createGrid(bombCount), bombCount, revealed: new Set(), bet: amount, active: true, lastSafe: -1, hitBomb: undefined, testMode, lucky, hasCustomMines };
+      const game = { bombs: createGrid(bombCount), bombCount, revealed: new Set(), bet: amount, active: true, lastSafe: -1, hitBomb: undefined, testMode, lucky, hasCustomMines, userId: message.author.id };
       activeGames.set(message.author.id, game);
 
       message.channel.send(buildContainer(game)).then(msg => {
@@ -123,7 +129,8 @@ module.exports = {
           const p = Math.floor(game.bet * mult(game.revealed.size, game.bombCount, game.lucky));
           const paid = game.testMode ? (p - game.bet) : db.payWin(message.author.id, p - game.bet, game.bet);
           const total = game.bet + paid;
-          return i.update({ embeds: [embed('💣 Mines', [['', `${game.testMode ? '🧪' : '💣'} Cashed Out${game.testMode ? ' [TEST]' : ''}\n\n**${total.toLocaleString()}** ${config.currency} (+**${paid}**)${game.testMode ? ' (no money gained)' : ''}`]], 0x57f287)] }).catch(() => {});
+          const gotMult = game.testMode ? '' : ` — got **${(total / game.bet).toFixed(2)}×**${paid < p - game.bet ? ' (balance cut)' : ''}`;
+          return i.update({ embeds: [embed('💣 Mines', [['', `${game.testMode ? '🧪' : '💣'} Cashed Out${game.testMode ? ' [TEST]' : ''}\n\n**${total.toLocaleString()}** ${config.currency} (+**${paid}**)${gotMult}${game.testMode ? ' (no money gained)' : ''}`]], 0x57f287)] }).catch(() => {});
         }
         const idx = parseInt(i.customId.split('_')[1]);
         if (game.revealed.has(idx)) { await i.deferUpdate().catch(() => {}); return; }
@@ -145,8 +152,9 @@ module.exports = {
           const p = Math.floor(game.bet * mult(rc, game.bombCount, game.lucky));
           const paid = game.testMode ? (p - game.bet) : db.payWin(message.author.id, p - game.bet, game.bet);
           const total = game.bet + paid;
+          const gotMult = game.testMode ? '' : ` — got **${(total / game.bet).toFixed(2)}×**${paid < p - game.bet ? ' (balance cut)' : ''}`;
           for (let j = 0; j < ROWS * COLS; j++) game.revealed.add(j);
-          const lines = [`${game.testMode ? '🧪' : '💣'} All Cleared!${game.testMode ? ' [TEST]' : ''}\n\n**${total.toLocaleString()}** ${config.currency} (+**${paid}**)${game.testMode ? ' (no money gained)' : ''}`];
+          const lines = [`${game.testMode ? '🧪' : '💣'} All Cleared!${game.testMode ? ' [TEST]' : ''}\n\n**${total.toLocaleString()}** ${config.currency} (+**${paid}**)${gotMult}${game.testMode ? ' (no money gained)' : ''}`];
           return i.update({ embeds: [embed('💣 Mines', [['', lines.join('\n')]], 0x57f287)], components: buildButtons(game) }).catch(() => {});
         }
         i.update(buildContainer(game)).catch(() => {});

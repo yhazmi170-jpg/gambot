@@ -330,6 +330,12 @@ function payWin(userId, profit, stakeReturn = 0) {
   return paid;
 }
 
+/** Real multiplier a user actually receives on a win at `rawMult` after the balance cut. */
+function effectiveMult(userId, rawMult) {
+  const f = getBalanceFactor(userId);
+  return Math.round(rawMult * f * 100) / 100;
+}
+
 function getCooldown(lastTime, cooldownSec) {
   if (!lastTime) return 0;
   const elapsed = Date.now() / 1000 - lastTime;
@@ -643,6 +649,23 @@ function randomRarity() {
 function randomSpecies(rarity) {
   const list = SPECIES[rarity];
   return list[Math.floor(Math.random() * list.length)];
+}
+
+/** Species owned by a user, grouped by rarity: { common: [names], ... } */
+function getOwnedSpecies(userId) {
+  const rows = db.exec(`SELECT DISTINCT species FROM animals WHERE user_id = '${userId}'`);
+  if (!rows.length) return {};
+  const owned = {};
+  for (const v of rows[0].values) {
+    const species = v[0];
+    for (const rarity of RARITY_ORDER) {
+      if (SPECIES[rarity].includes(species)) {
+        (owned[rarity] = owned[rarity] || []).push(species);
+        break;
+      }
+    }
+  }
+  return owned;
 }
 
 function randomStats(rarity) {
@@ -1574,6 +1597,9 @@ module.exports = {
   addWon,
   getTop,
   getLottery,
+  getBalanceFactor,
+  effectiveMult,
+  getOwnedSpecies,
   addTicket,
   resetLottery,
   totalTickets,
