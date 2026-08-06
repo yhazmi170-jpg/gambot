@@ -5,3 +5,5 @@ flush: move them into update_msg.txt as ONE combined log + bump package.json ver
 then push (the boot announcement posts it once).
 
 Format: one line per change, terse, no AI fluff.
+- play: subscribe audio player to voice connection so bot actually streams audio
+- play: add voiceStateUpdate handler to clear queue when bot is kicked/moved from VC

@@ -12,6 +12,10 @@ function getQueue(guildId) {
   return queues.get(guildId);
 }
 
+function clearQueue(guildId) {
+  queues.delete(guildId);
+}
+
 function durationStr(ms) {
   if (!ms || isNaN(ms)) return 'live/unknown';
   const s = Math.floor(ms / 1000);
@@ -103,6 +107,7 @@ module.exports = {
   helpCategory: 'Music',
   helpArgs: '<song or url> | skip | stop | queue | pause | resume | volume <0-100> | np',
   description: 'play music in your voice channel (YouTube)',
+  clearQueue,
   async execute(message, args) {
     const sub = (args[0] || '').toLowerCase();
     const guildId = message.guild?.id;
@@ -184,7 +189,14 @@ module.exports = {
         selfDeaf: true,
       });
       q.connection = connection;
-      setupPlayer(guildId);
+      const player = setupPlayer(guildId);
+      connection.subscribe(player);
+    } else if (!q.player) {
+      const connection = getVoiceConnection(guildId);
+      if (connection) {
+        const player = setupPlayer(guildId);
+        connection.subscribe(player);
+      }
     }
 
     const statusMsg = await message.channel.send({ embeds: [embed('🎵 Music', [['', 'searching for that...']])] }).catch(() => null);

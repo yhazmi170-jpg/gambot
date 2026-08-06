@@ -193,6 +193,12 @@ client.on('disconnect', () => console.log('disconnected — will auto-reconnect'
 client.on('reconnecting', () => console.log('reconnecting...'));
 client.on('resume', () => console.log('reconnected'));
 
+client.on('voiceStateUpdate', (oldState, newState) => {
+  if (newState.id === client.user.id && (!newState.channel || newState.channelId !== oldState.channelId)) {
+    try { require('./commands/play').clearQueue(oldState.guild.id); } catch {}
+  }
+});
+
 client.on('messageCreate', (message) => {
   handleMessage(message);
   if (message.author.bot) return;
