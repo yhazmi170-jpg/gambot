@@ -342,10 +342,12 @@ function payWin(userId, profit, stakeReturn = 0) {
   return paid;
 }
 
-/** Real multiplier a user actually receives on a win at `rawMult` after the balance cut. */
+/** Real multiplier a user actually receives on a win at `rawMult` after the balance cut.
+ *  The cut applies to profit only (stake is returned in full), so a 1.3x win at factor 0.4
+ *  pays 1 + 0.3*0.4 = 1.12x, NOT 0.52x. */
 function effectiveMult(userId, rawMult) {
   const f = getBalanceFactor(userId);
-  return Math.round(rawMult * f * 100) / 100;
+  return Math.round((1 + (rawMult - 1) * f) * 100) / 100;
 }
 
 function getCooldown(lastTime, cooldownSec) {
