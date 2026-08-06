@@ -86,6 +86,19 @@ module.exports = {
         embeds: [success(`received **${result.received}** ${config.currency}\nYou owe **${result.owed}** (${Math.round(result.interest * 100)}% interest)`)] });
     }
 
+    if (sub === 'shark' || sub === 'loan shark') {
+      let amount;
+      if ((args[1] || '').toLowerCase() === 'max') amount = Infinity;
+      else amount = parseAmount(args[1]);
+      if (!amount || amount <= 0) return message.channel.send({ embeds: [error('usage: `v bank shark <amount/max>`')] });
+
+      const result = db.sharkLoan(uid, amount);
+      if (!result) return message.channel.send({ embeds: [error("you already have a loan or the shark won't lend to you")] });
+
+      return message.channel.send({
+        embeds: [success(`🦈 the shark fronts you **${result.received.toLocaleString()}** ${config.currency}\nYou owe **${result.owed.toLocaleString()}** (${Math.round(result.interest * 100)}% interest) — pay it back or deal with the consequences`)] });
+    }
+
     message.channel.send({ embeds: [embed('🏦 Bank', [
       ['Commands', [
         `\`v bank\` — check bank balance`,
@@ -93,8 +106,9 @@ module.exports = {
         `\`v bank withdraw <amount/all>\` — withdraw money`,
         `\`v bank loan <amount/max>\` — take a loan`,
         `\`v bank loan pay <amount/all>\` — repay loan`,
+        `\`v bank shark <amount/max>\` — borrow from the loan shark`,
       ].join('\n')],
-      ['Loan Terms', `Borrow up to **2x** your net worth with **${Math.round(db.LOAN_INTEREST * 100)}%** interest (one-time fee).`],
+      ['Loan Terms', `Borrow up to **2x** your net worth with **${Math.round(db.LOAN_INTEREST * 100)}%** interest (one-time fee). The **shark** lends up to **${(db.SHARK_MAX / 1000000).toFixed(1)}M** at **${Math.round(db.SHARK_INTEREST * 100)}%** even if you're broke.`],
       ['Note', 'Bank money is safe — can\'t be gambled, robbed, or lost.'],
     ], 0x2b2d31)] });
   },

@@ -110,6 +110,12 @@ async function init() {
     key TEXT PRIMARY KEY,
     value INTEGER NOT NULL DEFAULT 1
   )`);
+  db.run(`CREATE TABLE IF NOT EXISTS stocks (
+    user_id TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    shares INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, symbol)
+  )`);
   save();
 }
 
@@ -786,6 +792,98 @@ function payLoan(userId, amount) {
   return { paid: actual, remaining, cleared: false };
 }
 
+// ---- Loan shark: borrow from the mob, balance can go negative ----
+const SHARK_INTEREST = 0.5;
+const SHARK_MAX = 2000000;
+
+function sharkLoan(userId, amount) {
+  const u = ensureUser(userId);
+  if (!u || u.loan > 0) return null;
+  if (u.balance < 0) return null;
+  const actual = Math.min(amount, SHARK_MAX);
+  if (actual <= 0) return null;
+  const now = Math.floor(Date.now() / 1000);
+  const totalOwed = Math.floor(actual * (1 + SHARK_INTEREST));
+  db.run(`UPDATE users SET balance = balance + ${actual}, loan = ${totalOwed}, loan_time = ${now} WHERE user_id = '${userId}'`);
+  save();
+  return { received: actual, owed: totalOwed, interest: SHARK_INTEREST };
+}
+
+function allowNegative(userId) {
+  const u = ensureUser(userId);
+  if (!u) return;
+  if (u.loan > 0 && u.balance < 0) {
+    db.run(`UPDATE users SET balance = ${u.balance} WHERE user_id = '${userId}'`);
+    save();
+  }
+}
+
+// ---- Stocks: deterministic market that drifts each hour ----
+const STOCKS = {
+  OVO: { base: 120, vol: 0.35 },
+  CRYPTO: { base: 4000, vol: 0.5 },
+  PIXEL: { base: 60, vol: 0.25 },
+  CASH: { base: 500, vol: 0.3 },
+  CLOWN: { base: 20, vol: 0.6 },
+  GAMBL: { base: 250, vol: 0.4 },
+};
+
+function stockPrice(symbol, time = Date.now()) {
+  const s = STOCKS[symbol];
+  if (!s) return null;
+  const hour = Math.floor(time / 3600000);
+  const wave = Math.sin(hour * 1.7 + symbol.length) * 0.5 + Math.sin(hour * 0.9 + symbol.charCodeAt(0)) * 0.5;
+  const price = s.base * (1 + wave * s.vol);
+  return Math.max(1, Math.floor(price));
+}
+
+function getStockPrices() {
+  const out = {};
+  for (const sym of Object.keys(STOCKS)) out[sym] = stockPrice(sym);
+  return out;
+}
+
+function buyStock(userId, symbol, shares) {
+  const s = STOCKS[symbol];
+  if (!s || !shares || shares <= 0) return null;
+  const price = stockPrice(symbol);
+  const cost = price * shares;
+  const u = ensureUser(userId);
+  if (!u || u.balance < cost) return null;
+  db.run(`UPDATE users SET balance = balance - ${cost} WHERE user_id = '${userId}'`);
+  db.run(`INSERT INTO stocks (user_id, symbol, shares) VALUES ('${userId}', '${symbol}', ${shares})
+    ON CONFLICT(user_id, symbol) DO UPDATE SET shares = shares + ${shares}`);
+  save();
+  return { price, shares, cost };
+}
+
+function sellStock(userId, symbol, shares) {
+  const s = STOCKS[symbol];
+  if (!s || !shares || shares <= 0) return null;
+  const rows = db.exec(`SELECT shares FROM stocks WHERE user_id = '${userId}' AND symbol = '${symbol}'`);
+  if (!rows.length || !rows[0].values.length) return null;
+  const held = rows[0].values[0][0];
+  const actual = Math.min(shares, held);
+  if (actual <= 0) return null;
+  const price = stockPrice(symbol);
+  const proceeds = price * actual;
+  const remaining = held - actual;
+  if (remaining <= 0) db.run(`DELETE FROM stocks WHERE user_id = '${userId}' AND symbol = '${symbol}'`);
+  else db.run(`UPDATE stocks SET shares = ${remaining} WHERE user_id = '${userId}' AND symbol = '${symbol}'`);
+  db.run(`UPDATE users SET balance = balance + ${proceeds} WHERE user_id = '${userId}'`);
+  save();
+  return { price, shares: actual, proceeds };
+}
+
+function getPortfolio(userId) {
+  const rows = db.exec(`SELECT symbol, shares FROM stocks WHERE user_id = '${userId}' AND shares > 0`);
+  if (!rows.length) return [];
+  return rows[0].values.map(([symbol, shares]) => {
+    const price = stockPrice(symbol);
+    return { symbol, shares, price, value: price * shares };
+  });
+}
+
 function setCustomRole(userId, guildId, roleId) {
   db.run(`INSERT OR REPLACE INTO custom_roles (user_id, guild_id, role_id) VALUES ('${userId}', '${guildId}', '${roleId}')`);
   save();
@@ -1181,6 +1279,8 @@ module.exports = {
   payWin,
   xpForLevel, levelInfo, grantXp,
   bankDeposit, bankWithdraw, takeLoan, payLoan, LOAN_INTEREST, MAX_LOAN_MULT,
+  sharkLoan, SHARK_INTEREST, SHARK_MAX,
+  stockPrice, getStockPrices, buyStock, sellStock, getPortfolio, STOCKS,
   SPECIES, RARITY_WEIGHTS, RARITY_ORDER, randomRarity, randomSpecies, randomStats, expForLevel,
   getEssence, addEssence, getTraits, traitCost, upgradeTrait, randomRarityWithEff,
   huntCapacity, huntYield, rollGemDrop, sacrificeAnimals, addXpRaw,
