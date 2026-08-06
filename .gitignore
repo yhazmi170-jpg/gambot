@@ -7,3 +7,5 @@ config.json
 .notified_v*
 bot.err
 .gambot.lock
+cookies.txt
+*-player-script.js

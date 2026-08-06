@@ -1,7 +1,7 @@
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, NoSubscriberBehavior, StreamType, getVoiceConnection } = require('@discordjs/voice');
 const play = require('play-dl');
 const ytdl = require('@distube/ytdl-core');
-const { spawn } = require('child_process');
+const { getYouTubeHeaders } = require('../utils/ytHeaders');
 const { embed, error } = require('../utils/embed');
 const config = require('../config');
 
@@ -55,38 +55,6 @@ async function resolveSpotify(url) {
   throw new Error('spotify: could not read that link');
 }
 
-async function playFFmpeg(url) {
-  const input = ytdl(url, { filter: 'audioonly', highWaterMark: 1 << 25 });
-  const ffmpeg = spawn('ffmpeg', [
-    '-i', 'pipe:0',
-    '-f', 'opus',
-    '-ar', '48000',
-    '-ac', '2',
-    '-vbr', 'on',
-    'pipe:1',
-  ]);
-
-  return new Promise((resolve, reject) => {
-    let stderr = '';
-    ffmpeg.stderr.on('data', (d) => { stderr += d.toString(); });
-
-    const cleanup = () => {
-      try { ffmpeg.kill(); } catch {}
-      try { input.destroy(); } catch {}
-    };
-
-    ffmpeg.on('error', (err) => { console.error('[play] ffmpeg spawn error:', err.message); cleanup(); reject(err); });
-    input.on('error', (err) => { console.error('[play] ytdl error:', err.message); cleanup(); reject(err); });
-    ffmpeg.stdout.on('error', (err) => { console.error('[play] ffmpeg stdout error:', err.message); reject(err); });
-    ffmpeg.on('close', (code) => {
-      if (code !== 0) console.error('[play] ffmpeg exit code:', code, 'stderr:', stderr.slice(-500));
-    });
-
-    input.pipe(ffmpeg.stdin);
-    resolve({ stream: ffmpeg.stdout, cleanup });
-  });
-}
-
 async function playTrack(guildId) {
   const q = getQueue(guildId);
   if (!q.tracks.length || !q.connection) return;
@@ -97,15 +65,19 @@ async function playTrack(guildId) {
   try {
     const ytUrl = /youtube\.com|youtu\.be/.test(track.url) ? track.url : null;
     if (ytUrl && ytdl.validateURL(ytUrl)) {
-      console.log('[play] streaming via ytdl+ffmpeg:', ytUrl);
-      const { stream, cleanup } = await playFFmpeg(ytUrl);
-      const resource = createAudioResource(stream, {
-        inputType: StreamType.Opus,
+      console.log('[play] streaming via ytdl-core:', ytUrl);
+      const headers = getYouTubeHeaders();
+      const ytStream = ytdl(ytUrl, { 
+        filter: 'audioonly', 
+        highWaterMark: 1 << 25,
+        requestOptions: { headers },
+      });
+      const resource = createAudioResource(ytStream, {
+        inputType: StreamType.Arbitrary,
         inlineVolume: true,
       });
       resource.volume.setVolume(q.volume ?? 1);
       q.player.play(resource);
-      track._cleanup = cleanup;
       console.log('[play] player.play() called, state:', q.player.state.status);
       if (q.channel) {
         q.channel.send({ embeds: [embed('🎵 Now Playing', [['Song', track.title], ['Requested by', `<@${track.requestedBy}>`]], 0x57f287)] }).catch(() => {});
@@ -124,7 +96,12 @@ async function playTrack(guildId) {
     }
   } catch (err) {
     console.error('playTrack error:', err);
-    if (q.channel) q.channel.send({ embeds: [error(`could not play that track — \`${String(err.message).slice(0, 200)}\``)] }).catch(() => {});
+    const msg = String(err.message).slice(0, 200);
+    let userMsg = `could not play that track — \`${msg}\``;
+    if (msg.includes('Sign in') || msg.includes('bot') || msg.includes('429') || msg.includes('403')) {
+      userMsg += '` — YouTube may be blocking this server. Try again later or use a direct audio file.';
+    }
+    if (q.channel) q.channel.send({ embeds: [error(userMsg)] }).catch(() => {});
     q.current = null;
     playTrack(guildId);
   }
@@ -137,7 +114,6 @@ function setupPlayer(guildId) {
 
   player.on('stateChange', (oldS, newS) => {
     if (newS.status === AudioPlayerStatus.Idle && oldS.status !== AudioPlayerStatus.Idle) {
-      if (q.current?._cleanup) q.current._cleanup();
       q.current = null;
       if (q.tracks.length) {
         playTrack(guildId);
@@ -169,8 +145,6 @@ module.exports = {
     if (sub === 'stop' || sub === 'leave' || sub === 'dc') {
       const conn = getVoiceConnection(guildId);
       if (!conn) return message.channel.send({ embeds: [error('not in a voice channel')] });
-      const q = getQueue(guildId);
-      if (q.current?._cleanup) q.current._cleanup();
       queues.delete(guildId);
       conn.destroy();
       return message.channel.send({ embeds: [embed('🎵 Music', [['', 'left the voice channel and cleared the queue']])] });
@@ -181,7 +155,6 @@ module.exports = {
       if (!q.player) return message.channel.send({ embeds: [error('nothing is playing')] });
       const wasIdle = q.player.state.status === AudioPlayerStatus.Idle;
       const conn = getVoiceConnection(guildId);
-      if (q.current?._cleanup) q.current._cleanup();
       if (conn) conn.state.subscription?.player.stop();
       if (wasIdle && q.tracks.length) playTrack(guildId);
       return message.channel.send({ embeds: [embed('🎵 Music', [['', q.tracks.length ? `skipped — up next: **${q.tracks[0].title}**` : 'skipped — queue is empty']])] });
