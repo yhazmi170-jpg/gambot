@@ -1,1 +1,1 @@
-v1.4.4 -- the bot now refuses to overwrite your cloud save with an empty/corrupted one, so restarts can no longer wipe your data · backups run every 1 minute
+v1.4.5 -- recovery: on boot the bot scans ALL cloud backups and restores the newest one that actually has your data — a bad/empty backup can no longer block recovery · backups every 1 minute

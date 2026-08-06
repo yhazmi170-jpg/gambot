@@ -86,31 +86,47 @@ async function download(filePath) {
   return d && d.content ? Buffer.from(d.content, 'base64') : null;
 }
 
+// All snapshot filenames in the latest commit touching backups/ (newest first)
+async function allSnapshots() {
+  const commits = await request('GET', `/repos/${OWNER}/${REPO}/commits?path=backups&per_page=1`);
+  if (!commits || !commits.length) return [];
+  const tree = await request('GET', `/repos/${OWNER}/${REPO}/git/trees/${commits[0].sha}?recursive=1`);
+  return (tree.tree || [])
+    .filter(t => t.type === 'blob' && /^backups\/.*\.db$/.test(t.path))
+    .map(t => t.path)
+    .sort((a, b) => b.localeCompare(a)); // newest filename first
+}
+
 async function restore() {
   const local = fs.existsSync(DB_PATH) && fs.statSync(DB_PATH).size > 100;
   const localMtime = local ? fs.statSync(DB_PATH).mtimeMs : 0;
 
+  // Scan snapshots newest→oldest; download the first one that actually has users.
+  // Never restore an empty/corrupt snapshot — a single bad backup must not nuke the DB.
   let newest = null;
   try { newest = await newestSnapshot(); } catch (e) { console.error('restore: snapshot lookup failed:', e.message); }
 
   if (newest) {
-    // Stale local DB? If the newest snapshot is NEWER than the local file, replace it —
-    // prevents an old instance from running on (and re-backing-up) outdated data.
     if (local && newest.date <= localMtime) {
       console.log('local db is up to date, skipping restore');
       return true;
     }
     try {
-      const buf = await download(newest.path);
-      if (buf && (await countUsers(buf)) > 0) {
-        fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-        fs.writeFileSync(DB_PATH, buf);
-        console.log(`restored db from github backup (${newest.path})`);
-        return true;
+      const all = await allSnapshots();
+      for (const p of all) {
+        try {
+          const buf = await download(p);
+          if (buf && (await countUsers(buf)) > 0) {
+            fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+            fs.writeFileSync(DB_PATH, buf);
+            console.log(`restored db from github backup (${p})`);
+            return true;
+          }
+          if (buf) console.error(`restore: skipped empty/corrupt snapshot ${p} (0 users)`);
+        } catch (e) { console.error(`restore: skip ${p}: ${e.message}`); }
       }
-      if (buf) console.error(`restore: SKIPPED empty/corrupt snapshot ${newest.path} (0 users)`);
     } catch (e) {
-      console.error('restore: snapshot download failed:', e.message);
+      console.error('restore: snapshot listing failed:', e.message);
     }
   }
 
