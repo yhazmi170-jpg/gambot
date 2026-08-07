@@ -112,6 +112,7 @@ async function init() {
     entries TEXT NOT NULL DEFAULT '[]',
     winner_id TEXT DEFAULT NULL
   )`);
+  db.run(`CREATE TABLE IF NOT EXISTS streaks (user_id TEXT PRIMARY KEY, count INTEGER NOT NULL DEFAULT 0, last_time INTEGER NOT NULL DEFAULT 0, best INTEGER NOT NULL DEFAULT 0)`);
   db.run(`CREATE TABLE IF NOT EXISTS vip_roles (guild_id TEXT PRIMARY KEY, role_id TEXT NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS animals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -416,6 +417,31 @@ function claimWeekly(userId, amount) {
   db.run(`UPDATE users SET weekly_time = ${now}, balance = balance + ${final} WHERE user_id = '${userId}'`);
   save();
   return { mult };
+}
+
+// ---- Logon streak: escalating daily bonus, resets after 48h without a claim ----
+const STREAK_BASE = 5000;
+const STREAK_MAX_DAY = 7;
+
+function getStreak(userId) {
+  const rows = db.exec(`SELECT count, last_time, best FROM streaks WHERE user_id = '${userId}'`);
+  if (!rows.length || !rows[0].values.length) return { count: 0, last_time: 0, best: 0 };
+  const v = rows[0].values[0];
+  return { count: v[0], last_time: v[1], best: v[2] };
+}
+
+function claimStreak(userId) {
+  const now = Math.floor(Date.now() / 1000);
+  const s = getStreak(userId);
+  if (s.last_time > 0 && now - s.last_time < 86400) return { cooldown: Math.floor(86400 - (now - s.last_time)) };
+  let count = 1;
+  if (s.last_time > 0 && now - s.last_time < 86400 * 2) count = s.count + 1;
+  const reward = Math.floor(STREAK_BASE * Math.min(count, STREAK_MAX_DAY) * getBalanceFactor(userId));
+  const best = Math.max(s.best, count);
+  db.run(`INSERT OR REPLACE INTO streaks (user_id, count, last_time, best) VALUES ('${userId}', ${count}, ${now}, ${best})`);
+  db.run(`UPDATE users SET balance = balance + ${reward} WHERE user_id = '${userId}'`);
+  save();
+  return { count, reward, best, cooldown: 0, maxDay: STREAK_MAX_DAY };
 }
 
 function claimWork(userId, amount) {
@@ -2549,6 +2575,7 @@ module.exports = {
   calcDailyReward,
   claimWeekly,
   claimWork,
+  getStreak, claimStreak, STREAK_BASE, STREAK_MAX_DAY,
   getCooldown,
   addGambled,
   addWon,

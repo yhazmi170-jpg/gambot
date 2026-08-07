@@ -57,9 +57,16 @@ module.exports = {
       mines: {
         name: 'Mines',
         aliases: 'mine, mines',
-        desc: '5x5 grid with mines. Reveal safe tiles to grow multiplier. Cash out anytime.',
+        desc: '4x4 grid with mines. Reveal safe tiles to grow multiplier. Cash out anytime.',
         play: `\`${prefix} mines <amount>\`\nClick tiles, or **Cash Out**\nExample: \`${prefix} mines 1000\``,
         tips: 'Cash out early for steady profit. One mine ends the round.',
+      },
+      wheel: {
+        name: 'Wheel',
+        aliases: 'wheel, spin',
+        desc: 'Spin the wheel of fortune. Multipliers from x0 up to a x10 jackpot.',
+        play: `\`${prefix} wheel <amount>\`\nHit **Spin**\nExample: \`${prefix} wheel 1000\``,
+        tips: 'x1 gives your bet back. x10 hits rarely but pays big.',
       },
       crash: {
         name: 'Crash',

@@ -12,3 +12,6 @@ Format: one line per change, terse, no AI fluff.
 - Fixed: 'v mines' board was missing the bottom-right tile (cell 15) and the cash-out button shared its row - now all 16 tiles render as a proper 4x4 with a dedicated cash-out row. Longer window (5 min) and unplayed games now refund the bet instead of silently eating it (that's why players felt it was rigged / lost money without playing).
 - More random events (now 15): extra win-mult gems/eggs/essence flavors + new Double Payday / Payday Plus events that boost daily & weekly rewards. Event announcement shows real duration.
 - Fixed: owner's DMs were getting spammed with 'Bot Restarted' on every deploy - the boot-DM now fires once per version, not once per restart.
+- New: 'v wheel <amount>' - spin the wheel, multipliers up to x10 jackpot (weighted, ~1.3% house edge; timeout refunds).
+- New: 'v streak' - daily logon streak bonus that scales up to day 7 (resets after 48h).
+- New: 'v loan take|shark|pay' - borrow coins (30% interest, max 2x balance+bank) or hit the loan shark (50%, up to 2M); winnings auto-repay the loan.

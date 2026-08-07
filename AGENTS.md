@@ -56,6 +56,7 @@
 - **Achievements / black market (v1.5.0):** `v achievements` + auto-unlock check hooked into `utils/commandHandler.js` after every command (19 in `db.ACHIEVEMENTS`). `v blackmarket` = 4 rotating slots refreshed every 6h (`db.refreshBlackMarket`), 6 item types.
 - **Animal dex:** `v dex [rarity]` shows all 35 species bold=owned / struck=missing via `db.getOwnedSpecies`.
 - **Insurance tiers (v1.5.0):** base `insurance` = 20% loss refund; shop upgrades `insurance2/3/4` = 30/40/50% (highest owned wins, `db.getInsuranceLevel`). Auto-applied in all games via `db.getInsuranceRefund`.
+- **Streak / Wheel / Loans:** `v streak` = daily logon bonus, `STREAK_BASE` 5k/day scaling to day 7 (`streaks` table, resets after 48h, `claimStreak`). `v wheel <amt>` = weighted wheel, `SEGMENTS` in commands/wheel.js (EV ~0.99, pays via `payWin`). `v loan take|shark|pay` = bank loan 30% up to 2x (balance+bank) or loan-shark 50% up to 2M; winnings auto-repay via `payWin`'s loan logic.
 
 ## Cards / UI
 - Blackjack uses owo-style board: `Dealer [10+?]` + card back, `Name [19]` + cards (description embed, not field grid)
