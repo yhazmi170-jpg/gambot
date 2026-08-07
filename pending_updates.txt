@@ -7,4 +7,6 @@ then push (the boot announcement posts it once).
 Format: one line per change, terse, no AI fluff.
 - Clan creation now costs 5M coins (was 500k).
 - New weekly Gambling Leaderboard: `Aovo lb #channel` picks a channel, bot auto-posts the top 10 gamblers every week and pays rewards (1st 1M → 10th 40k). Owner stays hidden. View anytime with `v glb`.
-- Random events expanded 15 → 35 with weighted rarity (no repeats in a row): new Shop Sale (prices up to 50% off), work boosts (up to 3x), hunting XP boosts (up to 3x), battle coin boosts, and instant Coin/Gem/Egg/Lucky Rains that drop coins+gems+eggs to every gambler at once.
+- Clans are now PLAYER-based, not server-based: `v clan create` makes a clan owned by you, `v clan join @me|name` joins anyone's clan, `v clan delete` disbands (50% treasury back). One clan per player, 5M to create.
+- NEW `v pokertournament <buy-in>` — 5-card poker showdown table (9 seats), best hand wins the whole pot (90%), join via button.
+- NEW Travelling merchant — rolls in every ~90min, sells 1 rare pet + gems + essence, first come first served via `v merchant`.

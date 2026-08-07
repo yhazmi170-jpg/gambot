@@ -80,6 +80,7 @@ async function init() {
   db.run(`CREATE TABLE IF NOT EXISTS pet_achievements (animal_id INTEGER NOT NULL, key TEXT NOT NULL, at INTEGER NOT NULL DEFAULT (strftime('%s','now')), PRIMARY KEY (animal_id, key))`);
   db.run(`CREATE TABLE IF NOT EXISTS clans (clan_id TEXT PRIMARY KEY, name TEXT NOT NULL, owner_id TEXT NOT NULL, balance INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')))`);
   db.run(`CREATE TABLE IF NOT EXISTS clan_members (clan_id TEXT NOT NULL, user_id TEXT NOT NULL, joined_at INTEGER NOT NULL DEFAULT (strftime('%s','now')), PRIMARY KEY (clan_id, user_id))`);
+  try { db.run(`CREATE UNIQUE INDEX IF NOT EXISTS uniq_clan_member_user ON clan_members (user_id)`); } catch (e) {}
   db.run(`CREATE TABLE IF NOT EXISTS bids (auction_id TEXT PRIMARY KEY, guild_id TEXT NOT NULL DEFAULT '', seller_id TEXT NOT NULL, animal_id INTEGER NOT NULL, min_bid INTEGER NOT NULL, current_bid INTEGER NOT NULL, current_bidder TEXT, ends_at INTEGER NOT NULL)`);
   try { db.run(`ALTER TABLE bids ADD COLUMN guild_id TEXT NOT NULL DEFAULT ''`); } catch (e) {}
   db.run(`CREATE TABLE IF NOT EXISTS world_boss (boss_id TEXT PRIMARY KEY, species TEXT NOT NULL, rarity TEXT NOT NULL, hp INTEGER NOT NULL, max_hp INTEGER NOT NULL, pot INTEGER NOT NULL DEFAULT 0, ends_at INTEGER NOT NULL)`);
@@ -87,9 +88,6 @@ async function init() {
   db.run(`CREATE TABLE IF NOT EXISTS boss_contrib (boss_id TEXT NOT NULL, user_id TEXT NOT NULL, damage INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (boss_id, user_id))`);
   db.run(`CREATE TABLE IF NOT EXISTS events (key TEXT PRIMARY KEY, type TEXT NOT NULL, ends_at INTEGER NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS plots (user_id TEXT PRIMARY KEY, level INTEGER NOT NULL DEFAULT 1, planted_at INTEGER NOT NULL DEFAULT 0, last_claim INTEGER NOT NULL DEFAULT 0)`);
-  try { db.run(`ALTER TABLE animals ADD COLUMN shiny INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
-  try { db.run(`ALTER TABLE animals ADD COLUMN trait TEXT NOT NULL DEFAULT ''`); } catch (e) {}
-  try { db.run(`ALTER TABLE animals ADD COLUMN fed_until INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   db.run(`CREATE TABLE IF NOT EXISTS marriages (user_id TEXT PRIMARY KEY, partner_id TEXT NOT NULL, married_at INTEGER NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS adoption (parent_id TEXT, child_id TEXT, PRIMARY KEY (parent_id, child_id))`);
   db.run(`CREATE TABLE IF NOT EXISTS purchases (user_id TEXT, perk TEXT, expires_at INTEGER, PRIMARY KEY (user_id, perk))`);
@@ -97,6 +95,8 @@ async function init() {
   db.run(`CREATE TABLE IF NOT EXISTS cmd_log_channels (guild_id TEXT PRIMARY KEY, channel_id TEXT NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS update_channels (guild_id TEXT PRIMARY KEY, channel_id TEXT NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS event_channels (guild_id TEXT PRIMARY KEY, channel_id TEXT NOT NULL)`);
+  db.run(`CREATE TABLE IF NOT EXISTS merchant_state (id INTEGER PRIMARY KEY CHECK (id = 1), next_at INTEGER NOT NULL DEFAULT 0)`);
+  db.run(`CREATE TABLE IF NOT EXISTS merchant_stock (slot INTEGER PRIMARY KEY, kind TEXT NOT NULL, label TEXT NOT NULL, price INTEGER NOT NULL, sold_to TEXT, extra TEXT)`);
   db.run(`CREATE TABLE IF NOT EXISTS pending_battles (
     id TEXT PRIMARY KEY,
     challenger_id TEXT NOT NULL,
@@ -143,6 +143,9 @@ async function init() {
     defense INTEGER NOT NULL DEFAULT 5,
     created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
   )`);
+  try { db.run(`ALTER TABLE animals ADD COLUMN shiny INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE animals ADD COLUMN trait TEXT NOT NULL DEFAULT ''`); } catch (e) {}
+  try { db.run(`ALTER TABLE animals ADD COLUMN fed_until INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   db.run(`CREATE TABLE IF NOT EXISTS teams (
     user_id TEXT PRIMARY KEY,
     slot1 INTEGER DEFAULT NULL,
@@ -174,6 +177,14 @@ async function init() {
     key TEXT PRIMARY KEY,
     value INTEGER NOT NULL DEFAULT 1
   )`);
+  // v1.8.0: clans became player-based (one clan per player, clan_id = owner's user id).
+  // Wipe the old guild-scoped clan data once so no stale server-clans linger.
+  if (!wasNotified('clan_v2_wipe')) {
+    db.run(`DELETE FROM clans`);
+    db.run(`DELETE FROM clan_members`);
+    markNotified('clan_v2_wipe');
+    save();
+  }
   db.run(`CREATE TABLE IF NOT EXISTS stocks (
     user_id TEXT NOT NULL,
     symbol TEXT NOT NULL,
@@ -2424,6 +2435,67 @@ function eventMult(apply) {
   return type && type.apply === apply ? type.mult : 1;
 }
 
+// ---- v1.8.0: Travelling merchant (rare rotating stock) ----
+const MERCHANT_OWNER_ID = '__merchant__';
+const MERCHANT_FIRST_MS = 5 * 60 * 1000;
+const MERCHANT_DWELL_MS = 90 * 60 * 1000;
+const MERCHANT_PET_PRICES = { common: 250000, uncommon: 600000, rare: 1200000, epic: 3000000, legendary: 8000000, mythic: 20000000 };
+
+function getNextMerchantArrival() {
+  const rows = db.exec(`SELECT id, next_at FROM merchant_state WHERE id = 1`);
+  if (rows.length && rows[0].values.length) return rows[0].values[0][1];
+  const now = Math.floor(Date.now() / 1000);
+  const ts = now + Math.floor(MERCHANT_FIRST_MS / 1000);
+  db.run(`INSERT OR REPLACE INTO merchant_state (id, next_at) VALUES (1, ${ts})`);
+  save();
+  return ts;
+}
+
+function refreshMerchant() {
+  db.run(`DELETE FROM merchant_stock`);
+  const eff = 3 + Math.floor(Math.random() * 3);
+  const animal = addAnimal(MERCHANT_OWNER_ID, eff);
+  const petSpec = getAnimal(animal.id);
+  const petPrice = Math.floor(MERCHANT_PET_PRICES[petSpec.rarity]);
+  db.run(`INSERT INTO merchant_stock (slot, kind, label, price, extra) VALUES (0, 'pet', '${petSpec.rarity.toUpperCase()} ${petSpec.species} (mystery grab bag)', ${petPrice}, '${animal.id}')`);
+  db.run(`INSERT INTO merchant_stock (slot, kind, label, price, extra) VALUES (1, 'gems', 'Gems x10', 8000000, '10')`);
+  db.run(`INSERT INTO merchant_stock (slot, kind, label, price, extra) VALUES (2, 'essence', 'Essence x25', 3500000, '25')`);
+  const nowTs = Math.floor(Date.now() / 1000);
+  const nextAt = nowTs + Math.floor(MERCHANT_DWELL_MS / 1000);
+  db.run(`INSERT OR REPLACE INTO merchant_state (id, next_at) VALUES (1, ${nextAt})`);
+  save();
+  return { slots: getMerchantItems(), next_at: nextAt };
+}
+
+function getMerchantItems() {
+  const rows = db.exec(`SELECT slot, kind, label, price, sold_to, extra FROM merchant_stock ORDER BY slot`);
+  if (!rows.length) return [];
+  return rows[0].values.map(v => ({ slot: v[0], kind: v[1], label: v[2], price: v[3], sold_to: v[4], extra: v[5] }));
+}
+
+function buyMerchantItem(userId, slot) {
+  const item = getMerchantItems().find(x => x.slot === Number(slot));
+  if (!item) return { ok: false, reason: 'gone' };
+  if (item.sold_to) return { ok: false, reason: 'sold' };
+  const u = ensureUser(userId);
+  if (!u || (u.balance || 0) < item.price) return { ok: false, reason: 'coins' };
+  if (item.kind === 'pet') {
+    const a = getAnimal(Number(item.extra));
+    if (!a || a.user_id !== MERCHANT_OWNER_ID) return { ok: false, reason: 'gone' };
+  }
+  db.run(`UPDATE users SET balance = balance - ${item.price} WHERE user_id = '${userId}'`);
+  if (item.kind === 'pet') {
+    db.run(`UPDATE animals SET user_id = '${userId}' WHERE id = ${item.extra} AND user_id = '${MERCHANT_OWNER_ID}'`);
+  } else if (item.kind === 'gems') {
+    addGems(userId, parseInt(item.extra || '10', 10));
+  } else if (item.kind === 'essence') {
+    addEssence(userId, parseInt(item.extra || '25', 10));
+  }
+  db.run(`UPDATE merchant_stock SET sold_to = '${userId}' WHERE slot = ${item.slot}`);
+  save();
+  return { ok: true, item };
+}
+
 // ---- v1.7.0: Plots / land ----
 const PLOT_BASE_PRICE = 500000;
 const PLOT_UPGRADE_COST = 400000;
@@ -2478,83 +2550,102 @@ function claimPlot(userId) {
 const CLAN_CREATE_COST = 5000000;
 const CLAN_MAX_MEMBERS = 20;
 
-function getClan(guildId) {
-  const rows = db.exec(`SELECT * FROM clans WHERE clan_id = '${guildId}'`);
+function getClan(clanId) {
+  const rows = db.exec(`SELECT * FROM clans WHERE clan_id = '${clanId}'`);
   if (!rows.length || !rows[0].values.length) return null;
   const v = rows[0].values[0];
   return { clan_id: v[0], name: v[1], owner_id: v[2], balance: v[3], created_at: v[4] };
 }
 
-function createClan(guildId, ownerId, name) {
-  if (getClan(guildId)) return { ok: false, reason: 'exists' };
+function createClan(ownerId, name) {
+  if (getClan(ownerId)) return { ok: false, reason: 'created' };
+  const memberOf = getClanOf(ownerId);
+  if (memberOf) return { ok: false, reason: 'member' };
   const u = ensureUser(ownerId);
   if (!u || (u.balance || 0) < CLAN_CREATE_COST) return { ok: false, reason: 'coins' };
   const safe = (name || '').slice(0, 20).replace(/'/g, "''");
   if (!safe) return { ok: false, reason: 'name' };
   db.run(`UPDATE users SET balance = balance - ${CLAN_CREATE_COST} WHERE user_id = '${ownerId}'`);
-  db.run(`INSERT INTO clans (clan_id, name, owner_id) VALUES ('${guildId}', '${safe}', '${ownerId}')`);
-  db.run(`INSERT OR IGNORE INTO clan_members (clan_id, user_id) VALUES ('${guildId}', '${ownerId}')`);
+  db.run(`INSERT INTO clans (clan_id, name, owner_id) VALUES ('${ownerId}', '${safe}', '${ownerId}')`);
+  db.run(`INSERT OR IGNORE INTO clan_members (clan_id, user_id) VALUES ('${ownerId}', '${ownerId}')`);
   save();
   return { ok: true, name: safe };
 }
 
-function getClanMembers(guildId) {
-  const rows = db.exec(`SELECT user_id FROM clan_members WHERE clan_id = '${guildId}' ORDER BY joined_at`);
+function getClanMembers(clanId) {
+  const rows = db.exec(`SELECT user_id FROM clan_members WHERE clan_id = '${clanId}' ORDER BY joined_at`);
   if (!rows.length) return [];
   return rows[0].values.map(v => v[0]);
 }
 
-function getClanOf(userId, guildId) {
-  const m = db.exec(`SELECT clan_id FROM clan_members WHERE user_id = '${userId}' AND clan_id = '${guildId}'`);
-  return m.length && m[0].values.length ? guildId : null;
+function getClanOf(userId) {
+  const m = db.exec(`SELECT clan_id FROM clan_members WHERE user_id = '${userId}' LIMIT 1`);
+  return m.length && m[0].values.length ? m[0].values[0][0] : null;
 }
 
-function clanJoin(guildId, userId) {
-  const clan = getClan(guildId);
+function findClanByName(name) {
+  const safe = (name || '').replace(/'/g, "''");
+  const rows = db.exec(`SELECT clan_id FROM clans WHERE lower(name) = lower('${safe}') LIMIT 1`);
+  if (!rows.length || !rows[0].values.length) return null;
+  return rows[0].values[0][0];
+}
+
+function clanJoin(clanId, userId) {
+  const clan = getClan(clanId);
   if (!clan) return { ok: false, reason: 'noclan' };
-  if (getClanOf(userId, guildId)) return { ok: false, reason: 'member' };
-  if (getClanMembers(guildId).length >= CLAN_MAX_MEMBERS) return { ok: false, reason: 'full' };
-  db.run(`INSERT OR IGNORE INTO clan_members (clan_id, user_id) VALUES ('${guildId}', '${userId}')`);
+  if (getClanOf(userId)) return { ok: false, reason: 'member' };
+  if (getClanMembers(clanId).length >= CLAN_MAX_MEMBERS) return { ok: false, reason: 'full' };
+  db.run(`INSERT OR IGNORE INTO clan_members (clan_id, user_id) VALUES ('${clanId}', '${userId}')`);
   save();
   return { ok: true };
 }
 
-function clanLeave(guildId, userId) {
-  const clan = getClan(guildId);
+function clanLeave(clanId, userId) {
+  const clan = getClan(clanId);
   if (!clan) return { ok: false, reason: 'noclan' };
   if (clan.owner_id === userId) return { ok: false, reason: 'owner' };
-  if (!getClanOf(userId, guildId)) return { ok: false, reason: 'notmember' };
-  db.run(`DELETE FROM clan_members WHERE clan_id = '${guildId}' AND user_id = '${userId}'`);
+  db.run(`DELETE FROM clan_members WHERE clan_id = '${clanId}' AND user_id = '${userId}'`);
   save();
   return { ok: true };
 }
 
-function clanKick(guildId, ownerId, userId) {
-  const clan = getClan(guildId);
+function clanKick(clanId, ownerId, userId) {
+  const clan = getClan(clanId);
   if (!clan || clan.owner_id !== ownerId) return { ok: false, reason: 'owner' };
   if (userId === ownerId) return { ok: false, reason: 'self' };
-  db.run(`DELETE FROM clan_members WHERE clan_id = '${guildId}' AND user_id = '${userId}'`);
+  db.run(`DELETE FROM clan_members WHERE clan_id = '${clanId}' AND user_id = '${userId}'`);
   save();
   return { ok: true };
 }
 
-function clanDeposit(guildId, userId, amount) {
-  const clan = getClan(guildId);
+function clanDeposit(clanId, userId, amount) {
+  const clan = getClan(clanId);
   const u = ensureUser(userId);
   if (!clan || !u || (u.balance || 0) < amount) return { ok: false, reason: 'coins' };
   db.run(`UPDATE users SET balance = balance - ${amount} WHERE user_id = '${userId}'`);
-  db.run(`UPDATE clans SET balance = balance + ${amount} WHERE clan_id = '${guildId}'`);
+  db.run(`UPDATE clans SET balance = balance + ${amount} WHERE clan_id = '${clanId}'`);
   save();
   return { ok: true };
 }
 
-function clanWithdraw(guildId, ownerId, amount) {
-  const clan = getClan(guildId);
+function clanWithdraw(clanId, ownerId, amount) {
+  const clan = getClan(clanId);
   if (!clan || clan.owner_id !== ownerId) return { ok: false, reason: 'owner' };
   if (clan.balance < amount) return { ok: false, reason: 'balance' };
-  db.run(`UPDATE clans SET balance = balance - ${amount} WHERE clan_id = '${guildId}'`);
+  db.run(`UPDATE clans SET balance = balance - ${amount} WHERE clan_id = '${clanId}'`);
   addBalance(ownerId, amount);
   return { ok: true };
+}
+
+function deleteClan(clanId, ownerId) {
+  const clan = getClan(clanId);
+  if (!clan || clan.owner_id !== ownerId) return { ok: false, reason: 'owner' };
+  const refund = Math.floor(clan.balance / 2);
+  db.run(`DELETE FROM clans WHERE clan_id = '${clanId}'`);
+  db.run(`DELETE FROM clan_members WHERE clan_id = '${clanId}'`);
+  addBalance(ownerId, refund);
+  save();
+  return { ok: true, refund };
 }
 
 function getClanTop(limit = 10) {
@@ -2876,8 +2967,9 @@ module.exports = {
   FUSION_COST, fuseAnimals,
   ZOO_DECOR, getZooDecors, buyZooDecor,
   EVENT_TYPES, getActiveEvent, startRandomEvent, eventMult, applyRain,
+  getNextMerchantArrival, refreshMerchant, getMerchantItems, buyMerchantItem,
   PLOT_BASE_PRICE, PLOT_UPGRADE_COST, PLOT_INCOME_PER_HOUR, PLOT_MAX_LEVEL, getPlot, buyPlot, upgradePlot, claimPlot,
-  CLAN_CREATE_COST, CLAN_MAX_MEMBERS, getClan, createClan, getClanMembers, getClanOf, clanJoin, clanLeave, clanKick, clanDeposit, clanWithdraw, getClanTop,
+  CLAN_CREATE_COST, CLAN_MAX_MEMBERS, getClan, createClan, getClanMembers, getClanOf, findClanByName, clanJoin, clanLeave, clanKick, clanDeposit, clanWithdraw, deleteClan, getClanTop,
   createAuction, getAuction, listAuctions, placeBid, endAuction, cancelAuction, cleanupExpiredAuctions,
   BOSS_BASE_HP, BOSS_LIFE, getBoss, spawnBoss, attackBoss, addBossPot, getBossContrib, resolveBoss,
   CRATES, getCratePity, setCratePity, rollCrateRarity, openCrate,

@@ -178,6 +178,18 @@ client.on('ready', () => {
       db.setLbState('week', String(lbWeek));
     }
     if (!lbPosted) db.setLbState('week', String(lbWeek));
+    // v1.8.0: travelling merchant arrival
+    if (Math.floor(Date.now() / 1000) >= db.getNextMerchantArrival()) {
+      const arrivals = db.refreshMerchant();
+      console.log(`[merchant] new stock — ${arrivals.slots.length} items, leaves at ${new Date(arrivals.next_at * 1000).toISOString()}`);
+      let mc = db.getAllEventChannels();
+      if (!mc.length) mc = db.getAllUpdateChannels();
+      for (const { channel_id } of mc) {
+        client.channels.fetch(channel_id).then(ch => {
+          if (ch && typeof ch.send === 'function') ch.send('🛍️ **The travelling merchant has arrived!** Rare stock up for grabs — `v merchant`, first come first served!').catch(() => {});
+        }).catch(() => {});
+      }
+    }
     for (const guild of client.guilds.cache.values()) {
       const boss = db.getBoss(guild.id);
       if (boss && (boss.hp <= 0 || Math.floor(Date.now() / 1000) > boss.ends_at)) {
@@ -311,6 +323,10 @@ client.on('interactionCreate', (i) => {
   if (!i.customId || !i.isButton()) return;
   if (i.customId.startsWith('shop_')) {
     require('./commands/shop').handleInteraction(i);
+    return;
+  }
+  if (i.customId.startsWith('mer_')) {
+    require('./commands/merchant').handleInteraction(i);
     return;
   }
   if (i.customId.startsWith('battle_')) {
