@@ -4,4 +4,4 @@ NEW:
 - Custom role rework: `v customrole color <#hex> <#hex>` sets an animated gradient; `v customrole delete` removes your role; roles auto-stay stacked under the portal role
 - New admin tool: `Aovo transfer @old @new` moves ALL of a user's data (money, pets, team, perks, quests, everything) onto another account — used when someone's account gets banned
 
-(and yes nina gets her money) lol
+(and yes nina gets her money)
