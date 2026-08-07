@@ -30,7 +30,7 @@ function fmtP(n) {
   return String(n);
 }
 
-function challengeRow(code, defId) {
+function challengeRows(code, defId) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`war_a_${code}`).setLabel(`Accept (pay ${fmtP(db.getClanWar(code).stake)})`).setStyle(ButtonStyle.Success).setEmoji('⚔️'),
     new ButtonBuilder().setCustomId(`war_d_${code}`).setLabel('Decline').setStyle(ButtonStyle.Secondary).setEmoji('❌'),

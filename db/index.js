@@ -2750,6 +2750,13 @@ function getClanWarFighters(code) {
 }
 
 function resolveClanWars(now = Math.floor(Date.now() / 1000)) {
+  const expired = db.exec(`SELECT code FROM clan_wars WHERE status = 'challenge' AND ends_at <= ${now}`);
+  if (expired.length) {
+    for (const v of expired[0].values) {
+      db.run(`UPDATE clan_wars SET status = 'done', winner = NULL WHERE code = '${v[0]}'`);
+    }
+    save();
+  }
   const rows = db.exec(`SELECT code FROM clan_wars WHERE status = 'fighting' AND ends_at <= ${now}`);
   const results = [];
   if (!rows.length) return results;

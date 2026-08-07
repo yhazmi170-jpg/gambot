@@ -12,3 +12,4 @@ Format: one line per change, terse, no AI fluff.
 - NEW Travelling merchant — rolls in every ~90min, sells 1 rare pet + gems + essence, first come first served via `v merchant`.
 - NEW Clan Wars — `v clanwar challenge <name> <stake>`: both clans pay a treasury stake, members click Fight, the winning clan takes both stakes. 1M–25%. No-show = refunded.
 - Custom roles now force-stack directly under the anchor role (failed position moves are logged instead of silently ignored).
+- FIXED: `v clanwar challenge` crashed with "an error occurred" right after creating the war (the accept/decline buttons failed to build). Challenges now post their board, and stale/unanswered challenges auto-expire after 60s.
