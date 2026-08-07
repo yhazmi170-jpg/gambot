@@ -4,9 +4,9 @@
 > Read `AGENTS.md` first, then this.
 
 ## Status
-- **Branch**: `master` (remote HEAD `335c063`)
-- **Version**: `1.6.0` (PUSHED -- music + per-channel disable + July fix batch; pending_updates flushed into this)
-- **Last update_msg**: `v1.6.0` -- `v play` music command (YouTube/Spotify links or names), `v disable/enable` per-channel, and the post-v1.5.0 fix batch (announcements, achievements, loan exploit, crash warning, battle persistence, team add, rob DM, help pagination, shop cleanup, slots jackpot)
+- **Branch**: `master` (remote HEAD `4a28013`)
+- **Version**: `1.6.1` (PUSHED -- custom role rework)
+- **Last update_msg**: `v1.6.1` -- custom role gradient colors (2 hexes), delete subcommand, auto-stack under anchor role `1535224349965942884`
 - **Host migration**: Replit → Render (free, Blueprint from `render.yaml`). Replit repl was stopped by user. **Render URL: `https://gambot-o2o4.onrender.com`** — keepalive pinger repointed to it.
 - **Keepalive**: `keepalive.ps1` pings every 240s; registered as Windows scheduled task `GambotKeepalive` (runs at logon). Pinger must be running on yazan's PC for this to work (now pinging the Render URL).
 
@@ -20,6 +20,7 @@
 - [x] **Secrets check.** `config.json`, `gambot.db`, `.env` are all `.gitignore`d; only `config.example.json` is tracked (verified via `git ls-files`). Bot token stays out of the repo; Render uses `TOKEN` env var.
 
 ## Done recently
+- [x] **Custom role rework (`4a28013`, v1.6.1):** `v customrole color <#hex> <#hex>` sets an animated gradient (2nd color optional — fades between the two via a 3s `setInterval` in index.js); `v customrole color`, `name`, combined `<name> | #hex`, and now `delete`. Roles are always stacked directly under anchor role `1535224349965942884` (`positionToAnchor`, uses `guild.roles.fetch` + `role.setPosition`). DB: `custom_roles` gained `color_a`/`color_b` columns (ALTER + CREATE); new `db.setCustomRoleColor`, `db.getGradientCustomRoles`. Sim-tested gradient math (red→mid→blue ping-pong).
 - [x] **Battle requests survive restarts (`9d9f707`):** `pendingBattles` was an in-memory `Map` — wiped on every Render redeploy, so in-flight `v battle` requests always read as "expired" (the v1.4.6 `_yes/_no` suffix fix was already in place; restart was the real cause). Now persisted in a new `pending_battles` DB table (`setPendingBattle/getPendingBattle/deletePendingBattle/cleanupPendingBattles`, exported). battle.js stores via `db.setPendingBattle`, `handleInteraction` reads `db.getPendingBattle` + deletes on resolve/decline/expiry, 60s window, `cleanupPendingBattles()` runs at boot (index.js). Interaction now uses `i.message`/`i.user` (button message + target) instead of the Map's stored message. Sim-tested: stored/not-expired/cleanup-keeps-live/deletes-expired.
 - [x] **`v team add` wiped slots 2/3 (`9d9f707`):** `setTeam` merged with `existing[s]` (numeric keys) but `getTeam` returns `slot1/slot2/slot3` — every add reset the other two slots to NULL, so you could never keep 3 animals. Fixed to `existing[\`slot${s}\`]`. Sim-tested: 3 adds → all 3 slots populated.
 - [x] **Per-channel command disable (`9d9f707`):** new `channel_disabled (guild_id, channel_id, commands)` table + `disableChannelCommand/enableChannelCommand/getChannelDisabled`; `isCommandDisabled(guildId, cmdName, channelId)` checks guild-level then channel-level; `commandHandler.js:108` passes `message.channel.id`; `disable.js`/`enable.js` rewritten with `parseChannelId` — `v disable <cmd> #channel` / `v enable <cmd> #channel` (server-wide is still the default with no channel arg).

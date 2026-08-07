@@ -23,6 +23,7 @@
 2. Owner has infinite bet cap, hidden from leaderboard, **no** balance-factor cut on rewards/wins
 3. Pet/hunt/battle system (`v hunt`, `v zoo`, `v team`, `v battle`, `v sell`, `v rename`) — see "Pets / hunt economy" below
 4. Perk customization: `v setbadge`, `v setlb`, `v autoreact`
+- Custom roles (`v customrole`): name, single color, or 2 colors = animated gradient (`color_a`/`color_b` cols in `custom_roles`, animated by a 3s interval in index.js). `v customrole delete` removes the role. Roles are always stacked directly under anchor role `1535224349965942884` (`positionToAnchor`).
 5. Shop purchase log only if log channel is set (`Aovo log #channel`) — do not flood with every command
 6. Admin: `Aovo add`, `Aovo remove`, `Aovo bal`, `Areward`, `Aremovereward`, `Arestart`, `Aovo shop add #channel`, `Aovo cmds`, `Aovo shutdown`
 
