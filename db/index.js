@@ -81,6 +81,8 @@ async function init() {
   db.run(`CREATE TABLE IF NOT EXISTS clans (clan_id TEXT PRIMARY KEY, name TEXT NOT NULL, owner_id TEXT NOT NULL, balance INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')))`);
   db.run(`CREATE TABLE IF NOT EXISTS clan_members (clan_id TEXT NOT NULL, user_id TEXT NOT NULL, joined_at INTEGER NOT NULL DEFAULT (strftime('%s','now')), PRIMARY KEY (clan_id, user_id))`);
   try { db.run(`CREATE UNIQUE INDEX IF NOT EXISTS uniq_clan_member_user ON clan_members (user_id)`); } catch (e) {}
+  db.run(`CREATE TABLE IF NOT EXISTS clan_wars (code TEXT PRIMARY KEY, attacker TEXT NOT NULL, defender TEXT NOT NULL, stake INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'challenge', winner TEXT, ends_at INTEGER NOT NULL, channel_id TEXT NOT NULL DEFAULT '', msg_id TEXT NOT NULL DEFAULT '')`);
+  db.run(`CREATE TABLE IF NOT EXISTS clan_war_fighters (code TEXT NOT NULL, clan_id TEXT NOT NULL, user_id TEXT NOT NULL, power INTEGER NOT NULL, PRIMARY KEY (code, user_id))`);
   db.run(`CREATE TABLE IF NOT EXISTS bids (auction_id TEXT PRIMARY KEY, guild_id TEXT NOT NULL DEFAULT '', seller_id TEXT NOT NULL, animal_id INTEGER NOT NULL, min_bid INTEGER NOT NULL, current_bid INTEGER NOT NULL, current_bidder TEXT, ends_at INTEGER NOT NULL)`);
   try { db.run(`ALTER TABLE bids ADD COLUMN guild_id TEXT NOT NULL DEFAULT ''`); } catch (e) {}
   db.run(`CREATE TABLE IF NOT EXISTS world_boss (boss_id TEXT PRIMARY KEY, species TEXT NOT NULL, rarity TEXT NOT NULL, hp INTEGER NOT NULL, max_hp INTEGER NOT NULL, pot INTEGER NOT NULL DEFAULT 0, ends_at INTEGER NOT NULL)`);
@@ -2654,6 +2656,127 @@ function getClanTop(limit = 10) {
   return rows[0].values.map(v => ({ clan_id: v[0], name: v[1], balance: v[2] }));
 }
 
+// ---- Clan wars (v1.8.0): treasury-staked clan vs clan battles ----
+const CLAN_WAR_MIN = 1000000;
+const CLAN_WAR_MAX_PCT = 0.25;
+const CLAN_WAR_ACCEPT_MS = 60000;
+const CLAN_WAR_FIGHT_MS = 120000;
+
+function clanBalanceAdd(clanId, amount) {
+  db.run(`UPDATE clans SET balance = balance + ${amount} WHERE clan_id = '${clanId}'`);
+}
+
+function getClanWar(code) {
+  const rows = db.exec(`SELECT * FROM clan_wars WHERE code = '${code}'`);
+  if (!rows.length || !rows[0].values.length) return null;
+  const v = rows[0].values[0];
+  return { code: v[0], attacker: v[1], defender: v[2], stake: v[3], status: v[4], winner: v[5], ends_at: v[6], channel_id: v[7], msg_id: v[8] };
+}
+
+function getOpenClanWars() {
+  const rows = db.exec(`SELECT code FROM clan_wars WHERE status = 'fighting' OR status = 'challenge' ORDER BY ends_at`);
+  if (!rows.length) return [];
+  return rows[0].values.map(v => getClanWar(v[0]));
+}
+
+function setClanWarMsg(code, msgId) {
+  db.run(`UPDATE clan_wars SET msg_id = '${msgId}' WHERE code = '${code}'`);
+  save();
+}
+
+function startClanWar(challengerClan, defenderClan, stake, channelId) {
+  if (!challengerClan || !defenderClan) return { ok: false, reason: 'noclan' };
+  if (challengerClan.clan_id === defenderClan.clan_id) return { ok: false, reason: 'same' };
+  if (!stake || stake < CLAN_WAR_MIN) return { ok: false, reason: 'min', min: CLAN_WAR_MIN };
+  const maxBet = Math.floor(Math.min(challengerClan.balance, defenderClan.balance) * CLAN_WAR_MAX_PCT);
+  if (stake > maxBet) return { ok: false, reason: 'max', maxBet };
+  const code = `cw${Math.floor(Math.random() * 0xffffff).toString(36)}${Date.now().toString(36)}`;
+  const now = Math.floor(Date.now() / 1000);
+  db.run(`INSERT INTO clan_wars (code, attacker, defender, stake, status, ends_at, channel_id) VALUES ('${code}', '${challengerClan.clan_id}', '${defenderClan.clan_id}', ${stake}, 'challenge', ${now + CLAN_WAR_ACCEPT_MS / 1000}, '${channelId || ''}')`);
+  save();
+  return { ok: true, code, stake };
+}
+
+function acceptClanWar(code, clanId) {
+  const w = getClanWar(code);
+  if (!w || w.status !== 'challenge') return { ok: false, reason: 'closed' };
+  if (w.defender !== clanId) return { ok: false, reason: 'defender' };
+  const atk = getClan(w.attacker);
+  const def = getClan(w.defender);
+  if (!atk || atk.balance < w.stake) return { ok: false, reason: 'atkco' };
+  if (!def || def.balance < w.stake) return { ok: false, reason: 'defco' };
+  db.run(`UPDATE clans SET balance = balance - ${w.stake} WHERE clan_id = '${w.attacker}'`);
+  db.run(`UPDATE clans SET balance = balance - ${w.stake} WHERE clan_id = '${w.defender}'`);
+  const endFight = Math.floor(Date.now() / 1000) + CLAN_WAR_FIGHT_MS / 1000;
+  db.run(`UPDATE clan_wars SET status = 'fighting', ends_at = ${endFight} WHERE code = '${code}'`);
+  save();
+  return { ok: true, w, atk, def, ends_at: endFight };
+}
+
+function declineClanWar(code, clanId) {
+  const w = getClanWar(code);
+  if (!w || w.status !== 'challenge') return { ok: false, reason: 'closed' };
+  if (w.defender !== clanId) return { ok: false, reason: 'defender' };
+  db.run(`UPDATE clan_wars SET status = 'done', winner = '' WHERE code = '${code}'`);
+  save();
+  return { ok: true };
+}
+
+function clanWarFight(code, clanId, userId) {
+  const w = getClanWar(code);
+  if (!w || w.status !== 'fighting') return { ok: false, reason: 'over' };
+  if (w.attacker !== clanId && w.defender !== clanId) return { ok: false, reason: 'clan' };
+  if (!getClanMembers(clanId).includes(userId)) return { ok: false, reason: 'member' };
+  const already = db.exec(`SELECT user_id FROM clan_war_fighters WHERE code = '${code}' AND user_id = '${userId}'`);
+  if (already.length && already[0].values.length) return { ok: false, reason: 'joined' };
+  const animals = getUserAnimals(userId);
+  const petsPower = Math.min(200, Math.floor(1.5 * animals.reduce((s, a) => s + Math.round(a.attack * 0.8 + a.level * 3 + a.hp / 100), 0)));
+  const power = petsPower + 20 + Math.floor(Math.random() * 50);
+  db.run(`INSERT INTO clan_war_fighters (code, clan_id, user_id, power) VALUES ('${code}', '${clanId}', '${userId}', ${power})`);
+  save();
+  return { ok: true, power };
+}
+
+function getClanWarFighters(code) {
+  const rows = db.exec(`SELECT clan_id, user_id, power FROM clan_war_fighters WHERE code = '${code}'`);
+  if (!rows.length) return { attacker: [], defender: [] };
+  const out = { attacker: [], defender: [] };
+  const w = getClanWar(code);
+  for (const v of rows[0].values) {
+    if (v[0] === (w && w.attacker)) out.attacker.push({ user_id: v[1], power: v[2] });
+    else out.defender.push({ user_id: v[1], power: v[2] });
+  }
+  return out;
+}
+
+function resolveClanWars(now = Math.floor(Date.now() / 1000)) {
+  const rows = db.exec(`SELECT code FROM clan_wars WHERE status = 'fighting' AND ends_at <= ${now}`);
+  const results = [];
+  if (!rows.length) return results;
+  for (const v of rows[0].values) {
+    const w = getClanWar(v[0]);
+    if (!w) continue;
+    const fighters = getClanWarFighters(w.code);
+    const aPower = fighters.attacker.reduce((s, f) => s + f.power, 0);
+    const dPower = fighters.defender.reduce((s, f) => s + f.power, 0);
+    let winner = '';
+    if (aPower > 0 && dPower > 0) {
+      if (aPower > dPower) winner = w.attacker;
+      else if (dPower > aPower) winner = w.defender;
+    }
+    if (winner) {
+      clanBalanceAdd(winner, w.stake * 2);
+    } else {
+      clanBalanceAdd(w.attacker, w.stake);
+      clanBalanceAdd(w.defender, w.stake);
+    }
+    db.run(`UPDATE clan_wars SET status = 'done', winner = ${winner === '' ? 'NULL' : `'${winner}'`} WHERE code = '${w.code}'`);
+    save();
+    results.push({ w, code: w.code, atPower: aPower, dPower, winner, pot: winner ? w.stake * 2 : 0 });
+  }
+  return results;
+}
+
 // ---- v1.7.0: Auction house (bidding wars) ----
 function createAuction(auctionId, guildId, sellerId, animalId, minBid, hours) {
   const a = getAnimal(animalId);
@@ -2970,6 +3093,7 @@ module.exports = {
   getNextMerchantArrival, refreshMerchant, getMerchantItems, buyMerchantItem,
   PLOT_BASE_PRICE, PLOT_UPGRADE_COST, PLOT_INCOME_PER_HOUR, PLOT_MAX_LEVEL, getPlot, buyPlot, upgradePlot, claimPlot,
   CLAN_CREATE_COST, CLAN_MAX_MEMBERS, getClan, createClan, getClanMembers, getClanOf, findClanByName, clanJoin, clanLeave, clanKick, clanDeposit, clanWithdraw, deleteClan, getClanTop,
+  CLAN_WAR_MIN, CLAN_WAR_MAX_PCT, startClanWar, acceptClanWar, declineClanWar, clanWarFight, getClanWar, getOpenClanWars, getClanWarFighters, setClanWarMsg, resolveClanWars,
   createAuction, getAuction, listAuctions, placeBid, endAuction, cancelAuction, cleanupExpiredAuctions,
   BOSS_BASE_HP, BOSS_LIFE, getBoss, spawnBoss, attackBoss, addBossPot, getBossContrib, resolveBoss,
   CRATES, getCratePity, setCratePity, rollCrateRarity, openCrate,

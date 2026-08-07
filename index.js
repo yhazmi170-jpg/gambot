@@ -190,6 +190,23 @@ client.on('ready', () => {
         }).catch(() => {});
       }
     }
+    // v1.8.0: clan wars auto-resolve (pay winner if a side fought, else refund both)
+    const warResults = db.resolveClanWars();
+    for (const r of warResults) {
+      console.log(`[clanwar] ${r.code} settled — winner=${r.winner || 'none'} pot=${r.pot} (${r.atPower} vs ${r.dPower})`);
+      (async () => {
+        try {
+          const ch = await client.channels.fetch(r.w.channel_id);
+          const msg = await ch.messages.fetch(r.w.msg_id);
+          const aName = (db.getClan(r.w.attacker) || {}).name || 'unknown';
+          const dName = (db.getClan(r.w.defender) || {}).name || 'unknown';
+          const fields = r.winner
+            ? [['Result', `**${aName}** (${r.atPower.toLocaleString()}) vs **${dName}** (${r.dPower.toLocaleString()})`], ['🏆 Winner', `**${(db.getClan(r.winner) || {}).name || '?'}** — takes the pot of **${r.pot.toLocaleString()}** ${config.currency}!`], ['', 'treasury payout deposited']]
+            : [['Result', `**${aName}** (${r.atPower.toLocaleString()}) vs **${dName}** (${r.dPower.toLocaleString()})`], ['⚖️', 'no clear victory — both stakes refunded']];
+          await msg.edit({ embeds: [embed('⚔️ Clan War — Settled', fields, 0x2ecc71)], components: [] });
+        } catch (e) { console.error('[clanwar] resolve post failed', e.message); }
+      })();
+    }
     for (const guild of client.guilds.cache.values()) {
       const boss = db.getBoss(guild.id);
       if (boss && (boss.hp <= 0 || Math.floor(Date.now() / 1000) > boss.ends_at)) {
@@ -331,6 +348,10 @@ client.on('interactionCreate', (i) => {
   }
   if (i.customId.startsWith('claninv_')) {
     require('./commands/clan').handleInteraction(i);
+    return;
+  }
+  if (i.customId.startsWith('war_')) {
+    require('./commands/clanwar').handleInteraction(i);
     return;
   }
   if (i.customId.startsWith('battle_')) {

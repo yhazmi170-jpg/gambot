@@ -82,12 +82,19 @@ module.exports = {
         play: `\`${prefix} lottery buy <tickets>\`\nEach ticket costs 10\nExample: \`${prefix} lottery buy 100\``,
         tips: 'More tickets = better odds. lottery_ticket perk = free ticket each draw.',
       },
-      heist: {
+heist: {
         name: 'Heist',
         aliases: 'heist',
         desc: 'Start a heist with an entry fee. Others join, then the crew rolls to pull off a big payout.',
         play: `\`${prefix} heist <fee>\`\nOthers hit **Join Heist**\nExample: \`${prefix} heist 50k\``,
         tips: 'Needs at least 2 players or it is called off and refunded. Winners split the pot.',
+      },
+      clanwar: {
+        name: 'Clan War',
+        aliases: 'war',
+        desc: 'Challenge another clan to a treasury war. Both clans put in a stake, members click Fight, the clan with the most power takes both stakes.',
+        play: `\`${prefix} clanwar challenge <clan name> <stake>\`\nDefending clan hits **Acceptance**\nMembers then hit **Fight for <Clan>**\nExample: \`${prefix} clanwar challenge RoyalKnights 1m\``,
+        tips: 'Stake is paid from the clan treasury (1M min, up to 25% of the poorer treasury). If nobody fights, all stakes are refunded. Power = your zoo + your best pets.',
       },
       race: {
         name: 'Pet Race',
