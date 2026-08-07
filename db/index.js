@@ -96,6 +96,7 @@ async function init() {
   db.run(`CREATE TABLE IF NOT EXISTS log_channels (guild_id TEXT PRIMARY KEY, channel_id TEXT NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS cmd_log_channels (guild_id TEXT PRIMARY KEY, channel_id TEXT NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS update_channels (guild_id TEXT PRIMARY KEY, channel_id TEXT NOT NULL)`);
+  db.run(`CREATE TABLE IF NOT EXISTS event_channels (guild_id TEXT PRIMARY KEY, channel_id TEXT NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS pending_battles (
     id TEXT PRIMARY KEY,
     challenger_id TEXT NOT NULL,
@@ -718,6 +719,27 @@ function getUpdateChannel(guildId) {
 
 function getAllUpdateChannels() {
   const rows = db.exec(`SELECT guild_id, channel_id FROM update_channels`);
+  if (!rows.length) return [];
+  return rows[0].values.map(v => ({ guild_id: v[0], channel_id: v[1] }));
+}
+
+function setEventChannel(guildId, channelId) {
+  if (!channelId) {
+    db.run(`DELETE FROM event_channels WHERE guild_id = '${guildId}'`);
+  } else {
+    db.run(`INSERT OR REPLACE INTO event_channels (guild_id, channel_id) VALUES ('${guildId}', '${channelId}')`);
+  }
+  save();
+}
+
+function getEventChannel(guildId) {
+  const rows = db.exec(`SELECT channel_id FROM event_channels WHERE guild_id = '${guildId}'`);
+  if (!rows.length || !rows[0].values.length) return null;
+  return rows[0].values[0][0];
+}
+
+function getAllEventChannels() {
+  const rows = db.exec(`SELECT guild_id, channel_id FROM event_channels`);
   if (!rows.length) return [];
   return rows[0].values.map(v => ({ guild_id: v[0], channel_id: v[1] }));
 }
@@ -2546,6 +2568,7 @@ module.exports = {
   getLogChannel,
   setCmdLogChannel, getCmdLogChannel,
   setUpdateChannel, getUpdateChannel, getAllUpdateChannels,
+  setEventChannel, getEventChannel, getAllEventChannels,
   getInsuranceRefund,
   addBattleWin, getBattleWins,
   getMaxBet,

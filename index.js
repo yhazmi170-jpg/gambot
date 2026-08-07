@@ -124,7 +124,8 @@ client.on('ready', () => {
   // v1.7.0: random server event every ~25-35 min + announce it
   const fireEvent = () => {
     const ev = db.startRandomEvent();
-    const channels = db.getAllUpdateChannels();
+    let channels = db.getAllEventChannels();
+    if (!channels.length) channels = db.getAllUpdateChannels(); // fallback so events aren't missed
     for (const { channel_id } of channels) {
       client.channels.fetch(channel_id).then(ch => {
         if (ch && typeof ch.send === 'function') {

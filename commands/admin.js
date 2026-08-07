@@ -95,6 +95,16 @@ module.exports = {
         db.setUpdateChannel(message.guild.id, '');
         message.channel.send({ embeds: [success('update channel removed')] });
       }
+    } else if (sub === 'events' || sub === 'event') {
+      if (!message.guild) return message.channel.send({ embeds: [error('must be in a server')] });
+      const channel = message.mentions.channels.first();
+      if (channel) {
+        db.setEventChannel(message.guild.id, channel.id);
+        message.channel.send({ embeds: [success(`event channel set to ${channel}`)] });
+      } else {
+        db.setEventChannel(message.guild.id, '');
+        message.channel.send({ embeds: [success('event channel removed')] });
+      }
     } else if (sub === 'restart') {
       const { execSync, spawn } = require('child_process');
       const ownerId = '536278876247162882';
@@ -148,6 +158,7 @@ module.exports = {
           ['Aovo shop add #channel', 'post shop in channel'],
           ['Aovo viprole @role', 'set VIP role'],
           ['Aovo updates #channel', 'set update channel'],
+          ['Aovo events #channel', 'set random event channel'],
           ['Aovo addrole @user name | #color', 'create custom role'],
           ['Aovo shutdown', 'fully stop the bot'],
           ['Aovo restart', 'pull updates + restart'],
