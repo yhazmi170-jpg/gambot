@@ -55,7 +55,7 @@ const t = theirAlive.reduce((a, b) => a.hp < b.hp ? a : b);
       const dmg = Math.max(0, pet.effAtk - Math.floor(t.effDef / 2) + Math.floor(Math.random() * 10));
       t.hp = Math.max(0, t.hp - dmg);
       log.push(`**${pet.species}** deals ${dmg} damage to **${t.species}** (${t.hp} HP left)`);
-      if (t.hp <= 0) log.push(`�?O **${t.species}** fainted!`);
+      if (t.hp <= 0) log.push(`💀 **${t.species}** fainted!`);
     }
 
     for (const pet of theirCopy.filter(p => p.hp > 0)) {
@@ -65,7 +65,7 @@ const t = theirAlive.reduce((a, b) => a.hp < b.hp ? a : b);
       const dmg = Math.max(0, pet.effAtk - Math.floor(t.effDef / 2) + Math.floor(Math.random() * 10));
       t.hp = Math.max(0, t.hp - dmg);
       log.push(`**${pet.species}** deals ${dmg} damage to **${t.species}** (${t.hp} HP left)`);
-      if (t.hp <= 0) log.push(`❌ **${t.species}** fainted!`);
+      if (t.hp <= 0) log.push(`💀 **${t.species}** fainted!`);
     }
   }
 
@@ -138,7 +138,10 @@ async function handleInteraction(i) {
     }
 
     await i.update({ embeds: [okEmbed('⚔️ Starting battle...')], components: [] });
-    await runBattle(i.message, i.user);
+
+    const challenger = await i.client.users.fetch(pending.challenger_id).catch(() => null);
+    if (!challenger) return;
+    await runBattle({ author: challenger, channel: i.message.channel, guild: i.message.guild }, i.user);
   } catch (e) {
     console.error('battle interaction err:', e);
     try { await i.deferUpdate().catch(() => {}); } catch (_) {}

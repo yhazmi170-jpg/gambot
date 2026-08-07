@@ -5,3 +5,4 @@ flush: move them into update_msg.txt as ONE combined log + bump package.json ver
 then push (the boot announcement posts it once).
 
 Format: one line per change, terse, no AI fluff.
+- Fixed: PvP battles kept failing with 'your team is empty' — the accept-button flow was reading the bot's team instead of the challenger's. Both players' teams now work.
