@@ -151,6 +151,8 @@ client.on('ready', () => {
   setInterval(() => {
     const ended = db.cleanupExpiredAuctions();
     if (ended > 0) console.log(`[auction] ${ended} auction(s) ended`);
+    const expiredBountyRefund = db.pruneExpiredBounties();
+    if (expiredBountyRefund > 0) console.log(`[bounty] expired bounty refunded ${expiredBountyRefund}`);
     for (const guild of client.guilds.cache.values()) {
       const boss = db.getBoss(guild.id);
       if (boss && (boss.hp <= 0 || Math.floor(Date.now() / 1000) > boss.ends_at)) {

@@ -5,13 +5,3 @@ flush: move them into update_msg.txt as ONE combined log + bump package.json ver
 then push (the boot announcement posts it once).
 
 Format: one line per change, terse, no AI fluff.
-- Fixed: PvP battles kept failing with 'your team is empty' — the accept-button flow was reading the bot's team instead of the challenger's. Both players' teams now work.
-- Fixed: giveaways could silently end with NO winner if the bot restarted mid-giveaway (e.g. on a deploy) - giveaways are now saved to the DB and a background sweep always draws, pays, and announces the winner, even after a restart.
-- Fixed: 'v zooshop buy flower garden' said 'that item does not exist' - buy now matches full multi-word names (not just single-word ids).
-- New: 'Aovo events #channel' - set a separate channel for random server events (falls back to the update channel if none set).
-- Fixed: 'v mines' board was missing the bottom-right tile (cell 15) and the cash-out button shared its row - now all 16 tiles render as a proper 4x4 with a dedicated cash-out row. Longer window (5 min) and unplayed games now refund the bet instead of silently eating it (that's why players felt it was rigged / lost money without playing).
-- More random events (now 15): extra win-mult gems/eggs/essence flavors + new Double Payday / Payday Plus events that boost daily & weekly rewards. Event announcement shows real duration.
-- Fixed: owner's DMs were getting spammed with 'Bot Restarted' on every deploy - the boot-DM now fires once per version, not once per restart.
-- New: 'v wheel <amount>' - spin the wheel, multipliers up to x10 jackpot (weighted, ~1.3% house edge; timeout refunds).
-- New: 'v streak' - daily logon streak bonus that scales up to day 7 (resets after 48h).
-- New: 'v loan take|shark|pay' - borrow coins (30% interest, max 2x balance+bank) or hit the loan shark (50%, up to 2M); winnings auto-repay the loan.

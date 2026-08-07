@@ -4,6 +4,21 @@ Complete list of every update shipped, newest first. Source: git history (`maste
 
 ---
 
+## v1.7.1 — Bounties & Fixes
+- Player-funded PvP bounties: `v bounty create @player <goal> <amount>` — fund a prize, first to the duel-win goal takes the pot; `v bounty list|info|cancel`; duel wins show live progress and auto-pay the winner (7-day expiry refunds the poster)
+- `v wheel <amount>` — weighted wheel of fortune, x0 → x10 jackpot, ~1.3% house edge, timeout refunds
+- `v streak` — daily logon streak bonus scaling to day 7 (`streaks` table, 48h grace, refund-reset rules)
+- `v loan take|shark|pay` — bank loan (30%, max 2x balance+bank) and loan-shark (50%, up to 2M); `payWin` auto-repays loans (backend existed, command was missing)
+- `Aovo events #channel` — dedicated channel for random server events (falls back to update channels); event announcements show real duration
+- Random events expanded 4 → 15 (Hot Streak, Gem Bonanza, Geode Storm, Hatch Madness, Essence Flood, Double Payday/Payday Plus boost daily+weekly via `rewardMult`)
+- Mines fix: 4th row only had 3 tiles (cell 15 unclickable) → proper 4x4 with dedicated cash-out row; unplayed games now refund the bet (5 min window) instead of silently eating it
+- Giveaways persisted to DB + background sweep always draws/pays/announces a winner even after a restart (the "no winner" bug)
+- `v zooshop buy` matches multi-word item names (`flower garden` → garden)
+- PvP battle 'your team is empty' fix (accept flow was reading the bot's team)
+- Owner boot-DM now fires once per version instead of on every restart
+
+---
+
 ## v1.7.0 — The Pet Evolution Update
 - Loot crates: `v crate <common|premium|mythic>` with a per-user **pity counter** that guarantees a top-rarity drop
 - Free bets: `v freebet [amount]` — claim 500 free house coins/day, cap 2500; lose = house money, win = real coins

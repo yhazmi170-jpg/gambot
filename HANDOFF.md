@@ -4,8 +4,8 @@
 > Read `AGENTS.md` first, then this.
 
 ## Status
-- **Branch**: `master` (remote HEAD `1697cba`)
-- **Version**: `1.7.0` (PUSHED -- pet evolution update; battle button fix in `1697cba`)
+- **Branch**: `master`
+- **Version**: `1.7.1` (PUSHED — PvP bounties, wheel, streak, loan, mines/giveaway/zooshop/battle fixes, events channel, 15 random events)
 - **Change log**: complete history of every update lives in `CHANGELOG.md` (newest first) — keep it in sync with the version bump + `update_msg.txt`
 - **Host migration**: Replit → Render (free, Blueprint from `render.yaml`). Replit repl was stopped by user. **Render URL: `https://gambot-o2o4.onrender.com`** — keepalive pinger repointed to it.
 - **Keepalive**: `keepalive.ps1` pings every 240s; registered as Windows scheduled task `GambotKeepalive` (runs at logon). Pinger must be running on yazan's PC for this to work (now pinging the Render URL).

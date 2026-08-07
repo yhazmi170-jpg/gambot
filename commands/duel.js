@@ -55,8 +55,16 @@ module.exports = {
         const loser = winner.id === message.author.id ? target : message.author;
         db.addBalance(winner.id, amount);
         db.addBalance(loser.id, -amount);
+        const bounty = db.recordPvpDuelWin(message.author.id, target.id, winner.id);
+        let bountyLine = '';
+        if (bounty) {
+          const b = bounty.bounty;
+          bountyLine = bounty.won
+            ? `\n🏴 **BOUNTY WON!** <@${winner.id}> takes the **${b.prize.toLocaleString()}** ${config.currency} pot!`
+            : `\n🏴 bounty progress: <@${b.poster_id}> ${b.poster_wins} — ${b.target_wins} <@${b.target_id}> (first to ${b.goal})`;
+        }
         msg.edit({
-          embeds: [success(`⚔️ **${winner.username}** won the duel against **${loser.username}** and earned **${amount.toLocaleString()}** ${config.currency}!`)],
+          embeds: [success(`⚔️ **${winner.username}** won the duel against **${loser.username}** and earned **${amount.toLocaleString()}** ${config.currency}!${bountyLine}`)],
           components: [],
         }).catch(() => {});
       });

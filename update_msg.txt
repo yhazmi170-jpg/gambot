@@ -1,26 +1,17 @@
-v1.7.0 — The Pet Evolution Update 🐾
+v1.7.1 — Bounties & Fixes
 
-NEW COMMANDS
-- `v crate <common|premium|mythic>` — loot boxes for random pets, with a pity counter that guarantees a top-rarity drop
-- `v freebet [amount]` — claim 500 free house coins a day and gamble them. lose = house money, win = real coins
-- `v raid <stake>` — fight the server boss. stake adds to the pot, damage splits it on the kill
-- `v clan <create|join|leave|info|deposit|withdraw|kick|top>` — server-wide clans with a shared treasury
-- `v auction <id> <min> [hours]` + `v bid <id> <amount>` — sell pets to the highest bidder
-- `v plot buy|upgrade|claim` — own land that pays coin income every hour
-- `v evolve <id>` — evolve a pet to the next rarity (costs essence)
-- `v feed <id>` — feed a pet for a 2-hour battle buff
-- `v fuse <id1> <id2>` — merge two pets into one stronger pet
-- `v family` — view your family tree (partner, parents, kids)
-- `v zooshop` — buy zoo decorations that show at the top of your zoo
+NEW
+- `v bounty create @player <goal> <amount>` — player-funded PvP bounty: you put up the prize, first to reach the duel-win goal against the other takes the whole pot. `v bounty list` for the board, `v bounty info <id>`, `v bounty cancel <id>` (before any duels are fought). Duel wins now show bounty progress live.
+- `v wheel <amount>` — spin the wheel of fortune, multipliers up to a x10 jackpot.
+- `v streak` — daily logon streak bonus that scales to day 7 (miss 48h and it resets).
+- `v loan take|shark|pay` — borrow coins from the bank (30% interest, up to 2x your balance+bank) or hit the loan shark (50%, up to 2M). Winnings auto-repay your loan.
+- `Aovo events #channel` — put random server events in their own channel (falls back to update channel).
+- More random events (15 now): Hot Streak, Gem Bonanza, Hatch Madness, Essence Flood, Double Payday + more.
 
-NEW GAMEPLAY:
-- Shiny pets ✨ (rare, 2x sell price) and a new MYTHIC tier 👑 (Odin, Tiamat, Bahamut, Cthulhu, Godzilla)
-- 20+ new pet species including Otter, Penguin, Capybara, Jaguar, Sphinx and more
-- Pet personalities: Brave, Chill, Eager, Lucky, Calm — each gives a small battle edge
-- Random server events: Gold Rush (wins +25%), Lucky Hour (gems x2), Egg Mania (eggs x2), Essence Surge (sacrifice x2)
-- Loss streak protection: lose 5+ in a row and losses start to refund extra
-- Vaults now earn 0.4% interest per hour
-- Married bonus: couples get +10% on daily, weekly and work
-- Pet achievements: first blood, level milestones, evolutions, fusion, shinies and more
+FIXES
+- Mines: board was missing the bottom-right tile (4x4 but 15 buttons) — all 16 tiles now show + a dedicated cash-out row; unplayed games refund your bet instead of silently eating it (5 min window).
+- Giveaways: no more silent no-winner endings — giveaways are saved to the DB and a sweep always draws, pays and announces the winner, even after a restart.
+- `v zooshop buy flower garden` now works (multi-word item names).
+- PvP battles 'your team is empty' bug fixed.
 
-`v zoo` shows shiny badges and your decorations; `v animal` shows personality, fed status and pet achievements. `v dex` now tracks the full 60+ collection including mythic.
+NOTE: the owner boot-DM only fires once per version now, so no more spam DMs on every restart.

@@ -113,6 +113,18 @@ async function init() {
     winner_id TEXT DEFAULT NULL
   )`);
   db.run(`CREATE TABLE IF NOT EXISTS streaks (user_id TEXT PRIMARY KEY, count INTEGER NOT NULL DEFAULT 0, last_time INTEGER NOT NULL DEFAULT 0, best INTEGER NOT NULL DEFAULT 0)`);
+  db.run(`CREATE TABLE IF NOT EXISTS pvp_bounties (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    poster_id TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    prize INTEGER NOT NULL,
+    goal INTEGER NOT NULL,
+    poster_wins INTEGER NOT NULL DEFAULT 0,
+    target_wins INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'active',
+    winner_id TEXT DEFAULT NULL,
+    created_at INTEGER NOT NULL
+  )`);
   db.run(`CREATE TABLE IF NOT EXISTS vip_roles (guild_id TEXT PRIMARY KEY, role_id TEXT NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS animals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1776,6 +1788,88 @@ function claimBounty(userId) {
   return { ...b, reward };
 }
 
+// ---- v1.7.x: Player-funded PvP bounties ----
+// Poster funds a prize; first player to reach `goal` duel wins vs the other takes the pot.
+const PVP_BOUNTY_LIFETIME = 7 * 86400;
+
+function createPvpBounty(posterId, targetId, goal, prize) {
+  const u = ensureUser(posterId);
+  if (!u || (u.balance || 0) < prize) return { ok: false, reason: 'coins' };
+  const rows = db.exec(`SELECT id FROM pvp_bounties WHERE status = 'active' AND ((poster_id = '${posterId}' AND target_id = '${targetId}') OR (poster_id = '${targetId}' AND target_id = '${posterId}')) LIMIT 1`);
+  if (rows.length && rows[0].values.length) return { ok: false, reason: 'existing' };
+  addBalance(posterId, -prize);
+  db.run(`INSERT INTO pvp_bounties (poster_id, target_id, prize, goal, poster_wins, target_wins, status, created_at) VALUES ('${posterId}', '${targetId}', ${prize}, ${goal}, 0, 0, 'active', ${Math.floor(Date.now() / 1000)})`);
+  save();
+  const id = db.exec(`SELECT id FROM pvp_bounties WHERE poster_id = '${posterId}' AND target_id = '${targetId}' AND status = 'active' ORDER BY id DESC LIMIT 1`)[0].values[0][0];
+  return { ok: true, id };
+}
+
+function getPvpBounty(id) {
+  const rows = db.exec(`SELECT id, poster_id, target_id, prize, goal, poster_wins, target_wins, status, winner_id FROM pvp_bounties WHERE id = ${id}`);
+  if (!rows.length || !rows[0].values.length) return null;
+  const v = rows[0].values[0];
+  return { id: v[0], poster_id: v[1], target_id: v[2], prize: v[3], goal: v[4], poster_wins: v[5], target_wins: v[6], status: v[7], winner_id: v[8] };
+}
+
+function listActiveBounties() {
+  const rows = db.exec(`SELECT id, poster_id, target_id, prize, goal, poster_wins, target_wins FROM pvp_bounties WHERE status = 'active' ORDER BY id DESC`);
+  if (!rows.length) return [];
+  return rows[0].values.map(v => ({ id: v[0], poster_id: v[1], target_id: v[2], prize: v[3], goal: v[4], poster_wins: v[5], target_wins: v[6] }));
+}
+
+function getPvpBountyBetween(a, b) {
+  const rows = db.exec(`SELECT id FROM pvp_bounties WHERE status = 'active' AND ((poster_id = '${a}' AND target_id = '${b}') OR (poster_id = '${b}' AND target_id = '${a}')) LIMIT 1`);
+  if (!rows.length || !rows[0].values.length) return null;
+  return getPvpBounty(rows[0].values[0][0]);
+}
+
+// Called after every duel between a & b; `winnerId` is the duel winner.
+// Returns null if no active bounty, or the updated bounty + whether the pot was won.
+function recordPvpDuelWin(a, b, winnerId) {
+  const bounty = getPvpBountyBetween(a, b);
+  if (!bounty) return null;
+  const isPoster = winnerId === bounty.poster_id;
+  const col = isPoster ? 'poster_wins' : 'target_wins';
+  const wins = (isPoster ? bounty.poster_wins : bounty.target_wins) + 1;
+  if (wins >= bounty.goal) {
+    addBalance(winnerId, bounty.prize);
+    db.run(`UPDATE pvp_bounties SET status = 'done', winner_id = '${winnerId}', ${col} = ${wins} WHERE id = ${bounty.id}`);
+    save();
+    return { bounty: { ...bounty, poster_wins: isPoster ? wins : bounty.poster_wins, target_wins: isPoster ? bounty.target_wins : wins }, won: true, winnerId };
+  }
+  db.run(`UPDATE pvp_bounties SET ${col} = ${wins} WHERE id = ${bounty.id}`);
+  save();
+  return { bounty: { ...bounty, poster_wins: isPoster ? wins : bounty.poster_wins, target_wins: isPoster ? bounty.target_wins : wins }, won: false, winnerId, wins, goal: bounty.goal };
+}
+
+function cancelPvpBounty(userId, id) {
+  const b = getPvpBounty(id);
+  if (!b || b.status !== 'active') return { ok: false, reason: 'notfound' };
+  if (b.poster_id !== userId) return { ok: false, reason: 'notowner' };
+  if (b.poster_wins > 0 || b.target_wins > 0) return { ok: false, reason: 'started' };
+  addBalance(userId, b.prize);
+  db.run(`UPDATE pvp_bounties SET status = 'cancelled' WHERE id = ${id}`);
+  save();
+  return { ok: true };
+}
+
+function pruneExpiredBounties() {
+  const now = Math.floor(Date.now() / 1000);
+  const rows = db.exec(`SELECT id, poster_id, prize FROM pvp_bounties WHERE status = 'active' AND created_at + ${PVP_BOUNTY_LIFETIME} < ${now}`);
+  if (!rows.length || !rows[0].values.length) return 0;
+  let refunded = 0;
+  for (const [id, poster, prize] of rows[0].values) {
+    const b = getPvpBounty(id);
+    if (b && b.poster_wins === 0 && b.target_wins === 0) {
+      addBalance(poster, prize);
+      refunded += prize;
+    }
+    db.run(`UPDATE pvp_bounties SET status = 'expired' WHERE id = ${id}`);
+  }
+  save();
+  return refunded;
+}
+
 // ---------- Clan vault (per-guild shared pot) ----------
 
 function getVault(guildId) {
@@ -2643,6 +2737,7 @@ module.exports = {
   stockPrice, getStockPrices, buyStock, sellStock, getStockShares, getPortfolio, STOCKS,
   rollEggDrop, getEggs, addEgg, hatchEgg, transferAnimal, EGG_DROP_CHANCE, EGG_HATCH_RARITY,
   getQuest, addQuestProgress, claimQuest, getBounty, addBountyProgress, claimBounty,
+  createPvpBounty, getPvpBounty, listActiveBounties, getPvpBountyBetween, recordPvpDuelWin, cancelPvpBounty, pruneExpiredBounties, PVP_BOUNTY_LIFETIME,
   getVault, vaultDeposit, vaultWithdraw, getVaultTop,
   getAchievements, checkAchievements, getAchievementList,
   getBlackMarket, buyBlackMarketItem,
