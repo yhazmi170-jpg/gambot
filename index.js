@@ -47,7 +47,10 @@ if (!acquireLock()) { console.error('could not acquire lock'); process.exit(1); 
 process.on('exit', () => { try { fs.unlinkSync(lockFile); } catch {} });
 
 const PORT = process.env.PORT || 3000;
-const server = http.createServer((req, res) => { res.writeHead(200); res.end('ok'); });
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end(`ok v${version} commit=${process.env.RENDER_GIT_COMMIT || process.env.GIT_SHA || 'unknown'}`);
+});
 server.listen(PORT);
 global._server = server;
 
