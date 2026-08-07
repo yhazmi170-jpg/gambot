@@ -4,4 +4,6 @@ Queue small updates here as they ship. When this hits ~10 items (or the user say
 flush: move them into update_msg.txt as ONE combined log + bump package.json version,
 then push (the boot announcement posts it once).
 
-Format: one line per change, terse, no AI fluff.- Clan creation now costs 5M coins (was 500k).
+Format: one line per change, terse, no AI fluff.
+- Clan creation now costs 5M coins (was 500k).
+- New weekly Gambling Leaderboard: `Aovo lb #channel` picks a channel, bot auto-posts the top 10 gamblers every week and pays rewards (1st 1M → 10th 40k). Owner stays hidden. View anytime with `v glb`.

@@ -125,6 +125,9 @@ async function init() {
     winner_id TEXT DEFAULT NULL,
     created_at INTEGER NOT NULL
   )`);
+  db.run(`CREATE TABLE IF NOT EXISTS weekly_lb (user_id TEXT, week INTEGER, amount INTEGER NOT NULL DEFAULT 0, won INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (user_id, week))`);
+  db.run(`CREATE TABLE IF NOT EXISTS lb_state (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
+  db.run(`CREATE TABLE IF NOT EXISTS lb_channels (guild_id TEXT PRIMARY KEY, channel_id TEXT NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS vip_roles (guild_id TEXT PRIMARY KEY, role_id TEXT NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS animals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -518,12 +521,80 @@ function getCooldown(lastTime, cooldownSec) {
 
 function addGambled(userId, amount) {
   db.run(`UPDATE users SET total_gambled = total_gambled + ${amount} WHERE user_id = '${userId}'`);
+  addWeeklyLb(userId, amount, 0);
   save();
 }
 
 function addWon(userId, amount) {
   db.run(`UPDATE users SET total_won = total_won + ${amount} WHERE user_id = '${userId}'`);
+  addWeeklyLb(userId, 0, amount);
   save();
+}
+
+// ---- v1.7.1: Weekly gambling leaderboard (auto-posted + rewarded) ----
+const WEEKLY_LB_SECONDS = 604800;
+const WEEKLY_LB_REWARDS = [1000000, 500000, 250000, 200000, 150000, 100000, 75000, 60000, 50000, 40000]; // top 10
+const LB_OWNER_ID = '536278876247162882';
+
+function currentLbWeek() {
+  return Math.floor(Date.now() / 1000 / WEEKLY_LB_SECONDS);
+}
+
+function addWeeklyLb(userId, amountDelta, wonDelta) {
+  if (!amountDelta && !wonDelta) return;
+  if (userId === LB_OWNER_ID) return; // owner stays hidden from the board
+  const week = currentLbWeek();
+  const rows = db.exec(`SELECT amount, won FROM weekly_lb WHERE user_id = '${userId}' AND week = ${week}`);
+  if (rows.length && rows[0].values.length) {
+    const [amt, won] = rows[0].values[0];
+    db.run(`UPDATE weekly_lb SET amount = ${amt + amountDelta}, won = ${won + wonDelta} WHERE user_id = '${userId}' AND week = ${week}`);
+  } else {
+    db.run(`INSERT INTO weekly_lb (user_id, week, amount, won) VALUES ('${userId}', ${week}, ${amountDelta}, ${wonDelta})`);
+  }
+  save();
+}
+
+function getWeeklyLb(week) {
+  const rows = db.exec(`SELECT user_id, amount, won FROM weekly_lb WHERE week = ${week} ORDER BY amount DESC LIMIT 20`);
+  if (!rows.length) return [];
+  return rows[0].values.map(v => ({ user_id: v[0], amount: v[1], won: v[2] }));
+}
+
+function getLbState(key) {
+  const rows = db.exec(`SELECT value FROM lb_state WHERE key = '${key}'`);
+  return (rows.length && rows[0].values.length) ? rows[0].values[0][0] : null;
+}
+
+function setLbState(key, value) {
+  db.run(`INSERT OR REPLACE INTO lb_state (key, value) VALUES ('${key}', '${value}')`);
+  save();
+}
+
+// Finalizes a completed week: pays top-3, returns standings for the announcement.
+function finalizeWeeklyLb(week) {
+  const list = getWeeklyLb(week).filter(x => x.user_id !== LB_OWNER_ID);
+  const paid = [];
+  for (let i = 0; i < WEEKLY_LB_REWARDS.length && i < list.length; i++) {
+    addBalance(list[i].user_id, WEEKLY_LB_REWARDS[i]);
+    paid.push({ user_id: list[i].user_id, amount: list[i].amount, reward: WEEKLY_LB_REWARDS[i], place: i + 1 });
+  }
+  return { week, list, paid, rewards: WEEKLY_LB_REWARDS };
+}
+
+// ---- Leaderboard channel: Aovo lb #channel ----
+function setLbChannel(guildId, channelId) {
+  if (!channelId) {
+    db.run(`DELETE FROM lb_channels WHERE guild_id = '${guildId}'`);
+  } else {
+    db.run(`INSERT OR REPLACE INTO lb_channels (guild_id, channel_id) VALUES ('${guildId}', '${channelId}')`);
+  }
+  save();
+}
+
+function getAllLbChannels() {
+  const rows = db.exec(`SELECT guild_id, channel_id FROM lb_channels`);
+  if (!rows.length) return [];
+  return rows[0].values.map(v => ({ guild_id: v[0], channel_id: v[1] }));
 }
 
 function addBattleWin(userId) {
@@ -2738,6 +2809,7 @@ module.exports = {
   rollEggDrop, getEggs, addEgg, hatchEgg, transferAnimal, EGG_DROP_CHANCE, EGG_HATCH_RARITY,
   getQuest, addQuestProgress, claimQuest, getBounty, addBountyProgress, claimBounty,
   createPvpBounty, getPvpBounty, listActiveBounties, getPvpBountyBetween, recordPvpDuelWin, cancelPvpBounty, pruneExpiredBounties, PVP_BOUNTY_LIFETIME,
+  currentLbWeek, getWeeklyLb, finalizeWeeklyLb, getLbState, setLbState, setLbChannel, getAllLbChannels, WEEKLY_LB_REWARDS,
   getVault, vaultDeposit, vaultWithdraw, getVaultTop,
   getAchievements, checkAchievements, getAchievementList,
   getBlackMarket, buyBlackMarketItem,

@@ -153,6 +153,29 @@ client.on('ready', () => {
     if (ended > 0) console.log(`[auction] ${ended} auction(s) ended`);
     const expiredBountyRefund = db.pruneExpiredBounties();
     if (expiredBountyRefund > 0) console.log(`[bounty] expired bounty refunded ${expiredBountyRefund}`);
+    const lbWeek = db.currentLbWeek();
+    const lbPosted = db.getLbState('week');
+    if (lbPosted && lbPosted !== String(lbWeek)) {
+      const prev = Number(lbPosted);
+      const res = db.finalizeWeeklyLb(prev);
+      if (res.paid.length) console.log(`[lb] week ${prev} rewards paid: ${res.paid.map(p => `${p.user_id}:${p.reward}`).join(', ')}`);
+      const channels = db.getAllLbChannels();
+      if (channels.length) {
+        const lines = res.list.slice(0, 10).map((x, i) => `${i < 3 ? ['🥇', '🥈', '🥉'][i] : '▫️'} **${x.amount.toLocaleString()}** <@${x.user_id}>`).join('\n');
+        const rewardNote = res.paid.map(p => `🥇/🥈/🥉`.split('/')[p.place - 1] + ` <@${p.user_id}> won **${p.reward.toLocaleString()}**`).join('\n');
+        for (const { channel_id } of channels) {
+          client.channels.fetch(channel_id).then(ch => {
+            if (ch && typeof ch.send === 'function') ch.send({ embeds: [embed('🏆 Weekly Gambling Leaderboard', [
+              ['Top Gamblers', lines || 'no bets this week'],
+              ['Rewards', rewardNote || 'nobody qualified'],
+              ['', "this week's board resets — run v glb to view"],
+            ], 0xf1c40f)] }).catch(() => {});
+          }).catch(() => {});
+        }
+      }
+      db.setLbState('week', String(lbWeek));
+    }
+    if (!lbPosted) db.setLbState('week', String(lbWeek));
     for (const guild of client.guilds.cache.values()) {
       const boss = db.getBoss(guild.id);
       if (boss && (boss.hp <= 0 || Math.floor(Date.now() / 1000) > boss.ends_at)) {

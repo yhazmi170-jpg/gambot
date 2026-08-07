@@ -105,6 +105,16 @@ module.exports = {
         db.setEventChannel(message.guild.id, '');
         message.channel.send({ embeds: [success('event channel removed')] });
       }
+    } else if (sub === 'lb' || sub === 'lboard' || sub === 'leaderboard' || sub === 'gambling') {
+      if (!message.guild) return message.channel.send({ embeds: [error('must be in a server')] });
+      const channel = message.mentions.channels.first();
+      if (channel) {
+        db.setLbChannel(message.guild.id, channel.id);
+        message.channel.send({ embeds: [success(`gambling leaderboard channel set to ${channel} — posted weekly`)] });
+      } else {
+        db.setLbChannel(message.guild.id, '');
+        message.channel.send({ embeds: [success('weekly leaderboard channel removed')] });
+      }
     } else if (sub === 'restart') {
       const { execSync, spawn } = require('child_process');
       const ownerId = '536278876247162882';
@@ -159,6 +169,7 @@ module.exports = {
           ['Aovo viprole @role', 'set VIP role'],
           ['Aovo updates #channel', 'set update channel'],
           ['Aovo events #channel', 'set random event channel'],
+          ['Aovo lb #channel', 'set weekly gambling leaderboard channel'],
           ['Aovo addrole @user name | #color', 'create custom role'],
           ['Aovo shutdown', 'fully stop the bot'],
           ['Aovo restart', 'pull updates + restart'],
