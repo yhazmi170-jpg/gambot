@@ -15,11 +15,25 @@ function parseColor(str) {
 
 async function positionToAnchor(guild, role) {
   try {
-    const anchor = await guild.roles.fetch(ANCHOR_ROLE_ID).catch(() => null);
-    const target = anchor ? anchor.position - 1 : Math.max(0, (guild.members.me.roles.highest?.position ?? 0) - 1);
-    await role.setPosition(Math.max(0, target), { reason: 'custom role under anchor' });
+    const [anchor, fresh, botHigh] = await Promise.all([
+      guild.roles.fetch(ANCHOR_ROLE_ID).catch(() => null),
+      guild.roles.fetch(role.id),
+      guild.members.me.roles.highest?.fetch?.() ?? Promise.resolve(guild.members.me.roles.highest ?? null),
+    ]);
+    const target = anchor ? anchor.position - 1 : null;
+    const botCap = botHigh ? botHigh.position - 1 : (fresh.position - 1);
+    const goal = target !== null ? Math.min(target, botCap) : botCap;
+    if (goal < 1) {
+      console.warn(`[customrole] skipping position — no slot under anchor (anchor=${anchor?.position ?? 'missing'}, botHigh=${botHigh?.position ?? 'none'})`);
+      return;
+    }
+    if (fresh.position === goal) return;
+    await fresh.setPosition(goal, { reason: 'custom role under anchor' });
+    if (fresh.position !== goal) {
+      console.error(`[customrole] move to ${goal} failed silently — role at ${fresh.position}`);
+    }
   } catch (e) {
-    // non-fatal
+    console.error('[customrole] positionToAnchor error:', e.message);
   }
 }
 

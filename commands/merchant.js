@@ -54,14 +54,24 @@ module.exports = {
   async handleInteraction(i) {
     if (!i.customId.startsWith('mer_')) return;
     const slot = i.customId.replace('mer_', '');
-    const res = db.buyMerchantItem(i.user.id, slot);
+    let res;
+    try {
+      res = db.buyMerchantItem(i.user.id, slot);
+    } catch (e) {
+      console.error('[merchant] buy crashed for', i.user.id, 'slot', slot, e);
+      return i.reply({ embeds: [error('the purchase failed internally — nothing was charged, try again')], ephemeral: true }).catch(() => {});
+    }
     if (res.ok) {
       const it = res.item;
-      await i.reply({ embeds: [success(`you bought the merchant\u2019s **${it.label}** for **${it.price.toLocaleString()}** ${config.currency}!`)], ephemeral: true });
+      console.log(`[merchant] ${i.user.id} bought ${it.kind} slot ${slot} for ${it.price}`);
+      await i.reply({
+        embeds: [success(`you bought the merchant\u2019s **${it.label}** for **${it.price.toLocaleString()}** ${config.currency}!${it.kind === 'gems' ? ' Check with `v bal` 🍓' : ''}`)],
+        ephemeral: true,
+      }).catch(() => {});
       i.message.edit({ embeds: [buildStockEmbed()], components: buildStockRows() }).catch(() => {});
       return;
     }
     const reasons = { coins: "you don't have enough", sold: 'someone else grabbed that already!', gone: 'the merchant already left with that item' };
-    await i.reply({ embeds: [error(reasons[res.reason] || 'could not buy')], ephemeral: true });
+    await i.reply({ embeds: [error(reasons[res.reason] || 'could not buy')], ephemeral: true }).catch(() => {});
   },
 };

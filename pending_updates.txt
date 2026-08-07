@@ -10,3 +10,4 @@ Format: one line per change, terse, no AI fluff.
 - Clans are now PLAYER-based, not server-based: `v clan create` makes a clan owned by you, `v clan join @me|name` joins anyone's clan, `v clan delete` disbands (50% treasury back). One clan per player, 5M to create.
 - NEW `v pokertournament <buy-in>` — 5-card poker showdown table (9 seats), best hand wins the whole pot (90%), join via button.
 - NEW Travelling merchant — rolls in every ~90min, sells 1 rare pet + gems + essence, first come first served via `v merchant`.
+- Custom roles now force-stack directly under the anchor role (failed position moves are logged instead of silently ignored).
