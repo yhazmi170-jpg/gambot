@@ -4,9 +4,9 @@
 > Read `AGENTS.md` first, then this.
 
 ## Status
-- **Branch**: `master` (remote HEAD `4a28013`)
-- **Version**: `1.6.1` (PUSHED -- custom role rework)
-- **Last update_msg**: `v1.6.1` -- custom role gradient colors (2 hexes), delete subcommand, auto-stack under anchor role `1535224349965942884`
+- **Branch**: `master` (remote HEAD `1697cba`)
+- **Version**: `1.7.0` (PUSHED -- pet evolution update; battle button fix in `1697cba`)
+- **Change log**: complete history of every update lives in `CHANGELOG.md` (newest first) — keep it in sync with the version bump + `update_msg.txt`
 - **Host migration**: Replit → Render (free, Blueprint from `render.yaml`). Replit repl was stopped by user. **Render URL: `https://gambot-o2o4.onrender.com`** — keepalive pinger repointed to it.
 - **Keepalive**: `keepalive.ps1` pings every 240s; registered as Windows scheduled task `GambotKeepalive` (runs at logon). Pinger must be running on yazan's PC for this to work (now pinging the Render URL).
 

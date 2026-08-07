@@ -9,7 +9,8 @@
 - **DB**: SQLite via sql.js at `DB_PATH` (env, default `./data` on Render; ephemeral on free tier → hourly GitHub backup + boot-restore is the data safety net). Backed up to GitHub every hour.
 - **Backups**: `backup.js` writes timestamped snapshots (`backups/gambot-<ts>.db`, never overwritten) + a mirror at `gambot.db`. Restore scans ALL snapshots newest→oldest and restores the first one with >0 users (`countUsers` via sql.js) — a bad/empty backup can never block recovery. Backup **refuses to upload** a 0-user DB (prevents an empty/corrupt instance from clobbering history). `index.js` logs backup failures loudly. Backups run **every 1 min** + on **SIGTERM/SIGINT shutdown** (Render free tier wipes `./data` on every deploy — shutdown backup caps loss at 1 min).
 - **Repo**: https://github.com/yhazmi170-jpg/gambot (branch `master`)
-- **Current version**: see `package.json` (as of last docs sync: **1.5.0**)
+- **Current version**: see `package.json` (as of last docs sync: **1.7.0**)
+- **Change log**: every update ever shipped is documented in `CHANGELOG.md` (newest first) — update it whenever you release, right alongside the version bump + `update_msg.txt`
 
 ## Agent docs (mandatory)
 - **Always keep markdown in sync** after meaningful work:
