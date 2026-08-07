@@ -2,8 +2,8 @@ const db = require('../db');
 const { embed } = require('../utils/embed');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
-const RARITY_EMOJIS = { common: '⚪', uncommon: '🟢', rare: '🔵', epic: '🟣', legendary: '🟡' };
-const RARITY_RANK = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4 };
+const RARITY_EMOJIS = { common: '⚪', uncommon: '🟢', rare: '🔵', epic: '🟣', legendary: '🟡', mythic: '👑' };
+const RARITY_RANK = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4, mythic: 5 };
 const COLOR_TO_RARITY = { gray: 'common', grey: 'common', white: 'common', green: 'uncommon', blue: 'rare', purple: 'epic', yellow: 'legendary', gold: 'legendary' };
 const PER_PAGE = 10;
 
@@ -21,7 +21,7 @@ module.exports = {
     let filterName = null;
     if (filterArg) {
       filterName = RARITY_RANK[filterArg] !== undefined ? filterArg : COLOR_TO_RARITY[filterArg];
-      if (!filterName) return message.channel.send({ embeds: [require('../utils/embed').error(`unknown rarity or color \`${args[0]}\` — try: gray, green, blue, purple, yellow, or common, uncommon, rare, epic, legendary`)] });
+      if (!filterName) return message.channel.send({ embeds: [require('../utils/embed').error(`unknown rarity or color \`${args[0]}\` — try: gray, green, blue, purple, yellow, or common, uncommon, rare, epic, legendary, mythic`)] });
       animals = animals.filter(a => a.rarity === filterName);
       if (!animals.length) return message.channel.send({ embeds: [require('../utils/embed').error(`you have no ${RARITY_EMOJIS[filterName]} **${filterName}** animals`)] });
     }
@@ -31,8 +31,9 @@ module.exports = {
     const team = db.getTeam(userId);
     const teamIds = team ? new Set([team.slot1, team.slot2, team.slot3].filter(Boolean)) : new Set();
     const lines = animals.map(a => {
-      const teamTag = teamIds.has(a.id) ? ' ⭐' : '';
-      return `\`#${a.id}\` ${RARITY_EMOJIS[a.rarity]} **${a.species}** Lv.${a.level} ${a.name !== 'Unnamed' ? `"${a.name}"` : ''} ${teamTag}`;
+      const teamTag = teamIds.has(a.id) ? ' 🛡️' : '';
+      const shinyTag = a.shiny ? ' ✨' : '';
+      return `\`#${a.id}\` ${RARITY_EMOJIS[a.rarity]} **${a.species}**${shinyTag} Lv.${a.level} ${a.name !== 'Unnamed' ? `"${a.name}"` : ''} ${teamTag}`;
     });
 
     const total = animals.length;
@@ -41,7 +42,10 @@ module.exports = {
     const summary = Object.entries(rarityCounts).map(([r, c]) => `${RARITY_EMOJIS[r]} ${c}`).join(' · ');
     const pageCount = Math.ceil(lines.length / PER_PAGE);
 
-    const buildEmbed = (page) => embed(`${filterName ? `${RARITY_EMOJIS[filterName]} Zoo — ${filterName} (${total})` : `🐾 Zoo (${total})`}`, [
+    const decors = db.getZooDecors(userId);
+    const decorLine = decors.length ? db.ZOO_DECOR.filter(d => decors.includes(d.id)).map(d => d.emoji).join(' ') + ' ' : '';
+
+    const buildEmbed = (page) => embed(`${decorLine}${filterName ? `${RARITY_EMOJIS[filterName]} Zoo — ${filterName} (${total})` : `🎪 Zoo (${total})`}`, [
       ['Summary', summary || 'none'],
       ['Gems & Essence', `**${db.getGems(userId)}** gems · **${db.getEssence(userId)}** essence`],
       ['', lines.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE).join('\n')],

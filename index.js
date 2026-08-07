@@ -115,6 +115,44 @@ client.on('ready', () => {
     }
   }, 3600000);
 
+  // v1.7.0: hourly vault interest
+  setInterval(() => {
+    const gain = db.accrueVaultInterest();
+    if (gain > 0) console.log(`vault interest accrued: +${gain}`);
+  }, 3600000);
+
+  // v1.7.0: random server event every ~25-35 min + announce it
+  const fireEvent = () => {
+    const ev = db.startRandomEvent();
+    const channels = db.getAllUpdateChannels();
+    for (const { channel_id } of channels) {
+      client.channels.fetch(channel_id).then(ch => {
+        if (ch && typeof ch.send === 'function') {
+          ch.send({ embeds: [embed(`📢 Random Event: ${ev.name}`, [
+            ['Effect', ev.desc],
+            ['Duration', '30 minutes'],
+            ['', 'no action needed — it applies automatically across the server'],
+          ], 0x9b59b6)] }).catch(() => {});
+        }
+      }).catch(() => {});
+    }
+  };
+  const startEventTimer = () => setTimeout(() => { fireEvent(); startEventTimer(); }, (25 + Math.random() * 5) * 60000);
+  startEventTimer();
+
+  // v1.7.0: expire auctions + clean up dead/expired boss raids
+  setInterval(() => {
+    const ended = db.cleanupExpiredAuctions();
+    if (ended > 0) console.log(`[auction] ${ended} auction(s) ended`);
+    for (const guild of client.guilds.cache.values()) {
+      const boss = db.getBoss(guild.id);
+      if (boss && (boss.hp <= 0 || Math.floor(Date.now() / 1000) > boss.ends_at)) {
+        const res = db.resolveBoss(guild.id);
+        if (res && res.payouts && res.payouts.length) console.log(`[boss] ${res.species} resolved in ${guild.id}: ${res.payouts.length} payouts`);
+      }
+    }
+  }, 60000);
+
   const fs = require('fs');
   const ver = version || '1.0.0';
   if (!db.wasNotified(`v${ver}`)) {

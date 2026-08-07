@@ -14,6 +14,21 @@ function pendingKey(authorId, targetId, ts) {
   return `${authorId}_${targetId}_${ts}`;
 }
 
+function battleMods(pet) {
+  let atkMod = 1;
+  let defMod = 1;
+  if (db.isFed(pet)) { atkMod += 0.1; defMod += 0.1; }
+  if (pet.trait === 'Brave') atkMod += 0.1;
+  else if (pet.trait === 'Chill') defMod += 0.1;
+  else if (pet.trait === 'Eager') { atkMod += 0.05; defMod += 0.05; }
+  else if (pet.trait === 'Lucky') atkMod += 0.15;
+  else if (pet.trait === 'Calm') atkMod += 0.03;
+  return {
+    effAtk: Math.floor((pet.attack || 0) * atkMod),
+    effDef: Math.floor((pet.defense || 0) * defMod),
+  };
+}
+
 async function runBattle(message, target) {
   const myTeam = db.getTeam(message.author.id);
   const theirTeam = db.getTeam(target.id);
@@ -24,8 +39,8 @@ async function runBattle(message, target) {
   const theirPets = [theirTeam.slot1, theirTeam.slot2, theirTeam.slot3].filter(Boolean).map(id => db.getAnimal(id)).filter(Boolean);
   if (!myPets.length || !theirPets.length) return message.channel.send({ embeds: [error('one of the teams has no valid animals')] });
 
-  const myCopy = myPets.map(p => ({ ...p }));
-  const theirCopy = theirPets.map(p => ({ ...p }));
+  const myCopy = myPets.map(p => ({ ...p, ...battleMods(p) }));
+  const theirCopy = theirPets.map(p => ({ ...p, ...battleMods(p) }));
 
   let log = [];
   let round = 0;
@@ -36,18 +51,18 @@ async function runBattle(message, target) {
 
     for (const pet of myAlive) {
       if (!theirAlive.length) break;
-      const t = theirAlive.reduce((a, b) => a.hp < b.hp ? a : b);
-      const dmg = Math.max(0, pet.attack - Math.floor(t.defense / 2) + Math.floor(Math.random() * 10));
+const t = theirAlive.reduce((a, b) => a.hp < b.hp ? a : b);
+      const dmg = Math.max(0, pet.effAtk - Math.floor(t.effDef / 2) + Math.floor(Math.random() * 10));
       t.hp = Math.max(0, t.hp - dmg);
       log.push(`**${pet.species}** deals ${dmg} damage to **${t.species}** (${t.hp} HP left)`);
-      if (t.hp <= 0) log.push(`❌ **${t.species}** fainted!`);
+      if (t.hp <= 0) log.push(`�?O **${t.species}** fainted!`);
     }
 
     for (const pet of theirCopy.filter(p => p.hp > 0)) {
       const myAliveNow = myCopy.filter(p => p.hp > 0);
       if (!myAliveNow.length) break;
       const t = myAliveNow.reduce((a, b) => a.hp < b.hp ? a : b);
-      const dmg = Math.max(0, pet.attack - Math.floor(t.defense / 2) + Math.floor(Math.random() * 10));
+      const dmg = Math.max(0, pet.effAtk - Math.floor(t.effDef / 2) + Math.floor(Math.random() * 10));
       t.hp = Math.max(0, t.hp - dmg);
       log.push(`**${pet.species}** deals ${dmg} damage to **${t.species}** (${t.hp} HP left)`);
       if (t.hp <= 0) log.push(`❌ **${t.species}** fainted!`);
@@ -68,6 +83,12 @@ async function runBattle(message, target) {
     db.payWin(winner.id, reward);
     db.addQuestProgress(winner.id, 'battle', 1);
     db.addBountyProgress(winner.id, 'battle', 1);
+    const wins = db.addBattleWin(winner.id);
+    const winnerPets = winner.id === message.author.id ? myPets : theirPets;
+    for (const pet of winnerPets) {
+      db.awardPetAchievement(pet.id, 'battle_first');
+      if (wins >= 10) db.awardPetAchievement(pet.id, 'battle_10');
+    }
     for (const pet of myPets) {
       const survived = myCopy.find(p => p.id === pet.id);
       if (survived && survived.hp > 0) db.addExp(pet.id, 20);

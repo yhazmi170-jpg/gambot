@@ -25,13 +25,15 @@ module.exports = {
     const base = Math.floor(Math.random() * (config.workMax - config.workMin + 1)) + config.workMin;
     const doubled = db.hasPerk(message.author.id, 'double_work');
     const factor = db.getBalanceFactor(message.author.id);
-    const amount = Math.floor((doubled ? base * 2 : base) * factor);
+    const raw = Math.floor((doubled ? base * 2 : base) * factor);
+    const married = db.marriedMult(message.author.id);
+    const amount = Math.floor(raw * married);
     const job = jobs[Math.floor(Math.random() * jobs.length)];
-    db.claimWork(message.author.id, amount);
+    db.claimWork(message.author.id, raw);
     db.addQuestProgress(message.author.id, 'work', 1);
     db.addBountyProgress(message.author.id, 'work', 1);
     message.channel.send({
-      embeds: [success(`you worked **${job}** and earned **${amount}** ${config.currency}${doubled ? ' (2x perk!)' : ''}${factor < 1 ? ` (${Math.round((1 - factor) * 100)}% reduction)` : ''}`)],
+      embeds: [success(`you worked **${job}** and earned **${amount}** ${config.currency}${doubled ? ' (2x perk!)' : ''}${married > 1 ? ' (❤️ married +10%)' : ''}${factor < 1 ? ` (${Math.round((1 - factor) * 100)}% reduction)` : ''}`)],
     });
   },
 };

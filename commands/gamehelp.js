@@ -138,6 +138,27 @@ module.exports = {
         play: `\`${prefix} bounty\` — view\n\`${prefix} bounty claim\` — claim when done`,
         tips: 'Resets every week. Same tasks as the daily quest but bigger. Double Quest Rewards perk applies.',
       },
+      crate: {
+        name: 'Loot Crates',
+        aliases: 'lootbox, box',
+        desc: 'Buy a crate for a random pet. Pity counter guarantees a top rarity drop after enough crates.',
+        play: `\`${prefix} crate [common|premium|mythic]\`\nExample: \`${prefix} crate premium\``,
+        tips: 'Pity is per-user and never resets unless you hit the guarantee. Mythic crates can drop mythic pets.',
+      },
+      freebet: {
+        name: 'Free Bets',
+        aliases: 'fb',
+        desc: 'Claim 500 free house coins every day and gamble them. Losses are house money; winnings are real coins paid to your balance.',
+        play: `\`${prefix} freebet\` — claim\n\`${prefix} freebet <amount>\` — gamble`,
+        tips: 'Cap is 2500 free coins. Win with house money and keep the profit — there is no way to lose real coins here.',
+      },
+      raid: {
+        name: 'Boss Raids',
+        aliases: 'boss',
+        desc: 'A server-wide boss fights back. Every `v raid <stake>` adds damage and coins to the pot. When it dies, the pot is split by damage.',
+        play: `\`${prefix} raid <stake>\`\nExample: \`${prefix} raid 5000\``,
+        tips: 'Attack with a full battle team for the most damage per stake. Top contributors win the biggest share of the pot.',
+      },
     };
 
     // alias map

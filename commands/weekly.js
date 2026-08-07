@@ -18,10 +18,12 @@ module.exports = {
     }
     const base = db.hasPerk(message.author.id, 'daily_cap') ? 25000 : config.weeklyAmount;
     const factor = db.getBalanceFactor(message.author.id);
-    const amount = Math.floor(base * factor);
-    db.claimWeekly(message.author.id, amount);
+    const raw = Math.floor(base * factor);
+    const married = db.marriedMult(message.author.id);
+    const amount = Math.floor(raw * married);
+    db.claimWeekly(message.author.id, raw);
     message.channel.send({
-      embeds: [success(`claimed **${amount}** ${config.currency} as your weekly reward!${base > config.weeklyAmount ? ' (daily cap perk!)' : ''}${factor < 1 ? ` (${Math.round((1 - factor) * 100)}% reduction)` : ''}`)],
+      embeds: [success(`claimed **${amount}** ${config.currency} as your weekly reward!${base > config.weeklyAmount ? ' (daily cap perk!)' : ''}${married > 1 ? ' (❤️ married +10%)' : ''}${factor < 1 ? ` (${Math.round((1 - factor) * 100)}% reduction)` : ''}`)],
     });
   },
 };

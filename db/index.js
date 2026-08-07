@@ -71,6 +71,25 @@ async function init() {
   try { db.run(`ALTER TABLE users ADD COLUMN eggs INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   try { db.run(`ALTER TABLE users ADD COLUMN hatched INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   try { db.run(`ALTER TABLE users ADD COLUMN battles_won INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN loss_streak INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN last_loss_time INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN free_bet INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN free_bet_time INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN crate_pity INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN zoo_decor TEXT NOT NULL DEFAULT '[]'`); } catch (e) {}
+  db.run(`CREATE TABLE IF NOT EXISTS pet_achievements (animal_id INTEGER NOT NULL, key TEXT NOT NULL, at INTEGER NOT NULL DEFAULT (strftime('%s','now')), PRIMARY KEY (animal_id, key))`);
+  db.run(`CREATE TABLE IF NOT EXISTS clans (clan_id TEXT PRIMARY KEY, name TEXT NOT NULL, owner_id TEXT NOT NULL, balance INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')))`);
+  db.run(`CREATE TABLE IF NOT EXISTS clan_members (clan_id TEXT NOT NULL, user_id TEXT NOT NULL, joined_at INTEGER NOT NULL DEFAULT (strftime('%s','now')), PRIMARY KEY (clan_id, user_id))`);
+  db.run(`CREATE TABLE IF NOT EXISTS bids (auction_id TEXT PRIMARY KEY, guild_id TEXT NOT NULL DEFAULT '', seller_id TEXT NOT NULL, animal_id INTEGER NOT NULL, min_bid INTEGER NOT NULL, current_bid INTEGER NOT NULL, current_bidder TEXT, ends_at INTEGER NOT NULL)`);
+  try { db.run(`ALTER TABLE bids ADD COLUMN guild_id TEXT NOT NULL DEFAULT ''`); } catch (e) {}
+  db.run(`CREATE TABLE IF NOT EXISTS world_boss (boss_id TEXT PRIMARY KEY, species TEXT NOT NULL, rarity TEXT NOT NULL, hp INTEGER NOT NULL, max_hp INTEGER NOT NULL, pot INTEGER NOT NULL DEFAULT 0, ends_at INTEGER NOT NULL)`);
+  try { db.run(`ALTER TABLE world_boss ADD COLUMN level INTEGER NOT NULL DEFAULT 1`); } catch (e) {}
+  db.run(`CREATE TABLE IF NOT EXISTS boss_contrib (boss_id TEXT NOT NULL, user_id TEXT NOT NULL, damage INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (boss_id, user_id))`);
+  db.run(`CREATE TABLE IF NOT EXISTS events (key TEXT PRIMARY KEY, type TEXT NOT NULL, ends_at INTEGER NOT NULL)`);
+  db.run(`CREATE TABLE IF NOT EXISTS plots (user_id TEXT PRIMARY KEY, level INTEGER NOT NULL DEFAULT 1, planted_at INTEGER NOT NULL DEFAULT 0, last_claim INTEGER NOT NULL DEFAULT 0)`);
+  try { db.run(`ALTER TABLE animals ADD COLUMN shiny INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE animals ADD COLUMN trait TEXT NOT NULL DEFAULT ''`); } catch (e) {}
+  try { db.run(`ALTER TABLE animals ADD COLUMN fed_until INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   db.run(`CREATE TABLE IF NOT EXISTS marriages (user_id TEXT PRIMARY KEY, partner_id TEXT NOT NULL, married_at INTEGER NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS adoption (parent_id TEXT, child_id TEXT, PRIMARY KEY (parent_id, child_id))`);
   db.run(`CREATE TABLE IF NOT EXISTS purchases (user_id TEXT, perk TEXT, expires_at INTEGER, PRIMARY KEY (user_id, perk))`);
@@ -230,6 +249,12 @@ function ensureUser(userId) {
       eggs: vals[34] || 0,
       hatched: vals[35] || 0,
       battles_won: vals[36] || 0,
+      loss_streak: vals[37] || 0,
+      last_loss_time: vals[38] || 0,
+      free_bet: vals[39] || 0,
+      free_bet_time: vals[40] || 0,
+      crate_pity: vals[41] || 0,
+      zoo_decor: vals[42] || '[]',
     };
   }
   return null;
@@ -367,22 +392,35 @@ function claimDaily(userId) {
   }
   const hasCap = hasPerk(userId, 'daily_cap');
   const max = hasCap ? 15000 : 5000;
-  const reward = Math.min(1000 + streak * 500, max);
+  const mult = marriedMult(userId);
+  const reward = Math.min(Math.floor((1000 + streak * 500) * mult), max);
   db.run(`UPDATE users SET daily_time = ${now}, daily_streak = ${streak}, balance = balance + ${reward} WHERE user_id = '${userId}'`);
   save();
-  return { reward, streak, max };
+  return { reward, streak, max, mult };
 }
 
 function claimWeekly(userId, amount) {
   const now = Math.floor(Date.now() / 1000);
-  db.run(`UPDATE users SET weekly_time = ${now}, balance = balance + ${amount} WHERE user_id = '${userId}'`);
+  const mult = marriedMult(userId);
+  const final = Math.floor(amount * mult);
+  db.run(`UPDATE users SET weekly_time = ${now}, balance = balance + ${final} WHERE user_id = '${userId}'`);
   save();
+  return { mult };
 }
 
 function claimWork(userId, amount) {
   const now = Math.floor(Date.now() / 1000);
-  db.run(`UPDATE users SET work_time = ${now}, balance = balance + ${amount} WHERE user_id = '${userId}'`);
+  const mult = marriedMult(userId);
+  const final = Math.floor(amount * mult);
+  db.run(`UPDATE users SET work_time = ${now}, balance = balance + ${final} WHERE user_id = '${userId}'`);
   save();
+  return { mult };
+}
+
+function isMarried(userId) { return !!getMarriage(userId); }
+
+function marriedMult(userId) {
+  return isMarried(userId) ? 1.1 : 1;
 }
 
 function getBalanceFactor(userId) {
@@ -395,7 +433,8 @@ function getBalanceFactor(userId) {
 
 /** Credit a gambling win: scales profit by balance factor. Optional stakeReturn (e.g. mines prepaid bet). Returns adjusted profit paid. */
 function payWin(userId, profit, stakeReturn = 0) {
-  const paid = profit > 0 ? Math.floor(profit * getBalanceFactor(userId)) : 0;
+  const rushMult = eventMult('winMult');
+  const paid = profit > 0 ? Math.floor(profit * getBalanceFactor(userId) * rushMult) : 0;
   let credit = stakeReturn;
   if (paid > 0) {
     const u = ensureUser(userId);
@@ -409,6 +448,7 @@ function payWin(userId, profit, stakeReturn = 0) {
       credit += paid;
     }
     addWon(userId, paid);
+    resetLossStreak(userId);
   }
   if (credit > 0) addBalance(userId, credit);
   return paid;
@@ -436,6 +476,20 @@ function addGambled(userId, amount) {
 function addWon(userId, amount) {
   db.run(`UPDATE users SET total_won = total_won + ${amount} WHERE user_id = '${userId}'`);
   save();
+}
+
+function addBattleWin(userId) {
+  const u = ensureUser(userId);
+  if (!u) return 0;
+  const wins = (u.battles_won || 0) + 1;
+  db.run(`UPDATE users SET battles_won = ${wins} WHERE user_id = '${userId}'`);
+  save();
+  return wins;
+}
+
+function getBattleWins(userId) {
+  const u = ensureUser(userId);
+  return u ? (u.battles_won || 0) : 0;
 }
 
 function getTop(limit, excludeUserId) {
@@ -643,8 +697,10 @@ function getInsuranceLevel(userId) {
 
 function getInsuranceRefund(userId, lossAmount) {
   const level = getInsuranceLevel(userId);
-  if (!level) return 0;
-  return Math.floor(lossAmount * INSURANCE_TIERS[level - 1].refund);
+  const base = level ? Math.floor(lossAmount * INSURANCE_TIERS[level - 1].refund) : 0;
+  const streak = registerLoss(userId);
+  const bonus = Math.floor(lossAmount * lossStreakBonus(streak));
+  return base + bonus;
 }
 
 function toggleInsurance(userId) {
@@ -790,15 +846,16 @@ function getUserPerks(userId) {
 }
 
 const SPECIES = {
-  common: ['Rabbit', 'Squirrel', 'Mouse', 'Sparrow', 'Frog', 'Chick', 'Duckling', 'Hamster', 'Fish', 'Butterfly'],
-  uncommon: ['Fox', 'Owl', 'Raccoon', 'Hedgehog', 'Ferret', 'Parrot', 'Turtle', 'Lizard'],
-  rare: ['Wolf', 'Eagle', 'Deer', 'Panther', 'Hawk', 'Lynx', 'Cobra', 'Boar'],
-  epic: ['Dragon', 'Phoenix', 'Griffin', 'Unicorn', 'Pegasus', 'Kraken', 'Basilisk'],
+  common: ['Rabbit', 'Squirrel', 'Mouse', 'Sparrow', 'Frog', 'Chick', 'Duckling', 'Hamster', 'Fish', 'Butterfly', 'Otter', 'Penguin', 'Koala', 'Sloth', 'Capybara'],
+  uncommon: ['Fox', 'Owl', 'Raccoon', 'Hedgehog', 'Ferret', 'Parrot', 'Turtle', 'Lizard', 'Guinea Pig', 'Skunk', 'Wallaby', 'Puffin'],
+  rare: ['Wolf', 'Eagle', 'Deer', 'Panther', 'Hawk', 'Lynx', 'Cobra', 'Boar', 'Jaguar', 'Grizzly', 'Moose', 'Hippo'],
+  epic: ['Dragon', 'Phoenix', 'Griffin', 'Unicorn', 'Pegasus', 'Kraken', 'Basilisk', 'Manticore', 'Sphinx', 'Roc', 'Wyvern'],
   legendary: ['Leviathan', 'Thunderbird', 'Kirin', 'Cerberus', 'Fenrir', 'Jormungandr'],
+  mythic: ['Odin', 'Tiamat', 'Bahamut', 'Cthulhu', 'Godzilla'],
 };
 
-const RARITY_WEIGHTS = { common: 50, uncommon: 25, rare: 15, epic: 8, legendary: 2 };
-const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
+const RARITY_WEIGHTS = { common: 50, uncommon: 25, rare: 15, epic: 8, legendary: 2, mythic: 0.2 };
+const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
 
 function randomRarity() {
   const total = Object.values(RARITY_WEIGHTS).reduce((a, b) => a + b, 0);
@@ -833,7 +890,7 @@ function getOwnedSpecies(userId) {
 }
 
 function randomStats(rarity) {
-  const base = { common: [100, 10, 5], uncommon: [130, 18, 12], rare: [180, 30, 22], epic: [270, 50, 38], legendary: [400, 75, 60] };
+  const base = { common: [100, 10, 5], uncommon: [130, 18, 12], rare: [180, 30, 22], epic: [270, 50, 38], legendary: [400, 75, 60], mythic: [650, 130, 100] };
   const [hp, atk, def] = base[rarity];
   return {
     hp: Math.floor(hp * (0.9 + Math.random() * 0.2)),
@@ -841,6 +898,12 @@ function randomStats(rarity) {
     defense: Math.floor(def * (0.85 + Math.random() * 0.3)),
   };
 }
+
+const SHINY_CHANCE = 1 / 200;
+const PERSONALITIES = ['Brave', 'Chill', 'Eager', 'Lucky', 'Calm'];
+
+function rollShiny() { return Math.random() < SHINY_CHANCE; }
+function rollTrait() { return PERSONALITIES[Math.floor(Math.random() * PERSONALITIES.length)]; }
 
 function expForLevel(level) { return level * 100; }
 
@@ -883,9 +946,15 @@ function addAnimal(userId, effLevel) {
   const rarity = effLevel > 0 ? randomRarityWithEff(effLevel) : randomRarity();
   const species = randomSpecies(rarity);
   const stats = randomStats(rarity);
-  db.run(`INSERT INTO animals (user_id, species, rarity, hp, max_hp, attack, defense) VALUES ('${userId}', '${species}', '${rarity}', ${stats.hp}, ${stats.hp}, ${stats.attack}, ${stats.defense})`);
+  const shiny = rollShiny() ? 1 : 0;
+  const trait = rollTrait();
+  db.run(`INSERT INTO animals (user_id, species, rarity, hp, max_hp, attack, defense, shiny, trait) VALUES ('${userId}', '${species}', '${rarity}', ${stats.hp}, ${stats.hp}, ${stats.attack}, ${stats.defense}, ${shiny}, '${trait}')`);
+  const rows = db.exec('SELECT last_insert_rowid() AS id');
+  const id = rows[0].values[0][0];
   save();
-  return { species, rarity, ...stats, level: 1, exp: 0, name: 'Unnamed' };
+  if (shiny) awardPetAchievement(id, 'shiny');
+  if (rarity === 'mythic') awardPetAchievement(id, 'mythic');
+  return { id, species, rarity, ...stats, level: 1, exp: 0, name: 'Unnamed', shiny: shiny === 1, trait };
 }
 
 function getUserAnimals(userId) {
@@ -894,6 +963,7 @@ function getUserAnimals(userId) {
   return rows[0].values.map(v => ({
     id: v[0], user_id: v[1], species: v[2], rarity: v[3], name: v[4],
     level: v[5], exp: v[6], hp: v[7], max_hp: v[8], attack: v[9], defense: v[10], created_at: v[11],
+    shiny: v[12] === 1, trait: v[13] || '', fed_until: v[14] || 0,
   }));
 }
 
@@ -901,7 +971,7 @@ function getAnimal(id) {
   const rows = db.exec(`SELECT * FROM animals WHERE id = ${id}`);
   if (!rows.length || !rows[0].values.length) return null;
   const v = rows[0].values[0];
-  return { id: v[0], user_id: v[1], species: v[2], rarity: v[3], name: v[4], level: v[5], exp: v[6], hp: v[7], max_hp: v[8], attack: v[9], defense: v[10], created_at: v[11] };
+  return { id: v[0], user_id: v[1], species: v[2], rarity: v[3], name: v[4], level: v[5], exp: v[6], hp: v[7], max_hp: v[8], attack: v[9], defense: v[10], created_at: v[11], shiny: v[12] === 1, trait: v[13] || '', fed_until: v[14] || 0 };
 }
 
 function removeAnimal(id) {
@@ -921,6 +991,11 @@ function addExp(id, amount) {
     const atkGain = Math.floor(3 * (1 + level * 0.02));
     const defGain = Math.floor(2 * (1 + level * 0.02));
     db.run(`UPDATE animals SET level = ${level}, exp = ${exp}, max_hp = max_hp + ${hpGain}, attack = attack + ${atkGain}, defense = defense + ${defGain} WHERE id = ${id}`);
+  }
+  if (level > a.level) {
+    if (a.level < 10 && level >= 10) awardPetAchievement(id, 'level_10');
+    if (a.level < 25 && level >= 25) awardPetAchievement(id, 'level_25');
+    if (a.level < 50 && level >= 50) awardPetAchievement(id, 'level_50');
   }
   db.run(`UPDATE animals SET exp = ${exp} WHERE id = ${id}`);
   save();
@@ -969,8 +1044,9 @@ function getHuntCooldown(userId) {
 }
 
 function sellPrice(animal) {
-  const mult = { common: 10, uncommon: 25, rare: 60, epic: 150, legendary: 500 };
-  return mult[animal.rarity] * animal.level;
+  const mult = { common: 10, uncommon: 25, rare: 60, epic: 150, legendary: 500, mythic: 1500 };
+  const shinyMult = animal.shiny ? 2 : 1;
+  return mult[animal.rarity] * animal.level * shinyMult;
 }
 
 function getAnimalCount(userId) {
@@ -980,11 +1056,11 @@ function getAnimalCount(userId) {
 
 // ---- Egg drop chance (per animal) + hatching ----
 const EGG_DROP_CHANCE = 0.08;
-const EGG_HATCH_RARITY = { common: 0.4, uncommon: 0.3, rare: 0.18, epic: 0.09, legendary: 0.03 };
+const EGG_HATCH_RARITY = { common: 0.38, uncommon: 0.29, rare: 0.18, epic: 0.1, legendary: 0.04, mythic: 0.01 };
 
 function rollEggDrop(userId) {
   const mult = hasPerk(userId, 'egg_luck') ? 2 : 1;
-  return Math.random() < EGG_DROP_CHANCE * mult;
+  return Math.random() < EGG_DROP_CHANCE * mult * eventMult('eggMult');
 }
 
 function getEggs(userId) {
@@ -1006,11 +1082,15 @@ function hatchEgg(userId) {
   for (const [rar, w] of Object.entries(EGG_HATCH_RARITY)) { acc += w; if (r < acc) { rarity = rar; break; } }
   const species = randomSpecies(rarity);
   const stats = randomStats(rarity);
-  db.run(`INSERT INTO animals (user_id, species, rarity, hp, max_hp, attack, defense) VALUES ('${userId}', '${species}', '${rarity}', ${stats.hp}, ${stats.hp}, ${stats.attack}, ${stats.defense})`);
+  const shiny = rollShiny() ? 1 : 0;
+  const trait = rollTrait();
+  db.run(`INSERT INTO animals (user_id, species, rarity, hp, max_hp, attack, defense, shiny, trait) VALUES ('${userId}', '${species}', '${rarity}', ${stats.hp}, ${stats.hp}, ${stats.attack}, ${stats.defense}, ${shiny}, '${trait}')`);
   const rows = db.exec('SELECT last_insert_rowid() AS id');
   const id = rows[0].values[0][0];
   save();
-  return { id, species, rarity, ...stats, level: 1, exp: 0, name: 'Unnamed' };
+  if (shiny) awardPetAchievement(id, 'shiny');
+  if (rarity === 'mythic') awardPetAchievement(id, 'mythic');
+  return { id, species, rarity, ...stats, level: 1, exp: 0, name: 'Unnamed', shiny: shiny === 1, trait };
 }
 
 // ---- Transfer an animal to another user (trading) ----
@@ -1218,7 +1298,7 @@ function getPerkHolders(perk) {
 
 // ---------- Essence / traits / autohunt ----------
 
-const ESSENCE_VALUES = { common: 1, uncommon: 3, rare: 8, epic: 25, legendary: 100 };
+const ESSENCE_VALUES = { common: 1, uncommon: 3, rare: 8, epic: 25, legendary: 100, mythic: 500 };
 const MAX_HUNT_CAP = 10;
 const HUNT_GEM_DIVISOR = 5;
 const HUNT_COST_BASE = 5;
@@ -1305,8 +1385,8 @@ function huntYield(userId) {
 }
 
 function rollGemDrop(rarity, radarMult) {
-  const chance = Math.min(GEM_DROP_BASE[rarity] * (radarMult || 1), 0.95);
-  if (Math.random() < chance) return GEM_AMOUNT[rarity];
+  const chance = Math.min(GEM_DROP_BASE[rarity] * (radarMult || 1) * eventMult('gemMult'), 0.95);
+  if (Math.random() < chance) return GEM_AMOUNT[rarity] * eventMult('gemMult');
   return 0;
 }
 
@@ -1326,14 +1406,17 @@ function sacrificeAnimals(userId, query, count) {
   let essence = 0;
   let sacrificed = 0;
   let skipped = 0;
+  const surgeMult = eventMult('essenceMult');
   for (const a of targets) {
     if (teamIds.has(a.id)) { skipped++; continue; }
-    essence += ESSENCE_VALUES[a.rarity];
+    let val = ESSENCE_VALUES[a.rarity];
+    if (a.shiny) val *= 2;
+    essence += Math.floor(val * surgeMult);
     removeAnimal(a.id);
     sacrificed++;
   }
   if (sacrificed > 0) addEssence(userId, essence);
-  return { essence, sacrificed, skipped };
+  return { essence, sacrificed, skipped, surgeMult, shinyCount: targets.filter(a => a.shiny && !teamIds.has(a.id)).length };
 }
 
 function addXpRaw(userId, amount) {
@@ -1770,6 +1853,607 @@ function markNotified(key) {
   save();
 }
 
+// ---- v1.7.0: Free bets (house money) ----
+const FREE_BET_DAILY = 500;
+const FREE_BET_MAX = 2500;
+
+function getFreeBet(userId) { const u = ensureUser(userId); return u ? (u.free_bet || 0) : 0; }
+
+function claimFreeBet(userId) {
+  const u = ensureUser(userId);
+  if (!u) return null;
+  const now = Math.floor(Date.now() / 1000);
+  const today = Math.floor(now / 86400);
+  const lastDay = Math.floor((u.free_bet_time || 0) / 86400);
+  if (lastDay >= today) return { granted: 0, total: u.free_bet || 0, already: true };
+  const total = Math.min((u.free_bet || 0) + FREE_BET_DAILY, FREE_BET_MAX);
+  db.run(`UPDATE users SET free_bet = ${total}, free_bet_time = ${now} WHERE user_id = '${userId}'`);
+  save();
+  return { granted: FREE_BET_DAILY, total };
+}
+
+function useFreeBet(userId, amount) {
+  const u = ensureUser(userId);
+  if (!u || (u.free_bet || 0) < amount) return false;
+  db.run(`UPDATE users SET free_bet = free_bet - ${amount} WHERE user_id = '${userId}'`);
+  save();
+  return true;
+}
+
+function addFreeBet(userId, amount) {
+  const u = ensureUser(userId);
+  if (!u) return;
+  const total = Math.min((u.free_bet || 0) + amount, FREE_BET_MAX);
+  db.run(`UPDATE users SET free_bet = ${total} WHERE user_id = '${userId}'`);
+  save();
+}
+
+// ---- v1.7.0: Loss streak protection ----
+const LOSS_STREAK_WINDOW = 1800; // 30 min
+const LOSS_STREAK_TIERS = [[5, 0.1], [8, 0.15], [12, 0.2]]; // [streak, extra refund]
+
+function registerLoss(userId) {
+  const u = ensureUser(userId);
+  if (!u) return 1;
+  const now = Math.floor(Date.now() / 1000);
+  const streak = now - (u.last_loss_time || 0) < LOSS_STREAK_WINDOW ? (u.loss_streak || 0) + 1 : 1;
+  db.run(`UPDATE users SET loss_streak = ${streak}, last_loss_time = ${now} WHERE user_id = '${userId}'`);
+  save();
+  return streak;
+}
+
+function resetLossStreak(userId) {
+  db.run(`UPDATE users SET loss_streak = 0 WHERE user_id = '${userId}'`);
+  save();
+}
+
+function lossStreakBonus(streak) {
+  let bonus = 0;
+  for (const [need, b] of LOSS_STREAK_TIERS) if (streak >= need) bonus = b;
+  return bonus;
+}
+
+// ---- v1.7.0: Vault interest (per guild, hourly) ----
+const VAULT_HOURLY_RATE = 0.004; // 0.4%/hour on vault balance
+
+function accrueVaultInterest() {
+  const rows = db.exec(`SELECT guild_id, balance FROM vaults WHERE balance > 0`);
+  if (!rows.length) return 0;
+  let total = 0;
+  for (const v of rows[0].values) {
+    const gain = Math.floor(v[1] * VAULT_HOURLY_RATE);
+    if (gain <= 0) continue;
+    db.run(`UPDATE vaults SET balance = balance + ${gain} WHERE guild_id = '${v[0]}'`);
+    total += gain;
+  }
+  if (total > 0) save();
+  return total;
+}
+
+// ---- v1.7.0: Pet achievements ----
+const PET_ACHIEVEMENTS = {
+  battle_first: { name: '⚔️ First Blood', desc: 'win your first battle', reward: 15000 },
+  battle_10: { name: '🏅 Fight Club', desc: 'win 10 battles', reward: 100000 },
+  level_10: { name: '📈 Reach level 10', desc: 'get any pet to level 10', reward: 20000 },
+  level_25: { name: '🚀 Reach level 25', desc: 'get any pet to level 25', reward: 100000 },
+  level_50: { name: '🌋 Reach level 50', desc: 'get any pet to level 50', reward: 500000 },
+  evolved: { name: '🦋 Evolution', desc: 'evolve any pet', reward: 50000 },
+  fused: { name: '🧬 Fusion', desc: 'fuse any two pets', reward: 100000 },
+  shiny: { name: '✨ Shiny Collector', desc: 'own a shiny pet', reward: 250000 },
+  mythic: { name: '👑 Mythic', desc: 'own a mythic pet', reward: 1000000 },
+  fed: { name: '🍖 Well Fed', desc: 'feed any pet', reward: 10000 },
+};
+
+function petAchievementsFor(animalId) {
+  const rows = db.exec(`SELECT key, at FROM pet_achievements WHERE animal_id = ${animalId} ORDER BY at`);
+  if (!rows.length) return [];
+  return rows[0].values.map(v => ({ key: v[0], at: v[1] }));
+}
+
+function awardPetAchievement(animalId, key) {
+  if (!PET_ACHIEVEMENTS[key]) return null;
+  db.run(`INSERT OR IGNORE INTO pet_achievements (animal_id, key) VALUES (${animalId}, '${key}')`);
+  save();
+}
+
+function getPetAchievementReward(animalId) {
+  const rows = db.exec(`SELECT key FROM pet_achievements WHERE animal_id = ${animalId}`);
+  if (!rows.length || !rows[0].values.length) return null;
+  const k = rows[0].values[0][0];
+  return PET_ACHIEVEMENTS[k] || null;
+}
+
+// ---- v1.7.0: Evolution ----
+const EVOLUTION_COSTS = { common: 50, uncommon: 200, rare: 800, epic: 3000, legendary: 15000 }; // essence to next tier
+const EVOLUTION_MIN_LEVEL = 10;
+
+function canEvolve(animal) {
+  if (animal.rarity === 'mythic') return { ok: false, reason: 'max' };
+  const idx = RARITY_ORDER.indexOf(animal.rarity);
+  const next = RARITY_ORDER[idx + 1];
+  const cost = EVOLUTION_COSTS[animal.rarity];
+  if (!next || !cost) return { ok: false, reason: 'max' };
+  const lacksLevel = animal.level < EVOLUTION_MIN_LEVEL;
+  if (lacksLevel) return { ok: false, reason: 'level', need: EVOLUTION_MIN_LEVEL };
+  return { ok: true, next, cost };
+}
+
+function evolveAnimal(animalId, userEssence) {
+  const a = getAnimal(animalId);
+  if (!a) return { ok: false, reason: 'notfound' };
+  const can = canEvolve(a);
+  if (!can.ok) return { ok: false, reason: can.reason, need: can.need };
+  if (userEssence < can.cost) return { ok: false, reason: 'essence' };
+  const newSpecies = randomSpecies(can.next);
+  db.run(`UPDATE animals SET species = '${newSpecies}', rarity = '${can.next}', attack = attack + ${Math.floor(a.attack * 0.15)}, defense = defense + ${Math.floor(a.defense * 0.15)}, max_hp = max_hp + ${Math.floor(a.max_hp * 0.15)} WHERE id = ${animalId}`);
+  db.run(`UPDATE users SET essence = essence - ${can.cost} WHERE user_id = '${a.user_id}'`);
+  awardPetAchievement(animalId, 'evolved');
+  save();
+  return { ok: true, species: newSpecies, rarity: can.next, cost: can.cost };
+}
+
+// ---- v1.7.0: Feeding ----
+const FEED_COST = 500;
+const FEED_DURATION = 2 * 3600; // 2h buff
+
+function isFed(animal) {
+  return animal && animal.fed_until > Math.floor(Date.now() / 1000);
+}
+
+function feedAnimal(animalId) {
+  const a = getAnimal(animalId);
+  if (!a) return { ok: false, reason: 'notfound' };
+  const net = Math.floor(Date.now() / 1000);
+  const nowF = Math.max(a.fed_until || 0, net);
+  db.run(`UPDATE animals SET fed_until = ${nowF + FEED_DURATION} WHERE id = ${animalId}`);
+  awardPetAchievement(animalId, 'fed');
+  save();
+  return { ok: true, fedUntil: nowF + FEED_DURATION };
+}
+
+// ---- v1.7.0: Fusion ----
+const FUSION_COST = 100000;
+
+function fuseAnimals(userId, id1, id2) {
+  const a1 = getAnimal(id1);
+  const a2 = getAnimal(id2);
+  if (!a1 || !a2) return { ok: false, reason: 'notfound' };
+  if (a1.user_id !== userId || a2.user_id !== userId) return { ok: false, reason: 'own' };
+  if (a1.id === a2.id) return { ok: false, reason: 'same' };
+  if (a1.rarity === 'mythic' || a2.rarity === 'mythic') return { ok: false, reason: 'mythic' };
+  const team = getTeam(userId);
+  const teamIds = team ? new Set([team.slot1, team.slot2, team.slot3].filter(Boolean)) : new Set();
+  if (teamIds.has(id1) || teamIds.has(id2)) return { ok: false, reason: 'team' };
+  const rank = Math.max(RARITY_ORDER.indexOf(a1.rarity), RARITY_ORDER.indexOf(a2.rarity));
+  const rarity = RARITY_ORDER[rank];
+  const species = randomSpecies(rarity);
+  const stats = randomStats(rarity);
+  const shiny = a1.shiny || a2.shiny ? 1 : 0;
+  const trait = rollTrait();
+  db.run(`DELETE FROM animals WHERE id IN (${id1}, ${id2})`);
+  db.run(`INSERT INTO animals (user_id, species, rarity, hp, max_hp, attack, defense, level, exp, shiny, trait) VALUES ('${userId}', '${species}', '${rarity}', ${stats.hp}, ${stats.hp}, ${stats.attack}, ${stats.defense}, ${Math.max(a1.level, a2.level)}, ${Math.max(a1.exp, a2.exp)}, ${shiny}, '${trait}')`);
+  db.run(`UPDATE users SET balance = balance - ${FUSION_COST} WHERE user_id = '${userId}'`);
+  const rows = db.exec('SELECT last_insert_rowid() AS id');
+  const id = rows[0].values[0][0];
+  awardPetAchievement(id, 'fused');
+  save();
+  return { ok: true, id, species, rarity, level: Math.max(a1.level, a2.level), shiny: shiny === 1, trait };
+}
+
+// ---- v1.7.0: Zoo shop (decorations, cosmetic) ----
+const ZOO_DECOR = [
+  { id: 'fountain', name: 'Fountain', emoji: '⛲', price: 100000 },
+  { id: 'garden', name: 'Flower Garden', emoji: '🌸', price: 150000 },
+  { id: 'statues', name: 'Pet Statues', emoji: '🗿', price: 250000 },
+  { id: 'lights', name: 'Party Lights', emoji: '✨', price: 300000 },
+  { id: 'castle', name: 'Mini Castle', emoji: '🏰', price: 1000000 },
+];
+
+function getZooDecors(userId) {
+  const u = ensureUser(userId);
+  if (!u || !u.zoo_decor) return [];
+  try { return JSON.parse(u.zoo_decor); } catch (e) { return []; }
+}
+
+function buyZooDecor(userId, decorId) {
+  const decor = ZOO_DECOR.find(d => d.id === decorId);
+  const u = ensureUser(userId);
+  if (!decor || !u) return { ok: false, reason: 'notfound' };
+  if ((u.balance || 0) < decor.price) return { ok: false, reason: 'coins' };
+  const owned = getZooDecors(userId);
+  if (owned.includes(decorId)) return { ok: false, reason: 'owned' };
+  db.run(`UPDATE users SET balance = balance - ${decor.price} WHERE user_id = '${userId}'`);
+  owned.push(decorId);
+  db.run(`UPDATE users SET zoo_decor = '${JSON.stringify(owned).replace(/'/g, "''")}' WHERE user_id = '${userId}'`);
+  save();
+  return { ok: true, decor };
+}
+
+// ---- v1.7.0: Random events ----
+const EVENT_TYPES = {
+  gold_rush: { name: 'Gold Rush', desc: 'gambling wins pay +25%', apply: 'winMult', mult: 1.25, duration: 1800 },
+  lucky_hour: { name: 'Lucky Hour', desc: 'gem drops are doubled', apply: 'gemMult', mult: 2, duration: 1800 },
+  egg_mania: { name: 'Egg Mania', desc: 'egg drops are doubled', apply: 'eggMult', mult: 2, duration: 1800 },
+  essence_surge: { name: 'Essence Surge', desc: 'sacrificing gives double essence', apply: 'essenceMult', mult: 2, duration: 1800 },
+};
+
+function getActiveEvent() {
+  const rows = db.exec(`SELECT key, ends_at FROM events LIMIT 1`);
+  if (!rows.length || !rows[0].values.length) return null;
+  const [key, endsAt] = rows[0].values[0];
+  if (Date.now() / 1000 > endsAt) {
+    db.run(`DELETE FROM events WHERE key = '${key}'`);
+    save();
+    return null;
+  }
+  return { key, endsAt };
+}
+
+function startRandomEvent() {
+  const keys = Object.keys(EVENT_TYPES);
+  const key = keys[Math.floor(Math.random() * keys.length)];
+  const ev = EVENT_TYPES[key];
+  db.run(`DELETE FROM events`);
+  db.run(`INSERT INTO events (key, type, ends_at) VALUES ('${key}', '${ev.apply}', ${Math.floor(Date.now() / 1000) + ev.duration})`);
+  save();
+  return { key, ...ev, endsAt: Math.floor(Date.now() / 1000) + ev.duration };
+}
+
+function eventMult(apply) {
+  const ev = getActiveEvent();
+  if (!ev) return 1;
+  const type = EVENT_TYPES[ev.key];
+  return type && type.apply === apply ? type.mult : 1;
+}
+
+// ---- v1.7.0: Plots / land ----
+const PLOT_BASE_PRICE = 500000;
+const PLOT_UPGRADE_COST = 400000;
+const PLOT_INCOME_PER_HOUR = 300;
+const PLOT_MAX_LEVEL = 5;
+
+function getPlot(userId) {
+  const rows = db.exec(`SELECT * FROM plots WHERE user_id = '${userId}'`);
+  if (!rows.length || !rows[0].values.length) return null;
+  const v = rows[0].values[0];
+  return { user_id: v[0], level: v[1], planted_at: v[2], last_claim: v[3] };
+}
+
+function buyPlot(userId) {
+  if (getPlot(userId)) return { ok: false, reason: 'owned' };
+  const u = ensureUser(userId);
+  if (!u || (u.balance || 0) < PLOT_BASE_PRICE) return { ok: false, reason: 'coins' };
+  const now = Math.floor(Date.now() / 1000);
+  db.run(`UPDATE users SET balance = balance - ${PLOT_BASE_PRICE} WHERE user_id = '${userId}'`);
+  db.run(`INSERT INTO plots (user_id, level, planted_at, last_claim) VALUES ('${userId}', 1, ${now}, ${now})`);
+  save();
+  return { ok: true, level: 1 };
+}
+
+function upgradePlot(userId) {
+  const p = getPlot(userId);
+  if (!p) return { ok: false, reason: 'noplot' };
+  if (p.level >= PLOT_MAX_LEVEL) return { ok: false, reason: 'max' };
+  const u = ensureUser(userId);
+  const cost = PLOT_UPGRADE_COST * p.level;
+  if ((u.balance || 0) < cost) return { ok: false, reason: 'coins' };
+  db.run(`UPDATE users SET balance = balance - ${cost} WHERE user_id = '${userId}'`);
+  db.run(`UPDATE plots SET level = level + 1 WHERE user_id = '${userId}'`);
+  save();
+  return { ok: true, level: p.level + 1, cost };
+}
+
+function claimPlot(userId) {
+  const p = getPlot(userId);
+  if (!p) return { ok: false, reason: 'noplot' };
+  const now = Math.floor(Date.now() / 1000);
+  const elapsed = Math.min(now - p.last_claim, 24 * 3600);
+  if (elapsed < 3600) return { ok: false, reason: 'toosoon', wait: 3600 - elapsed };
+  const income = Math.floor(elapsed / 3600 * PLOT_INCOME_PER_HOUR * p.level);
+  db.run(`UPDATE users SET balance = balance + ${income} WHERE user_id = '${userId}'`);
+  db.run(`UPDATE plots SET last_claim = ${now}, planted_at = ${now} WHERE user_id = '${userId}'`);
+  save();
+  return { ok: true, income, hours: Math.floor(elapsed / 3600) };
+}
+
+// ---- v1.7.0: Clans ----
+const CLAN_CREATE_COST = 500000;
+const CLAN_MAX_MEMBERS = 20;
+
+function getClan(guildId) {
+  const rows = db.exec(`SELECT * FROM clans WHERE clan_id = '${guildId}'`);
+  if (!rows.length || !rows[0].values.length) return null;
+  const v = rows[0].values[0];
+  return { clan_id: v[0], name: v[1], owner_id: v[2], balance: v[3], created_at: v[4] };
+}
+
+function createClan(guildId, ownerId, name) {
+  if (getClan(guildId)) return { ok: false, reason: 'exists' };
+  const u = ensureUser(ownerId);
+  if (!u || (u.balance || 0) < CLAN_CREATE_COST) return { ok: false, reason: 'coins' };
+  const safe = (name || '').slice(0, 20).replace(/'/g, "''");
+  if (!safe) return { ok: false, reason: 'name' };
+  db.run(`UPDATE users SET balance = balance - ${CLAN_CREATE_COST} WHERE user_id = '${ownerId}'`);
+  db.run(`INSERT INTO clans (clan_id, name, owner_id) VALUES ('${guildId}', '${safe}', '${ownerId}')`);
+  db.run(`INSERT OR IGNORE INTO clan_members (clan_id, user_id) VALUES ('${guildId}', '${ownerId}')`);
+  save();
+  return { ok: true, name: safe };
+}
+
+function getClanMembers(guildId) {
+  const rows = db.exec(`SELECT user_id FROM clan_members WHERE clan_id = '${guildId}' ORDER BY joined_at`);
+  if (!rows.length) return [];
+  return rows[0].values.map(v => v[0]);
+}
+
+function getClanOf(userId, guildId) {
+  const m = db.exec(`SELECT clan_id FROM clan_members WHERE user_id = '${userId}' AND clan_id = '${guildId}'`);
+  return m.length && m[0].values.length ? guildId : null;
+}
+
+function clanJoin(guildId, userId) {
+  const clan = getClan(guildId);
+  if (!clan) return { ok: false, reason: 'noclan' };
+  if (getClanOf(userId, guildId)) return { ok: false, reason: 'member' };
+  if (getClanMembers(guildId).length >= CLAN_MAX_MEMBERS) return { ok: false, reason: 'full' };
+  db.run(`INSERT OR IGNORE INTO clan_members (clan_id, user_id) VALUES ('${guildId}', '${userId}')`);
+  save();
+  return { ok: true };
+}
+
+function clanLeave(guildId, userId) {
+  const clan = getClan(guildId);
+  if (!clan) return { ok: false, reason: 'noclan' };
+  if (clan.owner_id === userId) return { ok: false, reason: 'owner' };
+  if (!getClanOf(userId, guildId)) return { ok: false, reason: 'notmember' };
+  db.run(`DELETE FROM clan_members WHERE clan_id = '${guildId}' AND user_id = '${userId}'`);
+  save();
+  return { ok: true };
+}
+
+function clanKick(guildId, ownerId, userId) {
+  const clan = getClan(guildId);
+  if (!clan || clan.owner_id !== ownerId) return { ok: false, reason: 'owner' };
+  if (userId === ownerId) return { ok: false, reason: 'self' };
+  db.run(`DELETE FROM clan_members WHERE clan_id = '${guildId}' AND user_id = '${userId}'`);
+  save();
+  return { ok: true };
+}
+
+function clanDeposit(guildId, userId, amount) {
+  const clan = getClan(guildId);
+  const u = ensureUser(userId);
+  if (!clan || !u || (u.balance || 0) < amount) return { ok: false, reason: 'coins' };
+  db.run(`UPDATE users SET balance = balance - ${amount} WHERE user_id = '${userId}'`);
+  db.run(`UPDATE clans SET balance = balance + ${amount} WHERE clan_id = '${guildId}'`);
+  save();
+  return { ok: true };
+}
+
+function clanWithdraw(guildId, ownerId, amount) {
+  const clan = getClan(guildId);
+  if (!clan || clan.owner_id !== ownerId) return { ok: false, reason: 'owner' };
+  if (clan.balance < amount) return { ok: false, reason: 'balance' };
+  db.run(`UPDATE clans SET balance = balance - ${amount} WHERE clan_id = '${guildId}'`);
+  addBalance(ownerId, amount);
+  return { ok: true };
+}
+
+function getClanTop(limit = 10) {
+  const rows = db.exec(`SELECT clan_id, name, balance FROM clans ORDER BY balance DESC LIMIT ${limit}`);
+  if (!rows.length) return [];
+  return rows[0].values.map(v => ({ clan_id: v[0], name: v[1], balance: v[2] }));
+}
+
+// ---- v1.7.0: Auction house (bidding wars) ----
+function createAuction(auctionId, guildId, sellerId, animalId, minBid, hours) {
+  const a = getAnimal(animalId);
+  if (!a || a.user_id !== sellerId) return { ok: false, reason: 'notfound' };
+  if (hours < 1 || hours > 72) return { ok: false, reason: 'time' };
+  const team = getTeam(sellerId);
+  if (team && [team.slot1, team.slot2, team.slot3].includes(animalId)) return { ok: false, reason: 'team' };
+  db.run(`INSERT INTO bids (auction_id, guild_id, seller_id, animal_id, min_bid, current_bid, current_bidder, ends_at) VALUES ('${auctionId}', '${guildId}', '${sellerId}', ${animalId}, ${minBid}, ${minBid}, NULL, ${Math.floor(Date.now() / 1000) + hours * 3600})`);
+  save();
+  return { ok: true };
+}
+
+function getAuction(auctionId) {
+  const rows = db.exec(`SELECT * FROM bids WHERE auction_id = '${auctionId}'`);
+  if (!rows.length || !rows[0].values.length) return null;
+  const v = rows[0].values[0];
+  return { auction_id: v[0], guild_id: v[1], seller_id: v[2], animal_id: v[3], min_bid: v[4], current_bid: v[5], current_bidder: v[6], ends_at: v[7] };
+}
+
+function listAuctions(guildId) {
+  const rows = db.exec(`SELECT * FROM bids WHERE guild_id = '${guildId}' AND ends_at > ${Math.floor(Date.now() / 1000)} ORDER BY ends_at`);
+  if (!rows.length) return [];
+  return rows[0].values.map(v => ({ auction_id: v[0], guild_id: v[1], seller_id: v[2], animal_id: v[3], min_bid: v[4], current_bid: v[5], current_bidder: v[6], ends_at: v[7] }));
+}
+
+function placeBid(auctionId, bidderId, amount) {
+  const auc = getAuction(auctionId);
+  if (!auc) return { ok: false, reason: 'notfound' };
+  if (Math.floor(Date.now() / 1000) > auc.ends_at) return { ok: false, reason: 'ended' };
+  if (auc.seller_id === bidderId) return { ok: false, reason: 'self' };
+  const minIncrement = Math.max(500, Math.floor(auc.current_bid * 0.05));
+  if (amount < auc.current_bid + minIncrement) return { ok: false, reason: 'low', min: auc.current_bid + minIncrement };
+  const u = ensureUser(bidderId);
+  if (!u || (u.balance || 0) < amount) return { ok: false, reason: 'coins' };
+  if (auc.current_bidder) {
+    addBalance(auc.current_bidder, auc.current_bid);
+  }
+  db.run(`UPDATE users SET balance = balance - ${amount} WHERE user_id = '${bidderId}'`);
+  db.run(`UPDATE bids SET current_bid = ${amount}, current_bidder = '${bidderId}' WHERE auction_id = '${auctionId}'`);
+  save();
+  return { ok: true, amount };
+}
+
+function endAuction(auctionId) {
+  const auc = getAuction(auctionId);
+  if (!auc) return null;
+  const a = getAnimal(auc.animal_id);
+  db.run(`DELETE FROM bids WHERE auction_id = '${auctionId}'`);
+  if (!auc.current_bidder) return { ok: false, reason: 'nobids' };
+  const fee = Math.floor(auc.current_bid * 0.05);
+  addBalance(auc.seller_id, auc.current_bid - fee);
+  if (a) {
+    transferAnimal(auc.animal_id, auc.seller_id, auc.current_bidder);
+  }
+  save();
+  return { ok: true, price: auc.current_bid, fee, winner: auc.current_bidder, animal: a };
+}
+
+function cancelAuction(auctionId, userId) {
+  const auc = getAuction(auctionId);
+  if (!auc) return { ok: false, reason: 'notfound' };
+  if (auc.seller_id !== userId) return { ok: false, reason: 'owner' };
+  db.run(`DELETE FROM bids WHERE auction_id = '${auctionId}'`);
+  if (auc.current_bidder) addBalance(auc.current_bidder, auc.current_bid);
+  save();
+  return { ok: true };
+}
+
+function cleanupExpiredAuctions() {
+  const rows = db.exec(`SELECT auction_id FROM bids WHERE ends_at <= ${Math.floor(Date.now() / 1000)}`);
+  if (!rows.length) return 0;
+  let n = 0;
+  for (const v of rows[0].values) { endAuction(v[0]); n++; }
+  return n;
+}
+
+// ---- v1.7.0: Boss raids (per guild) ----
+const BOSS_BASE_HP = 5000;
+// ---- v1.7.0: Lootbox crates + pity ----
+const CRATES = {
+  common: { name: 'Common Crate', price: 30000, weights: { common: 62, uncommon: 24, rare: 11, epic: 3 }, pity: 8, pityRarity: 'rare' },
+  premium: { name: 'Premium Crate', price: 250000, weights: { common: 20, uncommon: 35, rare: 30, epic: 12, legendary: 3 }, pity: 12, pityRarity: 'epic' },
+  mythic: { name: 'Mythic Crate', price: 1000000, weights: { uncommon: 15, rare: 30, epic: 30, legendary: 20, mythic: 5 }, pity: 15, pityRarity: 'legendary' },
+};
+
+function getCratePity(userId) { const u = ensureUser(userId); return u ? (u.crate_pity || 0) : 0; }
+
+function setCratePity(userId, val) {
+  db.run(`UPDATE users SET crate_pity = ${Math.max(0, val)} WHERE user_id = '${userId}'`);
+  save();
+}
+
+function rollCrateRarity(crateId, pity) {
+  const crate = CRATES[crateId];
+  if (!crate) return null;
+  if (pity >= crate.pity) return crate.pityRarity;
+  const total = Object.values(crate.weights).reduce((a, b) => a + b, 0);
+  let roll = Math.random() * total;
+  for (const [rar, w] of Object.entries(crate.weights)) {
+    roll -= w;
+    if (roll <= 0) return rar;
+  }
+  return 'common';
+}
+
+function openCrate(userId, crateId) {
+  const crate = CRATES[crateId];
+  const u = ensureUser(userId);
+  if (!crate || !u) return { ok: false, reason: 'notfound' };
+  if ((u.balance || 0) < crate.price) return { ok: false, reason: 'coins' };
+  const pity = getCratePity(userId) + 1;
+  const rarity = rollCrateRarity(crateId, pity);
+  setCratePity(userId, rarity === crate.pityRarity ? 0 : pity);
+  db.run(`UPDATE users SET balance = balance - ${crate.price} WHERE user_id = '${userId}'`);
+  const shiny = rollShiny() ? 1 : 0;
+  const trait = rollTrait();
+  const species = randomSpecies(rarity);
+  const stats = randomStats(rarity);
+  db.run(`INSERT INTO animals (user_id, species, rarity, hp, max_hp, attack, defense, shiny, trait) VALUES ('${userId}', '${species}', '${rarity}', ${stats.hp}, ${stats.hp}, ${stats.attack}, ${stats.defense}, ${shiny}, '${trait}')`);
+  const rows = db.exec('SELECT last_insert_rowid() AS id');
+  const id = rows[0].values[0][0];
+  save();
+  if (shiny) awardPetAchievement(id, 'shiny');
+  if (rarity === 'mythic') awardPetAchievement(id, 'mythic');
+  const bonus = rarity === 'mythic' ? 250 : rarity === 'legendary' ? 100 : rarity === 'epic' ? 50 : 0;
+  let gems = 0;
+  let essence = 0;
+  if (bonus > 0 && Math.random() < 0.5) { gems = Math.floor(bonus * 0.05); db.run(`UPDATE users SET gems = gems + ${gems} WHERE user_id = '${userId}'`); save(); }
+  if (bonus > 0 && Math.random() < 0.5) { essence = bonus; addEssence(userId, essence); }
+  return { ok: true, id, species, rarity, shiny: shiny === 1, trait, pity, crate: crate.name, gems, essence };
+}
+
+const BOSS_POT_TAX = 0.05;
+const BOSS_LIFE = 30 * 60; // 30 min
+
+function getBoss(guildId) {
+  const rows = db.exec(`SELECT * FROM world_boss WHERE boss_id = '${guildId}'`);
+  if (!rows.length || !rows[0].values.length) return null;
+  const v = rows[0].values[0];
+  const boss = { boss_id: v[0], species: v[1], rarity: v[2], hp: v[3], max_hp: v[4], pot: v[5], ends_at: v[6], level: v[7] };
+  if (boss.hp <= 0) return null;
+  return boss;
+}
+
+function spawnBoss(guildId, memberCount) {
+  const rarity = Math.random() < 0.7 ? 'epic' : 'legendary';
+  const species = randomSpecies(rarity);
+  const level = Math.max(1, Math.min(5, Math.floor((memberCount || 5) / 5)));
+  const stats = randomStats(rarity);
+  const hp = Math.floor(BOSS_BASE_HP * level * (0.8 + Math.random() * 0.4));
+  db.run(`INSERT INTO world_boss (boss_id, species, rarity, hp, max_hp, level, pot, ends_at) VALUES ('${guildId}', '${species}', '${rarity}', ${hp}, ${hp}, ${level}, 0, ${Math.floor(Date.now() / 1000) + BOSS_LIFE})`);
+  save();
+  return { boss_id: guildId, species, rarity, hp, max_hp: hp, level, pot: 0, ends_at: Math.floor(Date.now() / 1000) + BOSS_LIFE };
+}
+
+function attackBoss(guildId, userId, damage) {
+  const boss = getBoss(guildId);
+  if (!boss) return { ok: false, reason: 'noboss' };
+  if (Math.floor(Date.now() / 1000) > boss.ends_at) return { ok: false, reason: 'expired' };
+  db.run(`UPDATE world_boss SET hp = hp - ${damage} WHERE boss_id = '${guildId}'`);
+  const rows = db.exec(`SELECT damage FROM boss_contrib WHERE boss_id = '${guildId}' AND user_id = '${userId}'`);
+  if (rows.length && rows[0].values.length) {
+    db.run(`UPDATE boss_contrib SET damage = damage + ${damage} WHERE boss_id = '${guildId}' AND user_id = '${userId}'`);
+  } else {
+    db.run(`INSERT INTO boss_contrib (boss_id, user_id, damage) VALUES ('${guildId}', '${userId}', ${damage})`);
+  }
+  save();
+  return { ok: true, hp: boss.hp - damage, max_hp: boss.max_hp, boss_id: guildId };
+}
+
+function addBossPot(guildId, amount) {
+  const boss = getBoss(guildId);
+  if (!boss) return false;
+  db.run(`UPDATE world_boss SET pot = pot + ${amount} WHERE boss_id = '${guildId}'`);
+  save();
+  return true;
+}
+
+function getBossContrib(guildId) {
+  const rows = db.exec(`SELECT user_id, damage FROM boss_contrib WHERE boss_id = '${guildId}' ORDER BY damage DESC`);
+  if (!rows.length) return [];
+  return rows[0].values.map(v => ({ user_id: v[0], damage: v[1] }));
+}
+
+function resolveBoss(guildId) {
+  const rows = db.exec(`SELECT * FROM world_boss WHERE boss_id = '${guildId}'`);
+  const contrib = getBossContrib(guildId);
+  const boss = rows.length && rows[0].values.length
+    ? { boss_id: rows[0].values[0][0], species: rows[0].values[0][1], rarity: rows[0].values[0][2], hp: rows[0].values[0][3], max_hp: rows[0].values[0][4], pot: rows[0].values[0][5], ends_at: rows[0].values[0][6], level: rows[0].values[0][7] }
+    : null;
+  db.run(`DELETE FROM world_boss WHERE boss_id = '${guildId}'`);
+  db.run(`DELETE FROM boss_contrib WHERE boss_id = '${guildId}'`);
+  save();
+  if (!boss || !contrib.length) return null;
+  const payouts = distributeBossPot(guildId, contrib, boss.pot);
+  return { payouts, pot: boss.pot, species: boss.species, hp: boss.hp, max_hp: boss.max_hp };
+}
+
+function distributeBossPot(guildId, contrib, pot) {
+  const totalDamage = contrib.reduce((s, c) => s + c.damage, 0);
+  if (totalDamage <= 0) return [];
+  const payouts = [];
+  for (const c of contrib) {
+    const share = Math.floor(pot * (c.damage / totalDamage));
+    if (share > 0) { addBalance(c.user_id, share); payouts.push({ user_id: c.user_id, damage: c.damage, share }); }
+  }
+  return payouts;
+}
+
 module.exports = {
   init,
   ensureUser,
@@ -1815,6 +2499,7 @@ module.exports = {
   setCmdLogChannel, getCmdLogChannel,
   setUpdateChannel, getUpdateChannel, getAllUpdateChannels,
   getInsuranceRefund,
+  addBattleWin, getBattleWins,
   getMaxBet,
   getMarriage,
   setMarriage,
@@ -1859,4 +2544,20 @@ module.exports = {
   autohuntRank, autohuntUpgradeCost, autohuntAnimalsPerCycle, autohuntMaxMinutes,
   ESSENCE_VALUES, MAX_HUNT_CAP, HUNT_COST_BASE, AUTOHUNT_COST_PER_MIN, AUTOHUNT_CYCLE,
   getSnailInfo, breedSnails, buySnails, sellSnails, SNAIL_PRICE, SNAIL_SELL_PRICE, SNAIL_DAILY_LIMIT, SNAIL_CAPACITY,
+  FREE_BET_DAILY, FREE_BET_MAX, getFreeBet, claimFreeBet, useFreeBet, addFreeBet,
+  registerLoss, resetLossStreak, lossStreakBonus, LOSS_STREAK_WINDOW,
+  VAULT_HOURLY_RATE, accrueVaultInterest,
+  PET_ACHIEVEMENTS, petAchievementsFor, awardPetAchievement, getPetAchievementReward,
+  EVOLUTION_COSTS, EVOLUTION_MIN_LEVEL, canEvolve, evolveAnimal,
+  FEED_COST, FEED_DURATION, isFed, feedAnimal,
+  FUSION_COST, fuseAnimals,
+  ZOO_DECOR, getZooDecors, buyZooDecor,
+  EVENT_TYPES, getActiveEvent, startRandomEvent, eventMult,
+  PLOT_BASE_PRICE, PLOT_UPGRADE_COST, PLOT_INCOME_PER_HOUR, PLOT_MAX_LEVEL, getPlot, buyPlot, upgradePlot, claimPlot,
+  CLAN_CREATE_COST, CLAN_MAX_MEMBERS, getClan, createClan, getClanMembers, getClanOf, clanJoin, clanLeave, clanKick, clanDeposit, clanWithdraw, getClanTop,
+  createAuction, getAuction, listAuctions, placeBid, endAuction, cancelAuction, cleanupExpiredAuctions,
+  BOSS_BASE_HP, BOSS_LIFE, getBoss, spawnBoss, attackBoss, addBossPot, getBossContrib, resolveBoss,
+  CRATES, getCratePity, setCratePity, rollCrateRarity, openCrate,
+  isMarried, marriedMult,
+  SHINY_CHANCE, PERSONALITIES, rollShiny, rollTrait,
 };

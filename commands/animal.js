@@ -1,7 +1,8 @@
 const db = require('../db');
 const { embed, error } = require('../utils/embed');
 
-const RARITY_EMOJIS = { common: '⚪', uncommon: '🟢', rare: '🔵', epic: '🟣', legendary: '🟡' };
+const RARITY_EMOJIS = { common: '⚪', uncommon: '🟢', rare: '🔵', epic: '🟣', legendary: '🟡', mythic: '👑' };
+const TRAIT_EMOJIS = { Brave: '⚔️', Chill: '🧊', Eager: '⚡', Lucky: '🍀', Calm: '🌊' };
 
 function findAnimal(userId, query) {
   const all = db.getUserAnimals(userId);
@@ -36,14 +37,22 @@ module.exports = {
     const xpPct = Math.min(100, Math.floor((a.exp / xpNeed) * 100));
     const bar = '█'.repeat(Math.floor(xpPct / 10)) + '░'.repeat(10 - Math.floor(xpPct / 10));
 
-    const team = db.getTeam(message.author.id);
+const team = db.getTeam(message.author.id);
     const onTeam = team && [team.slot1, team.slot2, team.slot3].includes(a.id);
+    const fed = db.isFed(a);
+    const traitEmoji = TRAIT_EMOJIS[a.trait];
+    const achers = db.PET_ACHIEVEMENTS;
+    const achersList = db.petAchievementsFor(a.id);
+    const achievLine = achersList.length
+      ? achersList.map(pa => `${achers[pa.key] ? achers[pa.key].name : pa.key}`).join('\n')
+      : 'none yet';
 
     message.channel.send({ embeds: [embed(`${RARITY_EMOJIS[a.rarity]} ${a.name !== 'Unnamed' ? `${a.name} the ` : ''}${a.species}`, [
-      ['Info', `${a.rarity.toUpperCase()} · Lv.**${a.level}** · \`#${a.id}\`${onTeam ? ' · ⭐ on battle team' : ''}`],
-      ['Combat', `❤️ **${a.hp}**/${a.max_hp} HP\n⚔️ **${a.attack}** attack\n🛡️ **${a.defense}** defense`],
+      ['Info', `${a.rarity.toUpperCase()} · Lv.**${a.level}** · \`#${a.id}\`${onTeam ? ' · 🛡️ on battle team' : ''}${a.shiny ? '\n✨ **SHINY** (2x sell price)' : ''}\npersonality: ${traitEmoji || ''} **${a.trait || 'none'}**${fed ? '\n🍖 **fed** (+10% battle stats)' : ''}`],
+      ['Combat', `${traitEmoji || ''} **${a.hp}**/${a.max_hp} HP\n🗡️ **${a.attack}** attack\n🛡️ **${a.defense}** defense`],
       ['XP', `${bar} **${a.exp}/${xpNeed}** (${xpPct}%)`],
-      ['', `\`v team\` to put it on your battle team · \`v rename ${a.id} <name>\` to name it`],
+      ['Pet Achievements', achievLine],
+      ['', `\`v team\` to put it on your battle team · \`v rename ${a.id} <name>\` to name it · \`v feed ${a.id}\` · \`v evolve ${a.id}\``],
     ], 0x57f287)] });
   },
 };
