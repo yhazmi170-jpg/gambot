@@ -20,10 +20,13 @@ module.exports = {
     const factor = db.getBalanceFactor(message.author.id);
     const raw = Math.floor(base * factor);
     const married = db.marriedMult(message.author.id);
-    const amount = Math.floor(raw * married);
+    const rewardMult = db.eventMult('rewardMult');
+    const amount = Math.floor(raw * married * rewardMult);
     db.claimWeekly(message.author.id, raw);
+    const bonus = amount - Math.floor(raw * married);
+    if (bonus > 0) db.addBalance(message.author.id, bonus);
     message.channel.send({
-      embeds: [success(`claimed **${amount}** ${config.currency} as your weekly reward!${base > config.weeklyAmount ? ' (daily cap perk!)' : ''}${married > 1 ? ' (❤️ married +10%)' : ''}${factor < 1 ? ` (${Math.round((1 - factor) * 100)}% reduction)` : ''}`)],
+      embeds: [success(`claimed **${amount}** ${config.currency} as your weekly reward!${base > config.weeklyAmount ? ' (daily cap perk!)' : ''}${married > 1 ? ' (❤️ married +10%)' : ''}${rewardMult > 1 ? ` (event x${rewardMult})` : ''}${factor < 1 ? ` (${Math.round((1 - factor) * 100)}% reduction)` : ''}`)],
     });
   },
 };

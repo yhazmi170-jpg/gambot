@@ -20,12 +20,13 @@ module.exports = {
 const info = db.claimDaily(message.author.id);
     const factor = db.getBalanceFactor(message.author.id);
     const married = info.mult > 1;
-    const finalReward = Math.floor(info.reward * factor);
+    const rewardMult = db.eventMult('rewardMult');
+    const finalReward = Math.floor(info.reward * factor * rewardMult);
     const diff = finalReward - info.reward;
     if (diff !== 0) db.addBalance(message.author.id, diff);
     message.channel.send({
       embeds: [embed('🎁 Daily', [
-        ['Reward', `**${finalReward}** ${config.currency}${married ? ' (❤️ married +10%)' : ''}${factor < 1 ? ` (${Math.round((1 - factor) * 100)}% reduction)` : ''}`],
+        ['Reward', `**${finalReward}** ${config.currency}${married ? ' (❤️ married +10%)' : ''}${factor < 1 ? ` (${Math.round((1 - factor) * 100)}% reduction)` : ''}${rewardMult > 1 ? ` (event x${rewardMult})` : ''}`],
         ['Streak', `day **${info.streak}**`],
         ['Next', info.reward >= info.max ? 'max streak reached!' : `+500 per day (max ${info.max})`],
       ])],

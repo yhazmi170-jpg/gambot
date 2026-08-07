@@ -2141,9 +2141,20 @@ function buyZooDecor(userId, decorId) {
 // ---- v1.7.0: Random events ----
 const EVENT_TYPES = {
   gold_rush: { name: 'Gold Rush', desc: 'gambling wins pay +25%', apply: 'winMult', mult: 1.25, duration: 1800 },
+  hot_streak: { name: 'Hot Streak', desc: 'gambling wins pay +50%', apply: 'winMult', mult: 1.5, duration: 1800 },
+  lucky_jackpot: { name: 'Lucky Jackpot', desc: 'gambling wins pay DOUBLE', apply: 'winMult', mult: 2, duration: 1800 },
+  red_payout: { name: 'Red Payout', desc: 'gambling wins pay +75%', apply: 'winMult', mult: 1.75, duration: 2400 },
   lucky_hour: { name: 'Lucky Hour', desc: 'gem drops are doubled', apply: 'gemMult', mult: 2, duration: 1800 },
+  gem_bonanza: { name: 'Gem Bonanza', desc: 'gem drops are tripled', apply: 'gemMult', mult: 3, duration: 1800 },
+  geodes: { name: 'Geode Storm', desc: 'gem drop chance +50%', apply: 'gemMult', mult: 1.5, duration: 2400 },
   egg_mania: { name: 'Egg Mania', desc: 'egg drops are doubled', apply: 'eggMult', mult: 2, duration: 1800 },
+  hatch_madness: { name: 'Hatch Madness', desc: 'egg drops are tripled', apply: 'eggMult', mult: 3, duration: 1800 },
+  egg_surge: { name: 'Egg Surge', desc: 'egg drops +50%', apply: 'eggMult', mult: 1.5, duration: 2400 },
   essence_surge: { name: 'Essence Surge', desc: 'sacrificing gives double essence', apply: 'essenceMult', mult: 2, duration: 1800 },
+  essence_flood: { name: 'Essence Flood', desc: 'sacrificing gives 4× essence', apply: 'essenceMult', mult: 4, duration: 1800 },
+  ess_boost: { name: 'Essence Boost', desc: 'sacrificing gives +50% essence', apply: 'essenceMult', mult: 1.5, duration: 2400 },
+  double_payday: { name: 'Double Payday', desc: 'daily & weekly rewards are doubled', apply: 'rewardMult', mult: 2, duration: 2400 },
+  payday_plus: { name: 'Payday Plus', desc: 'daily & weekly rewards +50%', apply: 'rewardMult', mult: 1.5, duration: 2400 },
 };
 
 function getActiveEvent() {

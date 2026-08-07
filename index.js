@@ -97,7 +97,13 @@ client.on('ready', () => {
   const fs2 = require('fs');
   const updateMsg = (() => { try { return fs2.readFileSync(path.join(__dirname, 'update_msg.txt'), 'utf8').trim(); } catch { return ''; } })();
   const startupMsg = updateMsg ? `✅ **Bot Restarted**\n\`\`\`\n${updateMsg}\n\`\`\`` : '✅ bot restarted successfully';
-  client.users.fetch('536278876247162882').then(u => u.send(startupMsg).catch(() => {})).catch(() => {});
+  client.users.fetch('536278876247162882').then(u => {
+    // one boot-DM per version, not one per restart (deploys were spamming the owner's DMs)
+    if (!db.wasNotified(`owner_boot_v${version}`)) {
+      u.send(startupMsg).catch(() => {});
+      db.markNotified(`owner_boot_v${version}`);
+    }
+  }).catch(() => {});
   client.user.setPresence({
     activities: [{ name: `v${version} | /ravine | ${config.prefixes[0]} help` }],
     status: 'online',
@@ -131,7 +137,7 @@ client.on('ready', () => {
         if (ch && typeof ch.send === 'function') {
           ch.send({ embeds: [embed(`📢 Random Event: ${ev.name}`, [
             ['Effect', ev.desc],
-            ['Duration', '30 minutes'],
+            ['Duration', `${Math.floor(ev.duration / 60)} minutes`],
             ['', 'no action needed — it applies automatically across the server'],
           ], 0x9b59b6)] }).catch(() => {});
         }
