@@ -3,7 +3,7 @@ services:
     name: gambot
     env: node
     plan: free
-    buildCommand: apt-get update && apt-get install -y ffmpeg && npm install
+    buildCommand: npm install
     startCommand: node index.js
     healthCheckPath: /
     envVars:
