@@ -1,6 +1,7 @@
 const db = require('../db');
 const { embed, error, success, parseAmount } = require('../utils/embed');
 const config = require('../config');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 module.exports = {
   name: 'clan',
@@ -8,21 +9,50 @@ module.exports = {
   helpArgs: '<create <name> | join [@user|name] | leave | kick @user | deposit <amt> | withdraw <amt> | info | delete | top>',
   description: 'player-owned clans — one clan per player, join anyone\u2019s clan across the server',
   aliases: ['guild'],
-  execute(message, args) {
+  async execute(message, args) {
     const userId = message.author.id;
     const sub = (args[0] || '').toLowerCase();
     const usage = 'usage: `v clan create <name>` | `v clan join @user` | `v clan info` | `v clan deposit <amt>` | `v clan top`';
     if (!sub) return message.channel.send({ embeds: [error(usage)] });
 
-    if (sub === 'create') {
+if (sub === 'create') {
       const name = args.slice(1).join(' ').trim();
       if (!name) return message.channel.send({ embeds: [error('give a clan name: `v clan create Family`')] });
-      const res = db.createClan(userId, name);
-      if (!res.ok) {
-        const reasons = { created: 'you already own a clan — a player can only own one', member: 'you are already in a clan — leave it first with `v clan leave`', coins: `creating a clan costs **${db.CLAN_CREATE_COST.toLocaleString()}** coins` };
-        return message.channel.send({ embeds: [error(reasons[res.reason] || 'could not create clan')] });
+      const bal = db.getBalance(userId);
+      if (bal < db.CLAN_CREATE_COST) {
+        return message.channel.send({ embeds: [error(`creating a clan costs **${db.CLAN_CREATE_COST.toLocaleString()}** ${config.currency} — you only have **${bal.toLocaleString()}**`)] });
       }
-      return message.channel.send({ embeds: [embed('🏰 Clan Created', [['Name', res.name], ['Owner', `<@${userId}>`], ['Next', 'friends can `v clan join <@you>`; `v clan deposit <amt>` fills the treasury']])] });
+      const confirmRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('clan_confirm').setLabel('Pay 5,000,000 & Create').setStyle(ButtonStyle.Danger).setEmoji('⚠️'),
+        new ButtonBuilder().setCustomId('clan_cancel').setLabel('Cancel').setStyle(ButtonStyle.Secondary).setEmoji('❌'),
+      );
+      const prompt = await message.channel.send({
+        embeds: [embed('⚠️ Clan Creation — 5M coins', [
+          ['Name', name.slice(0, 20)],
+          ['Cost', `**${db.CLAN_CREATE_COST.toLocaleString()}** ${config.currency} — this will be charged from your balance (you have ${bal.toLocaleString()}). Create **${name}**?`],
+          ['', '⚠️ non-refundable — you won\u2019t get the 5M back when you delete the clan'],
+        ], 0xf1c40f)],
+        components: [confirmRow],
+      });
+      const confirm = async (i) => {
+        if (i.customId === 'clan_cancel') {
+          await i.update({ embeds: [error('clan creation cancelled')], components: [] }).catch(() => {});
+          return;
+        }
+        if (i.user.id !== userId) {
+          return i.reply({ embeds: [error('only the clan creator can confirm')], ephemeral: true });
+        }
+        const res = db.createClan(userId, name);
+        if (!res.ok) {
+          const reasons = { create: 'you already own a clan — a player can only own one', member: 'you are already in a clan — leave it first with `v clan leave`', coins: `creating a clan costs **${db.CLAN_CREATE_COST.toLocaleString()}** ${config.currency} — balance changed, not enough coins` };
+          return i.update({ embeds: [error(reasons[res.reason] || 'could not create clan')], components: [] }).catch(() => {});
+        }
+        await i.update({ embeds: [embed('Clan Created', [['Name', res.name], ['Owner', `<@${userId}>`], ['Cost', `**${db.CLAN_CREATE_COST.toLocaleString()}** ${config.currency} charged`], ['Next', 'friends can `v clan join <@you>` · `v clan deposit <amt>` fills the treasury']])], components: [] }).catch(() => {});
+      };
+      const col = prompt.createMessageComponentCollector({ max: 1, time: 30000 });
+      col.on('collect', confirm);
+      col.on('end', () => { prompt.edit({ components: [] }).catch(() => {}); });
+      return;
     }
 
     const myClanId = db.getClanOf(userId);
