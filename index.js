@@ -168,6 +168,27 @@ client.on('ready', () => {
       });
     }
   }, config.lotteryInterval || 3600000);
+
+  // animated gradient custom roles — fade each role's color between its two stored colors
+  setInterval(() => {
+    const gradients = db.getGradientCustomRoles();
+    if (!gradients.length) return;
+    const now = Date.now();
+    for (const g of gradients) {
+      const guild = client.guilds.cache.get(g.guildId);
+      if (!guild) continue;
+      const role = guild.roles.cache.get(g.roleId);
+      if (!role) continue;
+      // sin wave over ~12s gives a smooth A->B->A ping-pong every ~6s
+      const t = (Math.sin((now / 3000) * Math.PI) + 1) / 2; // 0..1
+      const r = Math.round(((g.colorA >> 16) & 255) + (((g.colorB >> 16) & 255) - ((g.colorA >> 16) & 255)) * t);
+      const g_ = Math.round(((g.colorA >> 8) & 255) + (((g.colorB >> 8) & 255) - ((g.colorA >> 8) & 255)) * t);
+      const b = Math.round((g.colorA & 255) + ((g.colorB & 255) - (g.colorA & 255)) * t);
+      const color = (r << 16) | (g_ << 8) | b;
+      if (role.color === color) continue;
+      role.setColor(color).catch(() => {});
+    }
+  }, 3000);
 });
 
 client.on('interactionCreate', (i) => {

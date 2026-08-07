@@ -112,8 +112,12 @@ async function init() {
     user_id TEXT NOT NULL,
     guild_id TEXT NOT NULL,
     role_id TEXT NOT NULL,
+    color_a INTEGER,
+    color_b INTEGER,
     PRIMARY KEY (user_id, guild_id)
   )`);
+  try { db.run(`ALTER TABLE custom_roles ADD COLUMN color_a INTEGER`); } catch (e) {}
+  try { db.run(`ALTER TABLE custom_roles ADD COLUMN color_b INTEGER`); } catch (e) {}
   db.run(`CREATE TABLE IF NOT EXISTS autohunts (
     user_id TEXT PRIMARY KEY,
     started_at INTEGER NOT NULL,
@@ -1128,6 +1132,17 @@ function setCustomRole(userId, guildId, roleId) {
   save();
 }
 
+function setCustomRoleColor(userId, guildId, colorA, colorB) {
+  db.run(`UPDATE custom_roles SET color_a = ${colorA === null ? 'NULL' : colorA}, color_b = ${colorB === null ? 'NULL' : colorB} WHERE user_id = '${userId}' AND guild_id = '${guildId}'`);
+  save();
+}
+
+function getGradientCustomRoles() {
+  const rows = db.exec(`SELECT user_id, guild_id, role_id, color_a, color_b FROM custom_roles WHERE color_a IS NOT NULL AND color_b IS NOT NULL AND color_a IS NOT color_b`);
+  if (!rows.length || !rows[0].values.length) return [];
+  return rows[0].values.map(v => ({ userId: v[0], guildId: v[1], roleId: v[2], colorA: v[3], colorB: v[4] }));
+}
+
 function getCustomRole(userId, guildId) {
   const rows = db.exec(`SELECT role_id FROM custom_roles WHERE user_id = '${userId}' AND guild_id = '${guildId}'`);
   if (!rows.length || !rows[0].values.length) return null;
@@ -1768,6 +1783,7 @@ module.exports = {
   addAnimal, getUserAnimals, getAnimal, removeAnimal, addExp, renameAnimal,
   setTeam, removeFromTeam, getTeam, setHuntCooldown, getHuntCooldown, sellPrice, getAnimalCount,
   setCustomRole, getCustomRole, deleteCustomRole, getPerkHolders,
+  setCustomRoleColor, getGradientCustomRoles,
   getBalanceFactor,
   payWin,
   xpForLevel, levelInfo, grantXp,

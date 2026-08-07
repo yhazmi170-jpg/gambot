@@ -1,16 +1,4 @@
-v1.6.0
+v1.6.1
 
 NEW:
- play <song> -- bot joins your voice channel and plays the song; works with YouTube links, Spotify links, or just a name; queue, skip, stop, pause, resume, volume
- disable <cmd> #channel /  enable <cmd> #channel -- turn commands off per-channel
-
-FIXES:
-- Update announcements no longer skip channels or fail with 400 (split across fields)
-- Achievements pay out BEFORE being marked unlocked (never a recorded-but-unpaid unlock)
-- Loan shark exploit fixed: can't give/rob/rain/duel/trade money away while a loan is outstanding; wins auto-repay the loan first
-- Fixed misleading balance-cut warning in crash (showed mult*factor, real payout is 1+(mult-1)*factor)
-- Battle requests survive restarts -- pending duels are saved to the DB
-- v team add no longer wipes your other slots
-- v rob now DMs the victim
-- v help is paginated like the shop; shop cleaned up (no more emojis); slots celebrates triple-7 jackpots
-- Achievements batch into one embed; v stocks sell all fixed; new v perkhelp
+- Custom role rework: `v customrole color <#hex> <#hex>` sets an animated gradient; `v customrole delete` removes your role; roles auto-stay stacked under the portal role
