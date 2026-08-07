@@ -132,13 +132,15 @@ client.on('ready', () => {
     const ev = db.startRandomEvent();
     let channels = db.getAllEventChannels();
     if (!channels.length) channels = db.getAllUpdateChannels(); // fallback so events aren't missed
+    const rain = ev.apply === 'rain' ? db.applyRain(ev.key) : null;
+    const rainNote = rain ? `\nevery gambler got **${rain.coins ? `+${rain.coins.toLocaleString()} coins` : ''}${rain.coins && rain.gems ? ', ' : ''}${rain.gems ? `+${rain.gems} gems` : ''}${(rain.coins || rain.gems) && rain.eggs ? ', ' : ''}${rain.eggs ? `+${rain.eggs} eggs` : ''}** 🌧️` : '';
     for (const { channel_id } of channels) {
       client.channels.fetch(channel_id).then(ch => {
         if (ch && typeof ch.send === 'function') {
-          ch.send({ embeds: [embed(`📢 Random Event: ${ev.name}`, [
+          ch.send({ embeds: [embed(`📢 Random Event: ${ev.emoji || '🎉'} ${ev.name}`, [
             ['Effect', ev.desc],
-            ['Duration', `${Math.floor(ev.duration / 60)} minutes`],
-            ['', 'no action needed — it applies automatically across the server'],
+            ['Duration', ev.apply === 'rain' ? 'instant payout 🌧️' : `${Math.floor(ev.duration / 60)} minutes`],
+            ['', `no action needed — it applies automatically across the server${rainNote.replace(/\n/g, ' ')}`],
           ], 0x9b59b6)] }).catch(() => {});
         }
       }).catch(() => {});

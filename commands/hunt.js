@@ -44,6 +44,8 @@ module.exports = {
     let gemsEarned = 0;
     let coinsEarned = 0;
     let eggsFound = 0;
+    const xpMult = db.eventMult('xpMult');
+    const xpEarned = Math.floor(yieldInfo.xp * count * xpMult);
     for (let i = 0; i < count; i++) {
       const animal = db.addAnimal(userId, traits.efficiency);
       const g = db.rollGemDrop(animal.rarity, yieldInfo.radarMult);
@@ -62,7 +64,7 @@ module.exports = {
       db.addBalance(userId, yieldInfo.coins * count);
       coinsEarned = yieldInfo.coins * count;
     }
-    const xpResult = yieldInfo.xp > 0 ? db.addXpRaw(userId, yieldInfo.xp * count) : null;
+    const xpResult = yieldInfo.xp > 0 ? db.addXpRaw(userId, xpEarned) : null;
     db.addQuestProgress(userId, 'hunt', count);
     db.addBountyProgress(userId, 'hunt', count);
 
@@ -79,7 +81,7 @@ module.exports = {
     if (gemsEarned > 0) summary.push(`💎 found **${gemsEarned} gem${gemsEarned > 1 ? 's' : ''}**!`);
     if (eggsFound > 0) summary.push(`🥚 found **${eggsFound} egg${eggsFound > 1 ? 's' : ''}**! (\`v hatch\` to open)`);
     summary.push(`💎 gems: **${db.getGems(userId)}**`);
-    if (xpResult) summary.push(`**+${yieldInfo.xp * count}** xp`);
+    if (xpResult) summary.push(`**+${xpEarned}** xp${xpMult > 1 ? ` (event x${xpMult})` : ''}`);
     if (xpResult && xpResult.leveledUp) summary.push(`leveled up to **${xpResult.newLevel}**!`);
     summary.push('`v huntbot` for upgrades · `v sacrifice` for essence');
 

@@ -2331,22 +2331,59 @@ function buyZooDecor(userId, decorId) {
 
 // ---- v1.7.0: Random events ----
 const EVENT_TYPES = {
-  gold_rush: { name: 'Gold Rush', desc: 'gambling wins pay +25%', apply: 'winMult', mult: 1.25, duration: 1800 },
-  hot_streak: { name: 'Hot Streak', desc: 'gambling wins pay +50%', apply: 'winMult', mult: 1.5, duration: 1800 },
-  lucky_jackpot: { name: 'Lucky Jackpot', desc: 'gambling wins pay DOUBLE', apply: 'winMult', mult: 2, duration: 1800 },
-  red_payout: { name: 'Red Payout', desc: 'gambling wins pay +75%', apply: 'winMult', mult: 1.75, duration: 2400 },
-  lucky_hour: { name: 'Lucky Hour', desc: 'gem drops are doubled', apply: 'gemMult', mult: 2, duration: 1800 },
-  gem_bonanza: { name: 'Gem Bonanza', desc: 'gem drops are tripled', apply: 'gemMult', mult: 3, duration: 1800 },
-  geodes: { name: 'Geode Storm', desc: 'gem drop chance +50%', apply: 'gemMult', mult: 1.5, duration: 2400 },
-  egg_mania: { name: 'Egg Mania', desc: 'egg drops are doubled', apply: 'eggMult', mult: 2, duration: 1800 },
-  hatch_madness: { name: 'Hatch Madness', desc: 'egg drops are tripled', apply: 'eggMult', mult: 3, duration: 1800 },
-  egg_surge: { name: 'Egg Surge', desc: 'egg drops +50%', apply: 'eggMult', mult: 1.5, duration: 2400 },
-  essence_surge: { name: 'Essence Surge', desc: 'sacrificing gives double essence', apply: 'essenceMult', mult: 2, duration: 1800 },
-  essence_flood: { name: 'Essence Flood', desc: 'sacrificing gives 4× essence', apply: 'essenceMult', mult: 4, duration: 1800 },
-  ess_boost: { name: 'Essence Boost', desc: 'sacrificing gives +50% essence', apply: 'essenceMult', mult: 1.5, duration: 2400 },
-  double_payday: { name: 'Double Payday', desc: 'daily & weekly rewards are doubled', apply: 'rewardMult', mult: 2, duration: 2400 },
-  payday_plus: { name: 'Payday Plus', desc: 'daily & weekly rewards +50%', apply: 'rewardMult', mult: 1.5, duration: 2400 },
+  gold_rush: { name: 'Gold Rush', desc: 'gambling wins pay +25%', emoji: '🪙', apply: 'winMult', mult: 1.25, duration: 1800, weight: 10 },
+  hot_streak: { name: 'Hot Streak', desc: 'gambling wins pay +50%', emoji: '🔥', apply: 'winMult', mult: 1.5, duration: 1800, weight: 10 },
+  red_payout: { name: 'Red Payout', desc: 'gambling wins pay +75%', emoji: '💸', apply: 'winMult', mult: 1.75, duration: 2400, weight: 10 },
+  lucky_jackpot: { name: 'Lucky Jackpot', desc: 'gambling wins pay DOUBLE', emoji: '🎰', apply: 'winMult', mult: 2, duration: 1800, weight: 8 },
+  casino_night: { name: 'Casino Night', desc: 'gambling wins pay TRIPLE', emoji: '🎲', apply: 'winMult', mult: 3, duration: 1500, weight: 4 },
+  lucky_hour: { name: 'Lucky Hour', desc: 'gem drops are doubled', emoji: '🍀', apply: 'gemMult', mult: 2, duration: 1800, weight: 10 },
+  geodes: { name: 'Geode Storm', desc: 'gem drop chance +50%', emoji: '🪨', apply: 'gemMult', mult: 1.5, duration: 2400, weight: 10 },
+  gem_bonanza: { name: 'Gem Bonanza', desc: 'gem drops are tripled', emoji: '💎', apply: 'gemMult', mult: 3, duration: 1800, weight: 8 },
+  gem_tsunami: { name: 'Gem Tsunami', desc: 'gem drops are 4x', emoji: '🌊', apply: 'gemMult', mult: 4, duration: 1200, weight: 4 },
+  egg_surge: { name: 'Egg Surge', desc: 'egg drops +50%', emoji: '🥚', apply: 'eggMult', mult: 1.5, duration: 2400, weight: 10 },
+  egg_mania: { name: 'Egg Mania', desc: 'egg drops are doubled', emoji: '🐣', apply: 'eggMult', mult: 2, duration: 1800, weight: 10 },
+  hatch_madness: { name: 'Hatch Madness', desc: 'egg drops are tripled', emoji: '🐥', apply: 'eggMult', mult: 3, duration: 1800, weight: 8 },
+  egg_frenzy: { name: 'Egg Frenzy', desc: 'egg drops are 5x', emoji: '🐤', apply: 'eggMult', mult: 5, duration: 900, weight: 3 },
+  ess_boost: { name: 'Essence Boost', desc: 'sacrificing gives +50% essence', emoji: '✨', apply: 'essenceMult', mult: 1.5, duration: 2400, weight: 10 },
+  essence_surge: { name: 'Essence Surge', desc: 'sacrificing gives double essence', emoji: '🔮', apply: 'essenceMult', mult: 2, duration: 1800, weight: 10 },
+  essence_flood: { name: 'Essence Flood', desc: 'sacrificing gives 4x essence', emoji: '💜', apply: 'essenceMult', mult: 4, duration: 1800, weight: 8 },
+  essence_tsunami: { name: 'Essence Tsunami', desc: 'sacrificing gives 6x essence', emoji: '🌌', apply: 'essenceMult', mult: 6, duration: 900, weight: 3 },
+  payday_plus: { name: 'Payday Plus', desc: 'daily & weekly rewards +50%', emoji: '📈', apply: 'rewardMult', mult: 1.5, duration: 2400, weight: 10 },
+  double_payday: { name: 'Double Payday', desc: 'daily & weekly rewards are doubled', emoji: '💰', apply: 'rewardMult', mult: 2, duration: 3600, weight: 8 },
+  mega_payday: { name: 'Mega Payday', desc: 'daily & weekly rewards are 2.5x', emoji: '🤑', apply: 'rewardMult', mult: 2.5, duration: 2400, weight: 4 },
+  shop_sale: { name: 'Shop Sale', desc: 'shop prices are 30% off', emoji: '🏷️', apply: 'priceMult', mult: 0.7, duration: 2700, weight: 10 },
+  shop_closeout: { name: 'Closeout Sale', desc: 'shop prices are 40% off', emoji: '🛍️', apply: 'priceMult', mult: 0.6, duration: 3600, weight: 8 },
+  shop_clearance: { name: 'Clearance', desc: 'shop prices are HALF off', emoji: '⚡', apply: 'priceMult', mult: 0.5, duration: 2700, weight: 6 },
+  work_boost: { name: 'Hustle Week', desc: 'work pays +50%', emoji: '💪', apply: 'workMult', mult: 1.5, duration: 3600, weight: 10 },
+  overtime: { name: 'Overtime', desc: 'work pays DOUBLE', emoji: '⏰', apply: 'workMult', mult: 2, duration: 2700, weight: 8 },
+  mega_work: { name: 'Mega Shift', desc: 'work pays TRIPLE', emoji: '🏭', apply: 'workMult', mult: 3, duration: 1800, weight: 4 },
+  wild_xp: { name: 'Wild XP', desc: 'hunting gives +50% animal XP', emoji: '📚', apply: 'xpMult', mult: 1.5, duration: 2700, weight: 10 },
+  hunt_frenzy: { name: 'Hunting Frenzy', desc: 'hunting gives DOUBLE animal XP', emoji: '🐾', apply: 'xpMult', mult: 2, duration: 1800, weight: 8 },
+  elite_training: { name: 'Elite Training', desc: 'hunting gives TRIPLE animal XP', emoji: '🥋', apply: 'xpMult', mult: 3, duration: 1200, weight: 4 },
+  war_bonus: { name: 'War Bonus', desc: 'battle winners earn +50% coins', emoji: '⚔️', apply: 'battleMult', mult: 1.5, duration: 2400, weight: 10 },
+  battle_fury: { name: 'Battle Fury', desc: 'battle winners earn DOUBLE coins', emoji: '🛡️', apply: 'battleMult', mult: 2, duration: 1800, weight: 8 },
+  coin_rain: { name: 'Coin Rain', desc: 'every gambler gets +30k coins', emoji: '🌧️', apply: 'rain', duration: 300, weight: 8 },
+  gem_rain: { name: 'Gem Rain', desc: 'every gambler gets +20 gems', emoji: '💠', apply: 'rain', duration: 300, weight: 6 },
+  egg_shower: { name: 'Egg Shower', desc: 'every gambler gets +2 eggs', emoji: '☔', apply: 'rain', duration: 300, weight: 5 },
+  lucky_rain: { name: 'Lucky Rain', desc: 'every gambler gets +100k coins, +20 gems & +2 eggs', emoji: '🌈', apply: 'rain', duration: 300, weight: 5 },
 };
+
+const RAIN_REWARDS = {
+  coin_rain: { coins: 30000 },
+  gem_rain: { gems: 20 },
+  egg_shower: { eggs: 2 },
+  lucky_rain: { coins: 100000, gems: 20, eggs: 2 },
+};
+
+function applyRain(key) {
+  const r = RAIN_REWARDS[key];
+  if (!r) return { coins: 0, gems: 0, eggs: 0 };
+  if (r.coins) db.run(`UPDATE users SET balance = balance + ${r.coins}`);
+  if (r.gems) db.run(`UPDATE users SET gems = gems + ${r.gems}`);
+  if (r.eggs) db.run(`UPDATE users SET eggs = eggs + ${r.eggs}`);
+  save();
+  return { coins: r.coins || 0, gems: r.gems || 0, eggs: r.eggs || 0 };
+}
 
 function getActiveEvent() {
   const rows = db.exec(`SELECT key, ends_at FROM events LIMIT 1`);
@@ -2360,9 +2397,19 @@ function getActiveEvent() {
   return { key, endsAt };
 }
 
+let lastEventKey = null;
+
 function startRandomEvent() {
   const keys = Object.keys(EVENT_TYPES);
-  const key = keys[Math.floor(Math.random() * keys.length)];
+  const pool = keys.filter(k => k !== lastEventKey);
+  const total = pool.reduce((a, k) => a + (EVENT_TYPES[k].weight || 10), 0);
+  let roll = Math.random() * total;
+  let key = pool[0];
+  for (const k of pool) {
+    roll -= (EVENT_TYPES[k].weight || 10);
+    if (roll <= 0) { key = k; break; }
+  }
+  lastEventKey = key;
   const ev = EVENT_TYPES[key];
   db.run(`DELETE FROM events`);
   db.run(`INSERT INTO events (key, type, ends_at) VALUES ('${key}', '${ev.apply}', ${Math.floor(Date.now() / 1000) + ev.duration})`);
@@ -2828,7 +2875,7 @@ module.exports = {
   FEED_COST, FEED_DURATION, isFed, feedAnimal,
   FUSION_COST, fuseAnimals,
   ZOO_DECOR, getZooDecors, buyZooDecor,
-  EVENT_TYPES, getActiveEvent, startRandomEvent, eventMult,
+  EVENT_TYPES, getActiveEvent, startRandomEvent, eventMult, applyRain,
   PLOT_BASE_PRICE, PLOT_UPGRADE_COST, PLOT_INCOME_PER_HOUR, PLOT_MAX_LEVEL, getPlot, buyPlot, upgradePlot, claimPlot,
   CLAN_CREATE_COST, CLAN_MAX_MEMBERS, getClan, createClan, getClanMembers, getClanOf, clanJoin, clanLeave, clanKick, clanDeposit, clanWithdraw, getClanTop,
   createAuction, getAuction, listAuctions, placeBid, endAuction, cancelAuction, cleanupExpiredAuctions,

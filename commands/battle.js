@@ -79,7 +79,7 @@ const t = theirAlive.reduce((a, b) => a.hp < b.hp ? a : b);
   const result = winner ? (winner.id === message.author.id ? `YOU WIN! +${20 * myPets.filter(p => myCopy.find(x => x.id === p.id) && myCopy.find(x => x.id === p.id).hp > 0).length} XP` : `YOU LOSE!`) : 'DRAW!';
 
   if (winner) {
-    const reward = 50 + myPets.length * 10;
+    const reward = Math.floor((50 + myPets.length * 10) * db.eventMult('battleMult'));
     db.payWin(winner.id, reward);
     db.addQuestProgress(winner.id, 'battle', 1);
     db.addBountyProgress(winner.id, 'battle', 1);

@@ -7,3 +7,4 @@ then push (the boot announcement posts it once).
 Format: one line per change, terse, no AI fluff.
 - Clan creation now costs 5M coins (was 500k).
 - New weekly Gambling Leaderboard: `Aovo lb #channel` picks a channel, bot auto-posts the top 10 gamblers every week and pays rewards (1st 1M → 10th 40k). Owner stays hidden. View anytime with `v glb`.
+- Random events expanded 15 → 35 with weighted rarity (no repeats in a row): new Shop Sale (prices up to 50% off), work boosts (up to 3x), hunting XP boosts (up to 3x), battle coin boosts, and instant Coin/Gem/Egg/Lucky Rains that drop coins+gems+eggs to every gambler at once.

@@ -170,8 +170,10 @@ async function handleInteraction(i) {
     }
 
     const user = db.ensureUser(i.user.id);
-    if (!user || user.balance < item.price) {
-      i.user.send(`You tried to buy **${item.name}** (\`${priceStr(item.price)}\` ${config.currency}) but you don't have enough money.`).catch(() => {});
+    const saleMult = db.eventMult('priceMult');
+    const price = Math.floor(item.price * saleMult);
+    if (!user || user.balance < price) {
+      i.user.send(`You tried to buy **${item.name}** (\`${priceStr(price)}\` ${config.currency}) but you don't have enough money.`).catch(() => {});
       await i.followUp({ embeds: [errEmbed('Not enough money.')], ephemeral: true });
       return;
     }
@@ -183,7 +185,7 @@ async function handleInteraction(i) {
 
     pendingShops.set(i.user.id, { itemId, item, guild: i.guild, channel: i.channel });
     setTimeout(() => pendingShops.delete(i.user.id), 30000);
-    await i.followUp({ embeds: [warnEmbed(`**${item.name}**\nPrice: \`${priceStr(item.price)}\` ${config.currency}${item.monthly ? '/mo' : ''}\n\n${item.desc}\n\nConfirm purchase?`)], components: [confirm], ephemeral: true });
+    await i.followUp({ embeds: [warnEmbed(`**${item.name}**\nPrice: \`${priceStr(price)}\` ${config.currency}${item.monthly ? '/mo' : ''}${saleMult < 1 ? ` ~~\`${priceStr(item.price)}\`~~ **-${Math.round((1 - saleMult) * 100)}% sale!**` : ''}\n\n${item.desc}\n\nConfirm purchase?`)], components: [confirm], ephemeral: true });
   } catch (e) { console.error('shop item err:', e); }
 }
 
@@ -204,13 +206,15 @@ async function handleConfirm(j) {
     }
 
     const userNow = db.ensureUser(j.user.id);
-    if (!userNow || userNow.balance < pending.item.price) {
-      j.user.send(`You tried to buy **${pending.item.name}** (\`${priceStr(pending.item.price)}\` ${config.currency}) but you don't have enough money.`).catch(() => {});
+    const saleMult = db.eventMult('priceMult');
+    const price = Math.floor(pending.item.price * saleMult);
+    if (!userNow || userNow.balance < price) {
+      j.user.send(`You tried to buy **${pending.item.name}** (\`${priceStr(price)}\` ${config.currency}) but you don't have enough money.`).catch(() => {});
       await j.update({ embeds: [errEmbed('Not enough money.')], components: [] });
       return;
     }
 
-    db.addBalance(j.user.id, -pending.item.price);
+    db.addBalance(j.user.id, -price);
     if (pending.item.gems) {
       db.addGems(j.user.id, pending.item.gems);
     } else if (pending.item.monthly) { db.addPerk(j.user.id, pending.itemId, Math.floor(Date.now() / 1000) + 30 * 86400); }
