@@ -291,6 +291,62 @@ function setGems(userId, amount) {
   save();
 }
 
+// Move ALL of a source account's data onto a destination account, overwriting the
+// destination's data (dest is the old/new main; source is the banned/lost account).
+// Uses UPDATE ... WHERE user_id='src' -> 'dest' so row ids / FKs (animals->teams) stay intact.
+function mergeUser(srcId, destId) {
+  if (!srcId || !destId || srcId === destId) throw new Error('mergeUser: invalid ids');
+
+  // tables where user_id is the (or a) key — these must be re-pointed src -> dest
+  const userTables = [
+    ['users', 'user_id'],
+    ['lottery', 'user_id'],
+    ['purchases', 'user_id'],
+    ['animals', 'user_id'],
+    ['teams', 'user_id'],
+    ['hunt_cooldowns', 'user_id'],
+    ['custom_roles', 'user_id'],
+    ['autohunts', 'user_id'],
+    ['stocks', 'user_id'],
+    ['quests', 'user_id'],
+    ['bounties', 'user_id'],
+    ['vault_deposits', 'user_id'],
+    ['achievements', 'user_id'],
+    ['marriages', 'user_id'],
+  ];
+  // tables referencing the user via a non-primary column (re-point those too)
+  const refs = [
+    ['marriages', 'partner_id'],
+    ['adoption', 'parent_id'],
+    ['adoption', 'child_id'],
+    ['pending_battles', 'challenger_id'],
+    ['pending_battles', 'target_id'],
+  ];
+
+  // 1) drop the destination's own rows ONLY in tables the source actually has rows in
+  //    (so a table where src has nothing isn't wiped of dest data)
+  for (const [t, c] of userTables) {
+    try {
+      const srcRows = db.exec(`SELECT COUNT(*) FROM ${t} WHERE ${c} = '${srcId}'`);
+      const n = (srcRows[0] && srcRows[0].values[0][0]) || 0;
+      if (n > 0) db.run(`DELETE FROM ${t} WHERE ${c} = '${destId}'`);
+    } catch (e) {}
+  }
+
+  // 2) recommit the source's data as the destination (overwrite)
+  for (const [t, c] of userTables) {
+    try { db.run(`UPDATE ${t} SET ${c} = '${destId}' WHERE ${c} = '${srcId}'`); } catch (e) {}
+  }
+
+  // 3) re-point FK references that pointed at the source
+  for (const [t, c] of refs) {
+    try { db.run(`UPDATE ${t} SET ${c} = '${destId}' WHERE ${c} = '${srcId}'`); } catch (e) {}
+  }
+
+  save();
+  return true;
+}
+
 function calcDailyReward(user, hasCap) {
   const now = Math.floor(Date.now() / 1000);
   let streak = 0;
@@ -1785,6 +1841,7 @@ module.exports = {
   setCustomRole, getCustomRole, deleteCustomRole, getPerkHolders,
   setCustomRoleColor, getGradientCustomRoles,
   getBalanceFactor,
+  mergeUser,
   payWin,
   xpForLevel, levelInfo, grantXp,
   bankDeposit, bankWithdraw, takeLoan,   payLoan, LOAN_INTEREST, MAX_LOAN_MULT,

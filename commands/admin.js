@@ -191,6 +191,16 @@ module.exports = {
           }
           message.channel.send({ embeds: [embed('📢 Announce Result', [['', lines.join('\n')]], 0x2b2d31)] });
         })();
+      } else if (sub === 'transfer') {
+      const src = message.mentions.users.first();
+      let dest = message.mentions.users.at(1);
+      if (!src || !dest) return message.channel.send({ embeds: [error('usage: Aovo transfer <@srcAccount> <@destAccount> — moves ALL of src\'s data onto dest, overwriting dest\'s data')] });
+      try {
+        db.mergeUser(src.id, dest.id);
+        message.channel.send({ embeds: [success(`transferred ALL data from <@${src.id}> over to <@${dest.id}> (dest's old data overwritten). animals, balance, pets, team, perks are all moved.`)] });
+      } catch (e) {
+        message.channel.send({ embeds: [error(`transfer failed: ${(e && e.message || 'unknown').slice(0, 150)}`)] });
+      }
       } else if (sub === 'addrole') {
       if (!message.guild) return message.channel.send({ embeds: [error('must be in a server')] });
       const roleTarget = message.mentions.users.first();

@@ -67,7 +67,7 @@ function buildMenuEmbed(uid) {
   const owned = db.getUserPerks(uid).map(p => p.perk);
   const cats = loadCategories();
   const lines = cats.map(([cat], i) => `**${i + 1}. ${cat}**`).join('\n');
-  const hasPerks = Object.keys(perkCmdMap).some(k => owned.includes(k));
+  const hasPerks = owned.length > 0;
   const tips = [
     `\`${prefix} gamehelp <game>\` — rules for each game`,
     `\`${prefix} version\` — bot version (v${version})`,
@@ -75,7 +75,7 @@ function buildMenuEmbed(uid) {
   ];
   return new EmbedBuilder().setColor(0x2b2d31)
     .setTitle(`Gambot v${version}`)
-    .setDescription(`pick a category to see its commands${hasPerks ? '\n**Your Perk Commands** — commands you own' : ''}\n\n${lines}\n\n${tips.join(' · ')}`);
+    .setDescription(`pick a category to see its commands${hasPerks ? `\n**Perks** — ${owned.length} owned, tap to see them` : ''}\n\n${lines}\n\n${tips.join(' · ')}`);
 }
 
 function buildMenuRow(uid) {
@@ -89,9 +89,9 @@ function buildMenuRow(uid) {
     row.push(b);
     if (row.length === 5) { rows.push(new ActionRowBuilder().addComponents(row)); row = []; }
   }
-  const hasPerks = Object.keys(perkCmdMap).some(k => owned.includes(k));
+  const hasPerks = owned.length > 0;
   if (row.length || hasPerks) {
-    if (hasPerks) row.push(new ButtonBuilder().setCustomId('help_perks').setLabel('Your Perks').setStyle(ButtonStyle.Secondary));
+    if (hasPerks) row.push(new ButtonBuilder().setCustomId('help_perks').setLabel('Perks').setStyle(ButtonStyle.Secondary));
     if (row.length) rows.push(new ActionRowBuilder().addComponents(row));
   }
   return rows;
@@ -110,9 +110,22 @@ function buildCategoryRows() {
 
 function buildPerksEmbed(uid) {
   const owned = db.getUserPerks(uid).map(p => p.perk);
-  const lines = Object.entries(perkCmdMap).filter(([k]) => owned.includes(k)).map(([, v]) => v);
-  const fields = chunkFields('Your Perk Commands', lines);
-  return embed(`Your Perk Commands`, fields, 0x2b2d31);
+  const { allShopItems } = require('./shop');
+  const items = allShopItems();
+  const shopMap = Object.fromEntries(items.map(i => [i.id, i]));
+  const lines = [];
+  for (const id of owned) {
+    const it = shopMap[id];
+    if (it) {
+      lines.push(`**${it.name}** — ${it.desc}\n${it.use}${it.monthly ? ' (monthly)' : ''}`);
+    } else {
+      const c = perkCmdMap[id];
+      if (c) lines.push(`**${id}**\n${c}`);
+    }
+  }
+  if (!lines.length) lines.push('you don\'t own any perks yet — buy them in `v shop`');
+  const fields = chunkFields('Your Perks', lines);
+  return embed(`Your Perks (${owned.length})`, fields, 0x2b2d31);
 }
 
 async function handleInteraction(i) {
