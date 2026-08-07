@@ -9,3 +9,4 @@ Format: one line per change, terse, no AI fluff.
 - Fixed: giveaways could silently end with NO winner if the bot restarted mid-giveaway (e.g. on a deploy) - giveaways are now saved to the DB and a background sweep always draws, pays, and announces the winner, even after a restart.
 - Fixed: 'v zooshop buy flower garden' said 'that item does not exist' - buy now matches full multi-word names (not just single-word ids).
 - New: 'Aovo events #channel' - set a separate channel for random server events (falls back to the update channel if none set).
+- Fixed: 'v mines' board was missing the bottom-right tile (cell 15) and the cash-out button shared its row - now all 16 tiles render as a proper 4x4 with a dedicated cash-out row. Longer window (5 min) and unplayed games now refund the bet instead of silently eating it (that's why players felt it was rigged / lost money without playing).

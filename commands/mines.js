@@ -23,9 +23,8 @@ function mult(gems, bombs, lucky) {
 function buildButtons(game) {
   const rows = [];
   for (let r = 0; r < ROWS; r++) {
-    const comps = [];
-    const maxC = r === ROWS - 1 ? COLS - 1 : COLS;
-    for (let c = 0; c < maxC; c++) {
+    const tileRow = [];
+    for (let c = 0; c < COLS; c++) {
       const idx = r * COLS + c;
       const rev = game.revealed.has(idx);
       let emoji, style, disabled;
@@ -37,14 +36,13 @@ function buildButtons(game) {
       const b = new ButtonBuilder().setCustomId(`m_${idx}`).setStyle(style).setDisabled(disabled);
       if (emoji) b.setEmoji(emoji);
       else b.setLabel('\u200b');
-      comps.push(b);
+      tileRow.push(b);
     }
-    if (r === ROWS - 1) {
-      const cd = game.hitBomb !== undefined || !game.active;
-      comps.push(new ButtonBuilder().setCustomId('m_cash').setEmoji('💰').setStyle(cd ? ButtonStyle.Secondary : ButtonStyle.Success).setDisabled(cd));
-    }
-    rows.push(new ActionRowBuilder().addComponents(comps));
+    rows.push(new ActionRowBuilder().addComponents(tileRow));
   }
+  // dedicated 5th row for cash-out so all 16 tiles (4x4) stay clickable
+  const cd = game.hitBomb !== undefined || !game.active;
+  rows.push(new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('m_cash').setEmoji('💰').setStyle(cd ? ButtonStyle.Secondary : ButtonStyle.Success).setDisabled(cd)));
   return rows;
 }
 
@@ -121,7 +119,7 @@ module.exports = {
       activeGames.set(message.author.id, game);
 
       message.channel.send(buildContainer(game)).then(msg => {
-      const col = msg.createMessageComponentCollector({ filter: i => i.user.id === message.author.id, time: 60000 });
+      const col = msg.createMessageComponentCollector({ filter: i => i.user.id === message.author.id, time: 300000 });
       col.on('collect', async (i) => {
         if (!game.active) { await i.deferUpdate().catch(() => {}); return; }
         if (i.customId === 'm_cash') {
@@ -160,7 +158,11 @@ module.exports = {
         i.update(buildContainer(game)).catch(() => {});
       });
       col.on('end', () => {
-        if (game.active) { game.active = false; activeGames.delete(message.author.id); msg.edit({ components: [] }).catch(() => {}); }
+        if (game.active) {
+          game.active = false; activeGames.delete(message.author.id);
+          if (!game.testMode) db.addBalance(message.author.id, game.bet); // refund an unplayed game instead of eating the bet
+          msg.edit({ embeds: [embed('💣 Mines', [['', '⏰ Game timed out (no moves for 5 min) — your bet was **refunded**.']], 0x2b2d31)], components: [] }).catch(() => {});
+        }
       });
     }).catch(err => {
       activeGames.delete(message.author.id);
