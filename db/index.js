@@ -2357,7 +2357,7 @@ function claimPlot(userId) {
 }
 
 // ---- v1.7.0: Clans ----
-const CLAN_CREATE_COST = 500000;
+const CLAN_CREATE_COST = 5000000;
 const CLAN_MAX_MEMBERS = 20;
 
 function getClan(guildId) {

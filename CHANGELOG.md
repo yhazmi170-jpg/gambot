@@ -22,7 +22,7 @@ Complete list of every update shipped, newest first. Source: git history (`maste
 ## v1.7.0 — The Pet Evolution Update
 - Loot crates: `v crate <common|premium|mythic>` with a per-user **pity counter** that guarantees a top-rarity drop
 - Free bets: `v freebet [amount]` — claim 500 free house coins/day, cap 2500; lose = house money, win = real coins
-- Clans: `v clan create|join|leave|info|deposit|withdraw|kick|top` — 500k to create, 20 members, shared treasury
+- Clans: `v clan create|join|leave|info|deposit|withdraw|kick|top` — 5M to create, 20 members, shared treasury
 - Boss raids: `v raid <stake>` — server-wide boss, stake adds to the pot, split by damage on the kill
 - Auctions + bidding: `v auction <id> <min> [hours]` / `v bid <id> <amount>` — 5% fee, 5% min increment
 - Plots: `v plot buy|upgrade|claim` — own land paying coin income every hour
