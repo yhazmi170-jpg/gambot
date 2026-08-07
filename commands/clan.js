@@ -6,13 +6,13 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 module.exports = {
   name: 'clan',
   helpCategory: 'Social',
-  helpArgs: '<create <name> | join [@user|name] | leave | kick @user | deposit <amt> | withdraw <amt> | info | delete | top>',
+  helpArgs: '<create <name> | invite @user | join [@user|name] | leave | kick @user | deposit <amt> | withdraw <amt> | info | delete | top>',
   description: 'player-owned clans — one clan per player, join anyone\u2019s clan across the server',
   aliases: ['guild'],
   async execute(message, args) {
     const userId = message.author.id;
     const sub = (args[0] || '').toLowerCase();
-    const usage = 'usage: `v clan create <name>` | `v clan join @user` | `v clan info` | `v clan deposit <amt>` | `v clan top`';
+    const usage = 'usage: `v clan create <name>` | `v clan invite @user` | `v clan join @user` | `v clan info` | `v clan deposit <amt>` | `v clan top`';
     if (!sub) return message.channel.send({ embeds: [error(usage)] });
 
 if (sub === 'create') {
@@ -72,6 +72,27 @@ if (sub === 'create') {
       return message.channel.send({ embeds: [success(`joined **${targetClan.name}** (owned by <@${targetClan.owner_id}>)!`)] });
     }
 
+    if (sub === 'invite') {
+      const target = message.mentions.users.first();
+      if (!target) return message.channel.send({ embeds: [error('mention who to invite: `v clan invite @user`')] });
+      if (!clan) return message.channel.send({ embeds: [error('you are not in a clan yet — create one with `v clan create <name>` or join a friend\u2019s first')] });
+      if (target.id === userId) return message.channel.send({ embeds: [error('you are already a member — you can\u2019t invite yourself')] });
+      if (db.getClanOf(target.id)) return message.channel.send({ embeds: [error(`**${target.username}** is already in a clan — they need to leave it first with \`v clan leave\``)] });
+      const inviteRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`claninv_a_${clan.clan_id}_${userId}_${target.id}`).setLabel('Accept').setStyle(ButtonStyle.Success).setEmoji('✅'),
+        new ButtonBuilder().setCustomId(`claninv_d_${clan.clan_id}_${userId}_${target.id}`).setLabel('Decline').setStyle(ButtonStyle.Secondary).setEmoji('❌'),
+      );
+      return message.channel.send({
+        content: `<@${target.id}>`,
+        embeds: [embed('📩 Clan Invite', [
+          ['Clan', `**${clan.name}** (owned by <@${clan.owner_id}>)`],
+          ['From', `<@${userId}>`],
+          ['', `**${target.username}**, accept to join **${clan.name}**. You can leave anytime with \`v clan leave\`.`],
+        ])],
+        components: [inviteRow],
+      });
+    }
+
     if (sub === 'leave') {
       if (clan && clan.owner_id === userId) return message.channel.send({ embeds: [error('the owner cannot leave — dissolve the clan with `v clan delete`')] });
       const res = clan ? db.clanLeave(clan.clan_id, userId) : { ok: false, reason: 'noclan' };
@@ -128,10 +149,34 @@ if (sub === 'create') {
         ['Owner', `<@${clan.owner_id}>`],
         ['Members', `${members.length} total\n${shown}${members.length > 15 ? `\n…and ${members.length - 15} more` : ''}`],
         ['Treasury', `**${clan.balance.toLocaleString()}** ${config.currency}`],
-        ['Commands', '`v clan deposit <amt>` · `v clan join @user` · `v clan top`'],
+        ['Commands', '`v clan invite @user` · `v clan deposit <amt>` · `v clan top`'],
       ])] });
     }
 
     return message.channel.send({ embeds: [error(usage)] });
+  },
+
+  async handleInteraction(i) {
+    if (!i.customId.startsWith('claninv_')) return;
+    const [, action, clanId, inviterId, targetId] = i.customId.split('_');
+    if (i.user.id !== targetId) {
+      return i.reply({ embeds: [error('only the invited player can respond to this invite')], ephemeral: true });
+    }
+    const clan = db.getClan(clanId);
+    if (!clan) {
+      return i.update({ embeds: [error('that clan no longer exists')], components: [] }).catch(() => {});
+    }
+    if (action === 'd') {
+      return i.update({ embeds: [embed('❌ Invite Declined', [['Clan', `**${clan.name}**`], ['To', `<@${targetId}>`], ['', 'declined the invite']])], components: [] }).catch(() => {});
+    }
+    if (db.getClanOf(inviterId) !== clan.clan_id) {
+      return i.update({ embeds: [error('this invite is no longer valid — the inviter left the clan')], components: [] }).catch(() => {});
+    }
+    const res = db.clanJoin(clan.clan_id, targetId);
+    if (!res.ok) {
+      const reasons = { noclan: 'that clan no longer exists', member: 'you are already in a clan — leave it first with `v clan leave`', full: 'that clan is full' };
+      return i.update({ embeds: [error(reasons[res.reason] || 'could not join the clan')], components: [] }).catch(() => {});
+    }
+    return i.update({ embeds: [embed('✅ Clan Joined!', [['Clan', `**${clan.name}**`], ['Owner', `<@${clan.owner_id}>`], ['', 'welcome to the family! Fill the treasury with `v clan deposit <amt>`']])], components: [] }).catch(() => {});
   },
 };

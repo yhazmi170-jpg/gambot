@@ -329,6 +329,10 @@ client.on('interactionCreate', (i) => {
     require('./commands/merchant').handleInteraction(i);
     return;
   }
+  if (i.customId.startsWith('claninv_')) {
+    require('./commands/clan').handleInteraction(i);
+    return;
+  }
   if (i.customId.startsWith('battle_')) {
     require('./commands/battle').handleInteraction(i);
     return;
