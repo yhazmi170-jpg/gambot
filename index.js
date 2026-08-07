@@ -153,6 +153,47 @@ client.on('ready', () => {
     }
   }, 60000);
 
+  // v1.7.0: draw + announce giveaways that ended — runs from persisted DB so it
+  // works even if the bot restarted mid-giveaway (winner is ALWAYS drawn + paid)
+  const finalizeGiveaway = async (mid) => {
+    const g = db.getGiveaway(mid);
+    if (!g) return;
+    const eligible = g.entries.filter(id => id !== g.host_id);
+    const ch = await client.channels.fetch(g.channel_id).catch(() => null);
+    if (!eligible.length) {
+      db.addBalance(g.host_id, g.prize);
+      db.finishGiveaway(mid, 'REFUND');
+      if (ch && typeof ch.send === 'function') ch.send({ embeds: [embed('🎉 Giveaway Ended', [
+        ['Host', `<@${g.host_id}>`],
+        ['Prize', `**${g.prize.toLocaleString()}** ${config.currency}`],
+        ['Result', 'nobody entered — prize returned to the host'],
+      ], 0xed4245)] }).catch(() => {});
+      return;
+    }
+    const winnerId = eligible[Math.floor(Math.random() * eligible.length)];
+    db.addBalance(winnerId, g.prize);
+    db.finishGiveaway(mid, winnerId);
+    const status = `🎉 **Winner:** <@${winnerId}> — they won **${g.prize.toLocaleString()}** ${config.currency}!`;
+    if (ch && typeof ch.fetch) {
+      ch.messages.fetch(mid).then(m => m.edit({ embeds: [embed('🎉 Giveaway Ended', [
+        ['Host', `<@${g.host_id}>`],
+        ['Prize', `**${g.prize.toLocaleString()}** ${config.currency}`],
+        ['Entries', `${g.entries.length}`],
+        ['Winner', `<@${winnerId}>`],
+      ], 0x57f287)], components: [] }).catch(() => {})).catch(() => {});
+      ch.send(`🎉 <@${winnerId}> won the giveaway for **${g.prize.toLocaleString()}** ${config.currency}!`).catch(() => {});
+    }
+    client.users.fetch(winnerId).then(u => u.send(`🎉 **You won a giveaway!** You got **${g.prize.toLocaleString()}** ${config.currency}. Congrats!`).catch(() => {})).catch(() => {});
+  };
+  setInterval(() => {
+    const now = Math.floor(Date.now() / 1000);
+    for (const mid of db.getExpiredGiveaways(now)) finalizeGiveaway(mid);
+  }, 30000);
+  setTimeout(() => {
+    const now = Math.floor(Date.now() / 1000);
+    for (const mid of db.getExpiredGiveaways(now)) finalizeGiveaway(mid);
+  }, 5000);
+
   const fs = require('fs');
   const ver = version || '1.0.0';
   if (!db.wasNotified(`v${ver}`)) {

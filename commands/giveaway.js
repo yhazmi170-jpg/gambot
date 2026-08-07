@@ -1,5 +1,5 @@
 const db = require('../db');
-const { embed, error, success, parseAmount } = require('../utils/embed');
+const { embed, error, parseAmount } = require('../utils/embed');
 const config = require('../config');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
@@ -32,7 +32,7 @@ module.exports = {
 
     db.addBalance(userId, -prize);
 
-    const enterBtn = new ButtonBuilder().setCustomId('gw_enter').setLabel('Enter').setStyle(ButtonStyle.Success).setEmoji('🎉');
+    const enterBtn = new ButtonBuilder().setCustomId(`gw_${userId}`).setLabel('Enter').setStyle(ButtonStyle.Success).setEmoji('🎉');
     const row = new ActionRowBuilder().addComponents(enterBtn);
     const entries = new Set();
     const hostId = userId;
@@ -40,8 +40,8 @@ module.exports = {
     const endsAt = Date.now() + duration;
     const fmt = (ms) => {
       const s = Math.max(0, Math.ceil(ms / 1000));
-      const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-      return [d ? `${d}d` : '', h ? `${h}h` : '', m ? `${m}m` : '', `${sec}s`].filter(Boolean).join(' ');
+      const dd = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+      return [dd ? `${dd}d` : '', h ? `${h}h` : '', m ? `${m}m` : '', `${sec}s`].filter(Boolean).join(' ');
     };
 
     const buildEmbed = (statusLine) => embed('🎉 Giveaway', [
@@ -54,37 +54,22 @@ module.exports = {
 
     const msg = await message.channel.send({ embeds: [buildEmbed('')], components: [row] });
 
-    const filter = i => i.customId === 'gw_enter' && !i.user.bot;
+    // persist so the winner is always drawn + announced even after a restart
+    db.createGiveaway(msg.id, message.channel.id, hostId, prize, Math.floor(endsAt / 1000));
+
+    const filter = i => i.customId === `gw_${hostId}` && !i.user.bot;
     const col = msg.createMessageComponentCollector({ filter, time: duration });
 
     col.on('collect', async (i) => {
       entries.add(i.user.id);
+      db.addGiveawayEntry(msg.id, i.user.id);
       await i.update({ embeds: [buildEmbed('')], components: [row] }).catch(() => {});
       if (i.user.id !== hostId) {
         i.user.send(`🎉 you entered the giveaway for **${prize.toLocaleString()}** ${config.currency}!`).catch(() => {});
       }
     });
 
-    col.on('end', async () => {
-      const eligible = [...entries].filter(id => id !== hostId);
-      if (!eligible.length) {
-        db.addBalance(hostId, prize);
-        await msg.edit({ embeds: [embed('🎉 Giveaway Ended', [
-          ['Host', `<@${hostId}>`],
-          ['Prize', `**${prize.toLocaleString()}** ${config.currency}`],
-          ['Result', 'nobody entered — prize returned to the host'],
-        ], 0xed4245)], components: [] }).catch(() => {});
-        return;
-      }
-      const winnerId = eligible[Math.floor(Math.random() * eligible.length)];
-      db.addBalance(winnerId, prize);
-      await msg.edit({ embeds: [embed('🎉 Giveaway Ended', [
-        ['Host', `<@${hostId}>`],
-        ['Prize', `**${prize.toLocaleString()}** ${config.currency}`],
-        ['Entries', `${eligible.length} participants`],
-        ['Winner', `🎊 **<@${winnerId}>** won **${prize.toLocaleString()}** ${config.currency}!`],
-      ], 0x57f287)], components: [] }).catch(() => {});
-      message.channel.send(`🎉 congratulations <@${winnerId}> — you won **${prize.toLocaleString()}** ${config.currency} from <@${hostId}>'s giveaway!`).catch(() => {});
-    });
+    // finalization (draw winner, pay, edit, announce) is handled by the sweep in index.js
+    col.on('end', async () => {});
   },
 };

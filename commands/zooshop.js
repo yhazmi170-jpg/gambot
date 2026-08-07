@@ -13,9 +13,11 @@ module.exports = {
     const sub = (args[0] || '').toLowerCase();
 
     if (sub === 'buy') {
-      const itemId = (args[1] || '').toLowerCase();
-      if (!itemId) return message.channel.send({ embeds: [error('usage: `v zooshop buy <item>` — see items with `v zooshop`')] });
-      const res = db.buyZooDecor(userId, itemId);
+      const query = args.slice(1).join(' ').toLowerCase();
+      if (!query) return message.channel.send({ embeds: [error('usage: `v zooshop buy <item>` — see items with `v zooshop`')] });
+      const found = db.ZOO_DECOR.find(d => d.id === query || d.name.toLowerCase() === query || d.name.toLowerCase().includes(query));
+      if (!found) return message.channel.send({ embeds: [error('that item does not exist — see `v zooshop`')] });
+      const res = db.buyZooDecor(userId, found.id);
       if (!res.ok) {
         const reasons = { notfound: 'that item does not exist', coins: 'not enough coins', owned: 'you already own that decoration' };
         return message.channel.send({ embeds: [error(reasons[res.reason] || 'could not buy')] });

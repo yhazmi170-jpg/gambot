@@ -102,6 +102,15 @@ async function init() {
     target_id TEXT NOT NULL,
     expires_at INTEGER NOT NULL
   )`);
+  db.run(`CREATE TABLE IF NOT EXISTS giveaways (
+    message_id TEXT PRIMARY KEY,
+    channel_id TEXT NOT NULL,
+    host_id TEXT NOT NULL,
+    prize INTEGER NOT NULL,
+    ends_at INTEGER NOT NULL,
+    entries TEXT NOT NULL DEFAULT '[]',
+    winner_id TEXT DEFAULT NULL
+  )`);
   db.run(`CREATE TABLE IF NOT EXISTS vip_roles (guild_id TEXT PRIMARY KEY, role_id TEXT NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS animals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -633,6 +642,44 @@ function deletePendingBattle(id) {
 
 function cleanupPendingBattles() {
   db.run(`DELETE FROM pending_battles WHERE expires_at < ${Math.floor(Date.now() / 1000)}`);
+  save();
+}
+
+// ---- Giveaways: persisted so a restart never kills an "about to end" giveaway ----
+function createGiveaway(messageId, channelId, hostId, prize, endsAt) {
+  db.run(`INSERT OR REPLACE INTO giveaways (message_id, channel_id, host_id, prize, ends_at, entries, winner_id) VALUES ('${messageId}', '${channelId}', '${hostId}', ${prize}, ${endsAt}, '[]', NULL)`);
+  save();
+}
+
+function getGiveaway(messageId) {
+  const rows = db.exec(`SELECT message_id, channel_id, host_id, prize, ends_at, entries, winner_id FROM giveaways WHERE message_id = '${messageId}'`);
+  if (!rows.length || !rows[0].values.length) return null;
+  const v = rows[0].values[0];
+  let entries = [];
+  try { entries = JSON.parse(v[5] || '[]'); } catch {}
+  return { message_id: v[0], channel_id: v[1], host_id: v[2], prize: v[3], ends_at: v[4], entries, winner_id: v[6] };
+}
+
+function addGiveawayEntry(messageId, userId) {
+  const g = getGiveaway(messageId);
+  if (!g) return false;
+  if (!g.entries.includes(userId)) {
+    g.entries.push(userId);
+    db.run(`UPDATE giveaways SET entries = '${JSON.stringify(g.entries).replace(/'/g, "''")}' WHERE message_id = '${messageId}'`);
+    save();
+  }
+  return true;
+}
+
+// IDs of giveaways that have expired but haven't drawn a winner yet (done: winner_id set)
+function getExpiredGiveaways(now) {
+  const rows = db.exec(`SELECT message_id FROM giveaways WHERE ends_at <= ${now} AND winner_id IS NULL`);
+  if (!rows.length) return [];
+  return rows[0].values.map(r => r[0]);
+}
+
+function finishGiveaway(messageId, winnerId) {
+  db.run(`UPDATE giveaways SET winner_id = '${winnerId}' WHERE message_id = '${messageId}'`);
   save();
 }
 
@@ -2492,6 +2539,7 @@ module.exports = {
   getPendingBattle,
   deletePendingBattle,
   cleanupPendingBattles,
+  createGiveaway, getGiveaway, getExpiredGiveaways, addGiveawayEntry, finishGiveaway,
   toggleLucky,
   toggleInsurance,
   setLogChannel,
