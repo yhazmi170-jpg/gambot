@@ -1,11 +1,12 @@
-# Gambot handoff (Cursor ↔ OpenCode)
+# Gambot handoff (Chat-Claude orchestrator ↔ Claude Code CLI)
 
 > Agents: rewrite this file when you finish a chunk of work or before the user switches tools.
-> Read `AGENTS.md` first, then this.
+> Read `AGENTS.md` first (incl. the "Two-agent workflow" section), then this.
 
 ## Status
 - **Branch**: `master`
-- **Version**: `1.7.1` (PUSHED — PvP bounties, wheel, streak, loan, mines/giveaway/zooshop/battle fixes, events channel, 15 random events)
+- **Version**: `1.7.1` — latest pushed commit `3e0028c` (weekly gambling LB ranks by NET win/loss; LIVE on Render). Previous `cbc98ea` (clanwar fix) also live.
+- **Roles (v two-agent workflow):** chat agent (orchestrator, is the user's main driver) delegates coding to Claude Code CLI; git is the message bus.
 - **Change log**: complete history of every update lives in `CHANGELOG.md` (newest first) — keep it in sync with the version bump + `update_msg.txt`
 - **Host migration**: Replit → Render (free, Blueprint from `render.yaml`). Replit repl was stopped by user. **Render URL: `https://gambot-o2o4.onrender.com`** — keepalive pinger repointed to it.
 - **Keepalive**: `keepalive.ps1` pings every 240s; registered as Windows scheduled task `GambotKeepalive` (runs at logon). Pinger must be running on yazan's PC for this to work (now pinging the Render URL).

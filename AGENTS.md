@@ -19,6 +19,16 @@
 - Do not leave stale todos in `HANDOFF.md` — mark done or remove
 - Same repo is shared by Cursor and OpenCode — git is the source of truth
 
+## Two-agent workflow (Claude chai ↔ Claude Code CLI) — READ THIS FIRST
+- **Roles:** The **chat agent** (this Claude, in the user's claude.ai/sidebar session) is the *orchestrator + ops*: the user talks to it about updates, it assigns/approves coding tasks, and it owns deploys (push → Render auto-deploy → poll `https://gambot-o2o4.onrender.com` until the new SHA is live), version bumps, `update_msg.txt`, `pending_updates.txt`, and this doc. The **CLI agent** (Claude Code, run via `claude -p "..."` with the repo's `AGENTS.md`/`HANDOFF.md` as context) is the *coder*: it writes the actual code changes.
+- **How they talk:** git is the ONLY message bus. The orchestrator may invoke the CLI agent on demand with `claude -p "<task>"` (headless, `--dangerously-skip-permissions` in temp/sim scenarios). The CLI agent commits + pushes its work; the orchestrator reads `git log`/diff to review, then deploys. The user can also run Claude Code interactively in the repo — either way, everything lands in commits.
+- **Shared memory files (both agents MUST keep fresh):**
+  - `HANDOFF.md` = live session state + "Done recently" (+ current todos). Rewrite top "Status" after a push; append bullet to "Done recently".
+  - `pending_updates.txt` = queued small-update notes that get flushed into `update_msg.txt` + one version bump later.
+  - `AGENTS.md` = system + economy rules (the CLI agent auto-loads it).
+- **Handoff direction:** orchestrator → CLI agent: give a precise task brief (file paths + expected behavior), expect a commit back. CLI agent → orchestrator: every code change is a pushed commit (git log is the proof + the memory). Running feature sims / battle-tests is mandatory for the coding agent before it commits.
+- Never use this repo as a chat channel — chat happens in the orchestrator session; the repo only ever contains code + the shared .md state files above.
+
 ## Rules
 1. Never lose user data — restore from GitHub backup only if DB doesn't exist
 2. Owner has infinite bet cap, hidden from leaderboard, **no** balance-factor cut on rewards/wins
