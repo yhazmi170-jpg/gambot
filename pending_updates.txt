@@ -5,3 +5,4 @@ flush: move them into update_msg.txt as ONE combined log + bump package.json ver
 then push (the boot announcement posts it once).
 
 Format: one line per change, terse, no AI fluff.
+- Reworked random events: pool expanded from 32 → 57 events with new mechanics (trait discounts, crate discounts + pity boost, battle pass XP boost, hunt cap boost, autohunt swarm, streak shield, seal/essence rain). Re-tuned durations/weights and richer names. Events now fire on an irregular schedule (8-12 / 15-40 / 45-65 min bands) instead of the old 25-30 min metronome. (v1.7.3)

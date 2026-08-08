@@ -127,26 +127,43 @@ client.on('ready', () => {
     if (gain > 0) console.log(`vault interest accrued: +${gain}`);
   }, 3600000);
 
-  // v1.7.0: random server event every ~25-35 min + announce it
+  function formatEventDuration(sec) {
+    const m = Math.floor(sec / 60);
+    if (m < 60) return `${m} minutes`;
+    const h = Math.floor(m / 60);
+    const rm = m % 60;
+    return rm > 0 ? `${h}h ${rm}m` : `${h} hour${h > 1 ? 's' : ''}`;
+  }
+
+  // v1.7.0: random server events on an irregular schedule (not clockwork)
   const fireEvent = () => {
     const ev = db.startRandomEvent();
     let channels = db.getAllEventChannels();
     if (!channels.length) channels = db.getAllUpdateChannels(); // fallback so events aren't missed
     const rain = ev.apply === 'rain' ? db.applyRain(ev.key) : null;
-    const rainNote = rain ? `\nevery gambler got **${rain.coins ? `+${rain.coins.toLocaleString()} coins` : ''}${rain.coins && rain.gems ? ', ' : ''}${rain.gems ? `+${rain.gems} gems` : ''}${(rain.coins || rain.gems) && rain.eggs ? ', ' : ''}${rain.eggs ? `+${rain.eggs} eggs` : ''}** 🌧️` : '';
+    const rainNote = rain ? ` — everyone got the payout instantly` : '';
     for (const { channel_id } of channels) {
       client.channels.fetch(channel_id).then(ch => {
         if (ch && typeof ch.send === 'function') {
           ch.send({ embeds: [embed(`📢 Random Event: ${ev.emoji || '🎉'} ${ev.name}`, [
-            ['Effect', ev.desc],
-            ['Duration', ev.apply === 'rain' ? 'instant payout 🌧️' : `${Math.floor(ev.duration / 60)} minutes`],
-            ['', `no action needed — it applies automatically across the server${rainNote.replace(/\n/g, ' ')}`],
+            ['Effect', `${ev.desc}${rainNote}`],
+            ['Duration', ev.apply === 'rain' ? 'instant payout' : formatEventDuration(ev.duration)],
+            ['', `no action needed — it applies automatically across the server`],
           ], 0x9b59b6)] }).catch(() => {});
         }
       }).catch(() => {});
     }
   };
-  const startEventTimer = () => setTimeout(() => { fireEvent(); startEventTimer(); }, (25 + Math.random() * 5) * 60000);
+  // irregular interval: mostly 15-40 min, occasionally 8-12 min or 45-65 min (never metronomic)
+  const eventDelay = () => {
+    const r = Math.random();
+    let mins;
+    if (r < 0.2) mins = 8 + Math.random() * 4;          // 20%: quick burst  8-12 min
+    else if (r < 0.75) mins = 15 + Math.random() * 25;   // 55%: normal      15-40 min
+    else mins = 45 + Math.random() * 20;                  // 25%: long gap    45-65 min
+    return Math.floor(mins * 60000);
+  };
+  const startEventTimer = () => setTimeout(() => { fireEvent(); startEventTimer(); }, eventDelay());
   startEventTimer();
 
   // v1.7.0: expire auctions + clean up dead/expired boss raids

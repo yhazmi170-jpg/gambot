@@ -519,8 +519,10 @@ function claimStreak(userId) {
   const now = Math.floor(Date.now() / 1000);
   const s = getStreak(userId);
   if (s.last_time > 0 && now - s.last_time < 86400) return { cooldown: Math.floor(86400 - (now - s.last_time)) };
+  const freeze = getActiveEvent() && EVENT_TYPES[getActiveEvent().key] && EVENT_TYPES[getActiveEvent().key].apply === 'streakFreeze';
+  const grace = freeze ? 86400 * 4 : 86400 * 2;
   let count = 1;
-  if (s.last_time > 0 && now - s.last_time < 86400 * 2) count = s.count + 1;
+  if (s.last_time > 0 && now - s.last_time < grace) count = s.count + 1;
   const reward = Math.floor(STREAK_BASE * Math.min(count, STREAK_MAX_DAY) * getBalanceFactor(userId));
   const best = Math.max(s.best, count);
   db.run(`INSERT OR REPLACE INTO streaks (user_id, count, last_time, best) VALUES ('${userId}', ${count}, ${now}, ${best})`);
@@ -1605,7 +1607,7 @@ function upgradeTrait(userId, trait) {
   const column = TRAIT_COLUMNS[trait];
   if (!u || !column) return null;
   const level = u[column] || 0;
-  const cost = traitCost(level);
+  const cost = Math.max(1, Math.floor(traitCost(level) * eventMult('traitMult')));
   if (u.essence < cost) return { cost, essence: u.essence, ok: false };
   db.run(`UPDATE users SET essence = essence - ${cost}, ${column} = ${column} + 1 WHERE user_id = '${userId}'`);
   save();
@@ -1630,7 +1632,10 @@ function randomRarityWithEff(effLevel) {
 }
 
 function huntCapacity(userId) {
-  return Math.min(MAX_HUNT_CAP, 1 + Math.floor(getGems(userId) / HUNT_GEM_DIVISOR));
+  const base = 1 + Math.floor(getGems(userId) / HUNT_GEM_DIVISOR);
+  const ev = getActiveEvent();
+  const bonus = ev && EVENT_TYPES[ev.key] && EVENT_TYPES[ev.key].apply === 'huntCapMult' ? EVENT_TYPES[ev.key].mult : 0;
+  return Math.min(MAX_HUNT_CAP + bonus, base + bonus);
 }
 
 function huntYield(userId) {
@@ -1741,7 +1746,7 @@ function catchUpAutohunt(userId) {
   const now = Math.floor(Date.now() / 1000);
   const level = (ensureUser(userId) || {}).autohunt_level || 0;
   const traits = getTraits(userId);
-  const perCycle = autohuntAnimalsPerCycle(level);
+  const perCycle = autohuntAnimalsPerCycle(level) + Math.round(eventMult('autohuntMult')) - 1;
   const coinsPerAnimal = traits.gain * 2;
   const xpPerAnimal = 2 + traits.experience * 2;
   const radarMult = 1 + traits.radar * 0.5;
@@ -2074,9 +2079,10 @@ function passProgress(userId) {
 
 function addPassXp(userId, amount) {
   if (!amount || amount <= 0) return passProgress(userId);
+  const boosted = Math.floor(amount * eventMult('passXpMult'));
   const { season } = currentSeason();
   const raw = passRow(userId, season, true);
-  const newXp = raw[2] + amount;
+  const newXp = raw[2] + boosted;
   db.run(`UPDATE battlepass SET xp = ${newXp} WHERE user_id = '${userId}' AND season = ${season}`);
   save();
   return passProgress(userId);
@@ -2616,58 +2622,115 @@ function buyZooDecor(userId, decorId) {
 
 // ---- v1.7.0: Random events ----
 const EVENT_TYPES = {
+  // ---- gambling wins ----
   gold_rush: { name: 'Gold Rush', desc: 'gambling wins pay +25%', emoji: '🪙', apply: 'winMult', mult: 1.25, duration: 1800, weight: 10 },
   hot_streak: { name: 'Hot Streak', desc: 'gambling wins pay +50%', emoji: '🔥', apply: 'winMult', mult: 1.5, duration: 1800, weight: 10 },
   red_payout: { name: 'Red Payout', desc: 'gambling wins pay +75%', emoji: '💸', apply: 'winMult', mult: 1.75, duration: 2400, weight: 10 },
-  lucky_jackpot: { name: 'Lucky Jackpot', desc: 'gambling wins pay DOUBLE', emoji: '🎰', apply: 'winMult', mult: 2, duration: 1800, weight: 8 },
-  casino_night: { name: 'Casino Night', desc: 'gambling wins pay TRIPLE', emoji: '🎲', apply: 'winMult', mult: 3, duration: 1500, weight: 4 },
+  lucky_jackpot: { name: 'Lucky Jackpot', desc: 'gambling wins pay DOUBLE', emoji: '🎰', apply: 'winMult', mult: 2, duration: 1500, weight: 8 },
+  casino_night: { name: 'Casino Night', desc: 'gambling wins pay TRIPLE', emoji: '🎲', apply: 'winMult', mult: 3, duration: 1200, weight: 4 },
+  house_edge: { name: 'House Party', desc: 'gambling wins pay +40% & losses are 20% smaller', emoji: '🥂', apply: 'winMult', mult: 1.4, duration: 1800, weight: 8 },
+  high_roller: { name: 'High Roller Hour', desc: 'gambling wins pay +60%', emoji: '♠️', apply: 'winMult', mult: 1.6, duration: 1500, weight: 7 },
+
+  // ---- gems ----
   lucky_hour: { name: 'Lucky Hour', desc: 'gem drops are doubled', emoji: '🍀', apply: 'gemMult', mult: 2, duration: 1800, weight: 10 },
   geodes: { name: 'Geode Storm', desc: 'gem drop chance +50%', emoji: '🪨', apply: 'gemMult', mult: 1.5, duration: 2400, weight: 10 },
   gem_bonanza: { name: 'Gem Bonanza', desc: 'gem drops are tripled', emoji: '💎', apply: 'gemMult', mult: 3, duration: 1800, weight: 8 },
   gem_tsunami: { name: 'Gem Tsunami', desc: 'gem drops are 4x', emoji: '🌊', apply: 'gemMult', mult: 4, duration: 1200, weight: 4 },
+  prismatic: { name: 'Prismatic Rain', desc: 'every hunt drops at least 1 gem', emoji: '🌈', apply: 'gemMult', mult: 2.5, duration: 1500, weight: 6 },
+
+  // ---- eggs ----
   egg_surge: { name: 'Egg Surge', desc: 'egg drops +50%', emoji: '🥚', apply: 'eggMult', mult: 1.5, duration: 2400, weight: 10 },
   egg_mania: { name: 'Egg Mania', desc: 'egg drops are doubled', emoji: '🐣', apply: 'eggMult', mult: 2, duration: 1800, weight: 10 },
   hatch_madness: { name: 'Hatch Madness', desc: 'egg drops are tripled', emoji: '🐥', apply: 'eggMult', mult: 3, duration: 1800, weight: 8 },
   egg_frenzy: { name: 'Egg Frenzy', desc: 'egg drops are 5x', emoji: '🐤', apply: 'eggMult', mult: 5, duration: 900, weight: 3 },
+  nest_overflow: { name: 'Nest Overflow', desc: 'egg drops +75%', emoji: '🪺', apply: 'eggMult', mult: 1.75, duration: 2100, weight: 9 },
+
+  // ---- essence ----
   ess_boost: { name: 'Essence Boost', desc: 'sacrificing gives +50% essence', emoji: '✨', apply: 'essenceMult', mult: 1.5, duration: 2400, weight: 10 },
   essence_surge: { name: 'Essence Surge', desc: 'sacrificing gives double essence', emoji: '🔮', apply: 'essenceMult', mult: 2, duration: 1800, weight: 10 },
   essence_flood: { name: 'Essence Flood', desc: 'sacrificing gives 4x essence', emoji: '💜', apply: 'essenceMult', mult: 4, duration: 1800, weight: 8 },
   essence_tsunami: { name: 'Essence Tsunami', desc: 'sacrificing gives 6x essence', emoji: '🌌', apply: 'essenceMult', mult: 6, duration: 900, weight: 3 },
+  spirit_pact: { name: 'Spirit Pact', desc: 'sacrificing gives +100% essence', emoji: '👻', apply: 'essenceMult', mult: 2, duration: 2000, weight: 7 },
+
+  // ---- daily / weekly rewards ----
   payday_plus: { name: 'Payday Plus', desc: 'daily & weekly rewards +50%', emoji: '📈', apply: 'rewardMult', mult: 1.5, duration: 2400, weight: 10 },
   double_payday: { name: 'Double Payday', desc: 'daily & weekly rewards are doubled', emoji: '💰', apply: 'rewardMult', mult: 2, duration: 3600, weight: 8 },
   mega_payday: { name: 'Mega Payday', desc: 'daily & weekly rewards are 2.5x', emoji: '🤑', apply: 'rewardMult', mult: 2.5, duration: 2400, weight: 4 },
+
+  // ---- shop ----
   shop_sale: { name: 'Shop Sale', desc: 'shop prices are 30% off', emoji: '🏷️', apply: 'priceMult', mult: 0.7, duration: 2700, weight: 10 },
   shop_closeout: { name: 'Closeout Sale', desc: 'shop prices are 40% off', emoji: '🛍️', apply: 'priceMult', mult: 0.6, duration: 3600, weight: 8 },
   shop_clearance: { name: 'Clearance', desc: 'shop prices are HALF off', emoji: '⚡', apply: 'priceMult', mult: 0.5, duration: 2700, weight: 6 },
+
+  // ---- work ----
   work_boost: { name: 'Hustle Week', desc: 'work pays +50%', emoji: '💪', apply: 'workMult', mult: 1.5, duration: 3600, weight: 10 },
   overtime: { name: 'Overtime', desc: 'work pays DOUBLE', emoji: '⏰', apply: 'workMult', mult: 2, duration: 2700, weight: 8 },
   mega_work: { name: 'Mega Shift', desc: 'work pays TRIPLE', emoji: '🏭', apply: 'workMult', mult: 3, duration: 1800, weight: 4 },
+
+  // ---- hunting xp ----
   wild_xp: { name: 'Wild XP', desc: 'hunting gives +50% animal XP', emoji: '📚', apply: 'xpMult', mult: 1.5, duration: 2700, weight: 10 },
   hunt_frenzy: { name: 'Hunting Frenzy', desc: 'hunting gives DOUBLE animal XP', emoji: '🐾', apply: 'xpMult', mult: 2, duration: 1800, weight: 8 },
   elite_training: { name: 'Elite Training', desc: 'hunting gives TRIPLE animal XP', emoji: '🥋', apply: 'xpMult', mult: 3, duration: 1200, weight: 4 },
+
+  // ---- battles ----
   war_bonus: { name: 'War Bonus', desc: 'battle winners earn +50% coins', emoji: '⚔️', apply: 'battleMult', mult: 1.5, duration: 2400, weight: 10 },
   battle_fury: { name: 'Battle Fury', desc: 'battle winners earn DOUBLE coins', emoji: '🛡️', apply: 'battleMult', mult: 2, duration: 1800, weight: 8 },
-  coin_rain: { name: 'Coin Rain', desc: 'every gambler gets +30k coins', emoji: '🌧️', apply: 'rain', duration: 300, weight: 8 },
-  gem_rain: { name: 'Gem Rain', desc: 'every gambler gets +20 gems', emoji: '💠', apply: 'rain', duration: 300, weight: 6 },
-  egg_shower: { name: 'Egg Shower', desc: 'every gambler gets +2 eggs', emoji: '☔', apply: 'rain', duration: 300, weight: 5 },
-  lucky_rain: { name: 'Lucky Rain', desc: 'every gambler gets +100k coins, +20 gems & +2 eggs', emoji: '🌈', apply: 'rain', duration: 300, weight: 5 },
+  conquest: { name: 'Conquest', desc: 'battle winners earn +75% coins', emoji: '🏴', apply: 'battleMult', mult: 1.75, duration: 2000, weight: 6 },
+
+  // ---- trait upgrades (NEW) ----
+  trait_discount: { name: 'Trait Discount', desc: 'trait upgrades cost 30% less essence', emoji: '🔧', apply: 'traitMult', mult: 0.7, duration: 2400, weight: 9 },
+  trait_sale: { name: 'Trait Clearance', desc: 'trait upgrades cost HALF essence', emoji: '🏗️', apply: 'traitMult', mult: 0.5, duration: 2000, weight: 5 },
+  trait_freebie: { name: 'Free Upgrade', desc: 'trait upgrades cost 60% less essence', emoji: '🎁', apply: 'traitMult', mult: 0.4, duration: 1500, weight: 3 },
+
+  // ---- crates (NEW) ----
+  crate_discount: { name: 'Crate Sale', desc: 'all crates are 25% off', emoji: '📦', apply: 'crateMult', mult: 0.75, duration: 2400, weight: 9 },
+  crate_clearance: { name: 'Crate Clearance', desc: 'all crates are HALF off', emoji: '🗃️', apply: 'crateMult', mult: 0.5, duration: 1800, weight: 5 },
+  pity_boost: { name: 'Pity Surge', desc: 'crate pity builds +50% faster', emoji: '🌟', apply: 'pityMult', mult: 1.5, duration: 2000, weight: 7 },
+  guaranteed_rare: { name: 'Jackpot Pull', desc: 'crate pity builds DOUBLE speed', emoji: '🏆', apply: 'pityMult', mult: 2, duration: 1500, weight: 4 },
+
+  // ---- battle pass (NEW) ----
+  pass_boost: { name: 'Pass Boost', desc: 'battle pass XP is doubled', emoji: '🏅', apply: 'passXpMult', mult: 2, duration: 2400, weight: 8 },
+  pass_frenzy: { name: 'Pass Frenzy', desc: 'battle pass XP is TRIPLED', emoji: '🚀', apply: 'passXpMult', mult: 3, duration: 1500, weight: 4 },
+
+  // ---- hunt capacity (NEW) ----
+  big_game: { name: 'Big Game', desc: 'hunt capacity +4 for the duration', emoji: '🦏', apply: 'huntCapMult', mult: 4, duration: 1800, weight: 7 },
+  overgrowth: { name: 'Overgrowth', desc: 'hunt capacity +6', emoji: '🌿', apply: 'huntCapMult', mult: 6, duration: 1500, weight: 4 },
+
+  // ---- autohunt (NEW) ----
+  swarm: { name: 'Animal Swarm', desc: 'autohunt cycles produce +2 animals', emoji: '🐺', apply: 'autohuntMult', mult: 2, duration: 2000, weight: 6 },
+  stampede: { name: 'Stampede', desc: 'autohunt cycles produce +3 animals', emoji: '🦬', apply: 'autohuntMult', mult: 3, duration: 1500, weight: 3 },
+
+  // ---- streak protection (NEW) ----
+  streak_shield: { name: 'Streak Shield', desc: 'your daily streak won\'t reset for 24h', emoji: '🛡️', apply: 'streakFreeze', duration: 86400, weight: 5 },
+
+  // ---- instant payouts ----
+  coin_rain: { name: 'Coin Rain', desc: 'everyone gets +50k coins', emoji: '🌧️', apply: 'rain', duration: 300, weight: 8 },
+  gem_rain: { name: 'Gem Rain', desc: 'everyone gets +25 gems', emoji: '💠', apply: 'rain', duration: 300, weight: 6 },
+  egg_shower: { name: 'Egg Shower', desc: 'everyone gets +3 eggs', emoji: '☔', apply: 'rain', duration: 300, weight: 5 },
+  seal_drizzle: { name: 'Seal Drizzle', desc: 'everyone gets +2 seals', emoji: '🎫', apply: 'rain', duration: 300, weight: 5 },
+  lucky_rain: { name: 'Lucky Rain', desc: 'everyone gets +150k coins, +30 gems, +3 eggs & +2 seals', emoji: '🌈', apply: 'rain', duration: 300, weight: 4 },
+  essence_deluge: { name: 'Essence Deluge', desc: 'everyone gets +50 essence', emoji: '💜', apply: 'rain', duration: 300, weight: 5 },
 };
 
 const RAIN_REWARDS = {
-  coin_rain: { coins: 30000 },
-  gem_rain: { gems: 20 },
-  egg_shower: { eggs: 2 },
-  lucky_rain: { coins: 100000, gems: 20, eggs: 2 },
+  coin_rain: { coins: 50000 },
+  gem_rain: { gems: 25 },
+  egg_shower: { eggs: 3 },
+  seal_drizzle: { seals: 2 },
+  lucky_rain: { coins: 150000, gems: 30, eggs: 3, seals: 2 },
+  essence_deluge: { essence: 50 },
 };
 
 function applyRain(key) {
   const r = RAIN_REWARDS[key];
-  if (!r) return { coins: 0, gems: 0, eggs: 0 };
+  if (!r) return { coins: 0, gems: 0, eggs: 0, seals: 0, essence: 0 };
   if (r.coins) db.run(`UPDATE users SET balance = balance + ${r.coins}`);
   if (r.gems) db.run(`UPDATE users SET gems = gems + ${r.gems}`);
   if (r.eggs) db.run(`UPDATE users SET eggs = eggs + ${r.eggs}`);
+  if (r.seals) db.run(`UPDATE users SET seals = seals + ${r.seals}`);
+  if (r.essence) db.run(`UPDATE users SET essence = essence + ${r.essence}`);
   save();
-  return { coins: r.coins || 0, gems: r.gems || 0, eggs: r.eggs || 0 };
+  return { coins: r.coins || 0, gems: r.gems || 0, eggs: r.eggs || 0, seals: r.seals || 0, essence: r.essence || 0 };
 }
 
 function getActiveEvent() {
@@ -3165,11 +3228,13 @@ function openCrate(userId, crateId) {
   const crate = CRATES[crateId];
   const u = ensureUser(userId);
   if (!crate || !u) return { ok: false, reason: 'notfound' };
-  if ((u.balance || 0) < crate.price) return { ok: false, reason: 'coins' };
-  const pity = getCratePity(userId) + 1;
+  const price = Math.max(1, Math.floor(crate.price * eventMult('crateMult')));
+  if ((u.balance || 0) < price) return { ok: false, reason: 'coins' };
+  const pityGain = Math.max(1, Math.round(eventMult('pityMult')));
+  const pity = getCratePity(userId) + pityGain;
   const rarity = rollCrateRarity(crateId, pity);
   setCratePity(userId, rarity === crate.pityRarity ? 0 : pity);
-  db.run(`UPDATE users SET balance = balance - ${crate.price} WHERE user_id = '${userId}'`);
+  db.run(`UPDATE users SET balance = balance - ${price} WHERE user_id = '${userId}'`);
   const shiny = rollShiny() ? 1 : 0;
   const trait = rollTrait();
   const species = randomSpecies(rarity);
