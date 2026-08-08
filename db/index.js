@@ -77,6 +77,7 @@ async function init() {
   try { db.run(`ALTER TABLE users ADD COLUMN free_bet_time INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   try { db.run(`ALTER TABLE users ADD COLUMN crate_pity INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   try { db.run(`ALTER TABLE users ADD COLUMN zoo_decor TEXT NOT NULL DEFAULT '[]'`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN seals INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   db.run(`CREATE TABLE IF NOT EXISTS pet_achievements (animal_id INTEGER NOT NULL, key TEXT NOT NULL, at INTEGER NOT NULL DEFAULT (strftime('%s','now')), PRIMARY KEY (animal_id, key))`);
   db.run(`CREATE TABLE IF NOT EXISTS clans (clan_id TEXT PRIMARY KEY, name TEXT NOT NULL, owner_id TEXT NOT NULL, balance INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')))`);
   db.run(`CREATE TABLE IF NOT EXISTS clan_members (clan_id TEXT NOT NULL, user_id TEXT NOT NULL, joined_at INTEGER NOT NULL DEFAULT (strftime('%s','now')), PRIMARY KEY (clan_id, user_id))`);
@@ -211,6 +212,26 @@ async function init() {
     reward INTEGER NOT NULL DEFAULT 0,
     claimed INTEGER NOT NULL DEFAULT 0
   )`);
+  db.run(`CREATE TABLE IF NOT EXISTS checklist_daily (
+    user_id TEXT PRIMARY KEY,
+    day INTEGER NOT NULL DEFAULT 0,
+    eggs INTEGER NOT NULL DEFAULT 0,
+    hunt INTEGER NOT NULL DEFAULT 0,
+    battle INTEGER NOT NULL DEFAULT 0,
+    gamble INTEGER NOT NULL DEFAULT 0,
+    gems INTEGER NOT NULL DEFAULT 0,
+    claimed INTEGER NOT NULL DEFAULT 0
+  )`);
+  db.run(`CREATE TABLE IF NOT EXISTS checklist_weekly (
+    user_id TEXT PRIMARY KEY,
+    week INTEGER NOT NULL DEFAULT 0,
+    hunt INTEGER NOT NULL DEFAULT 0,
+    battle INTEGER NOT NULL DEFAULT 0,
+    eggs INTEGER NOT NULL DEFAULT 0,
+    gamble INTEGER NOT NULL DEFAULT 0,
+    gems INTEGER NOT NULL DEFAULT 0,
+    claimed INTEGER NOT NULL DEFAULT 0
+  )`);
   db.run(`CREATE TABLE IF NOT EXISTS vaults (
     guild_id TEXT PRIMARY KEY,
     balance INTEGER NOT NULL DEFAULT 0
@@ -294,6 +315,7 @@ function ensureUser(userId) {
       free_bet_time: vals[40] || 0,
       crate_pity: vals[41] || 0,
       zoo_decor: vals[42] || '[]',
+      seals: vals[43] || 0,
     };
   }
   return null;
@@ -348,11 +370,31 @@ function addGems(userId, amount) {
   }
   db.run(`UPDATE users SET gems = ${u.gems + amount} WHERE user_id = '${userId}'`);
   save();
+  if (amount > 0) {
+    addChecklistProgress(userId, 'daily', 'gems', amount);
+    addChecklistProgress(userId, 'weekly', 'gems', amount);
+  }
 }
 
 function setGems(userId, amount) {
   db.run(`UPDATE users SET gems = ${amount} WHERE user_id = '${userId}'`);
   save();
+}
+
+function getSeals(userId) {
+  const u = ensureUser(userId);
+  return u ? (u.seals || 0) : 0;
+}
+
+function addSeals(userId, amount) {
+  let u = ensureUser(userId);
+  if (!u) {
+    db.run(`INSERT INTO users (user_id, balance) VALUES ('${userId}', 0)`);
+    u = ensureUser(userId);
+  }
+  db.run(`UPDATE users SET seals = ${u.seals + amount} WHERE user_id = '${userId}'`);
+  save();
+  return u.seals + amount;
 }
 
 // Move ALL of a source account's data onto a destination account, overwriting the
@@ -535,6 +577,8 @@ function getCooldown(lastTime, cooldownSec) {
 function addGambled(userId, amount) {
   db.run(`UPDATE users SET total_gambled = total_gambled + ${amount} WHERE user_id = '${userId}'`);
   addWeeklyLb(userId, amount, 0);
+  addChecklistProgress(userId, 'daily', 'gamble', amount);
+  addChecklistProgress(userId, 'weekly', 'gamble', amount);
   save();
 }
 
@@ -1872,6 +1916,82 @@ function claimBounty(userId) {
   return { ...b, reward };
 }
 
+// ---------- Multi-task checklists (daily + weekly) ----------
+const CHECKLIST_COLUMNS = ['eggs', 'hunt', 'battle', 'gamble', 'gems'];
+const CHECKLIST_DEFS = {
+  daily: {
+    table: 'checklist_daily',
+    period: 'day',
+    tasks: { hunt: 10, battle: 5, eggs: 5, gamble: 100000, gems: 10 },
+    reward: 50000,
+    seals: 1,
+  },
+  weekly: {
+    table: 'checklist_weekly',
+    period: 'week',
+    tasks: { hunt: 100, battle: 50, eggs: 100, gamble: 1000000, gems: 100 },
+    reward: 300000,
+    seals: 3,
+  },
+};
+
+function checklistPeriodNumber(period) {
+  return period === 'weekly' ? Math.floor(dayNumber() / 7) : dayNumber();
+}
+
+function checklistRow(userId, period, ensure) {
+  const def = CHECKLIST_DEFS[period];
+  const num = checklistPeriodNumber(period);
+  const select = `SELECT user_id, ${def.period}, eggs, hunt, battle, gamble, gems, claimed FROM ${def.table}`;
+  let rows = db.exec(`${select} WHERE user_id = '${userId}'`);
+  const raw = rows.length && rows[0].values.length ? rows[0].values[0] : null;
+  if (raw && raw[1] === num) return raw;
+  if (raw && raw[1] !== num && ensure) {
+    db.run(`DELETE FROM ${def.table} WHERE user_id = '${userId}' AND ${def.period} <> ${num}`);
+    save();
+  }
+  if (ensure) {
+    db.run(`INSERT OR REPLACE INTO ${def.table} (user_id, ${def.period}) VALUES ('${userId}', ${num})`);
+    save();
+    rows = db.exec(`${select} WHERE user_id = '${userId}'`);
+    return rows[0].values[0];
+  }
+  return null;
+}
+
+function getChecklist(userId, period) {
+  const def = CHECKLIST_DEFS[period];
+  const raw = checklistRow(userId, period, true);
+  let progress = {};
+  for (const k of CHECKLIST_COLUMNS) progress[k] = raw[progressIdx(k)] || 0;
+  const allDone = CHECKLIST_COLUMNS.every(k => progress[k] >= (def.tasks[k] || 0));
+  return { period, periodNum: raw[1], tasks: def.tasks, progress, allDone, claimed: raw[7] === 1, reward: def.reward, seals: def.seals };
+}
+
+function progressIdx(key) {
+  return { eggs: 2, hunt: 3, battle: 4, gamble: 5, gems: 6 }[key];
+}
+
+function addChecklistProgress(userId, period, key, amount) {
+  if (!CHECKLIST_DEFS[period] || !CHECKLIST_COLUMNS.includes(key)) return;
+  const raw = checklistRow(userId, period, true);
+  if (raw[7] === 1) return; // already claimed this period
+  const def = CHECKLIST_DEFS[period];
+  const target = def.tasks[key];
+  db.run(`UPDATE ${def.table} SET ${key} = MIN(${key} + ${amount}, ${target}) WHERE user_id = '${userId}'`);
+  save();
+}
+
+function claimChecklist(userId, period) {
+  const c = getChecklist(userId, period);
+  if (c.claimed || !c.allDone) return null;
+  db.run(`UPDATE ${CHECKLIST_DEFS[period].table} SET claimed = 1 WHERE user_id = '${userId}'`);
+  addBalance(userId, c.reward);
+  addSeals(userId, c.seals);
+  save();
+  return { ...c, claimed: true };
+}
+
 // ---- v1.7.x: Player-funded PvP bounties ----
 // Poster funds a prize; first player to reach `goal` duel wins vs the other takes the pot.
 const PVP_BOUNTY_LIFETIME = 7 * 86400;
@@ -3076,6 +3196,7 @@ module.exports = {
   stockPrice, getStockPrices, buyStock, sellStock, getStockShares, getPortfolio, STOCKS,
   rollEggDrop, getEggs, addEgg, hatchEgg, transferAnimal, EGG_DROP_CHANCE, EGG_HATCH_RARITY,
   getQuest, addQuestProgress, claimQuest, getBounty, addBountyProgress, claimBounty,
+  getChecklist, addChecklistProgress, claimChecklist, getSeals, addSeals,
   createPvpBounty, getPvpBounty, listActiveBounties, getPvpBountyBetween, recordPvpDuelWin, cancelPvpBounty, pruneExpiredBounties, PVP_BOUNTY_LIFETIME,
   currentLbWeek, getWeeklyLb, finalizeWeeklyLb, getLbState, setLbState, setLbChannel, getAllLbChannels, WEEKLY_LB_REWARDS,
   getVault, vaultDeposit, vaultWithdraw, getVaultTop,

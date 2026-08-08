@@ -14,3 +14,5 @@ Format: one line per change, terse, no AI fluff.
 - Custom roles now force-stack directly under the anchor role (failed position moves are logged instead of silently ignored).
 - FIXED: `v clanwar challenge` crashed with "an error occurred" right after creating the war (the accept/decline buttons failed to build). Challenges now post their board, and stale/unanswered challenges auto-expire after 60s.
 - Weekly Gambling Leaderboard now ranks by NET win/loss (wins - bets) instead of total bet volume — best gamblers of the week, not biggest spenders. Rewards unchanged.
+- NEW \ checklist\ — multi-task daily + weekly checklists (hunt/battle/eggs/gamble/gems), rewards coins + collectible seals (\ checklist weekly claim\ for the weekly one).
+- NEW \ snailgarden <bet>\ — plant garden rows step by step, multiplier grows ~1.25x/row while failure chance climbs; Sell to cash out before a row fails (buttons, like mines).

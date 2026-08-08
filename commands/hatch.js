@@ -22,6 +22,10 @@ module.exports = {
       if (!a) break;
       results.push(a);
     }
+    if (results.length > 0) {
+      db.addChecklistProgress(userId, 'daily', 'eggs', results.length);
+      db.addChecklistProgress(userId, 'weekly', 'eggs', results.length);
+    }
     if (!results.length) return message.channel.send({ embeds: [error('nothing hatched — you ran out of eggs')] });
 
     const remaining = db.getEggs(userId);

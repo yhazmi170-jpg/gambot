@@ -83,6 +83,8 @@ const t = theirAlive.reduce((a, b) => a.hp < b.hp ? a : b);
     db.payWin(winner.id, reward);
     db.addQuestProgress(winner.id, 'battle', 1);
     db.addBountyProgress(winner.id, 'battle', 1);
+    db.addChecklistProgress(winner.id, 'daily', 'battle', 1);
+    db.addChecklistProgress(winner.id, 'weekly', 'battle', 1);
     const wins = db.addBattleWin(winner.id);
     const winnerPets = winner.id === message.author.id ? myPets : theirPets;
     for (const pet of winnerPets) {

@@ -61,6 +61,13 @@ module.exports = {
         play: `\`${prefix} mines <amount>\`\nClick tiles, or **Cash Out**\nExample: \`${prefix} mines 1000\``,
         tips: 'Cash out early for steady profit. One mine ends the round.',
       },
+      snailgarden: {
+        name: 'Snail Garden',
+        aliases: 'sgarden, gardenbet',
+        desc: 'Plant garden rows step by step. Each row grows the multiplier but also the failure chance — cash out before a row fails.',
+        play: `\`${prefix} snailgarden <amount>\`\nHit **Next row** to plant, or **Sell** to cash out\nExample: \`${prefix} snailgarden 1000\``,
+        tips: 'Cash out early for a safe small win. The multiplier compounds each row (~1.25x), failure chance climbs as you go.',
+      },
       wheel: {
         name: 'Wheel',
         aliases: 'wheel, spin',
@@ -151,6 +158,13 @@ heist: {
         desc: 'A weekly challenge with a big coin reward. Bigger goal, bigger payout.',
         play: `\`${prefix} bounty\` — view\n\`${prefix} bounty claim\` — claim when done`,
         tips: 'Resets every week. Same tasks as the daily quest but bigger. Double Quest Rewards perk applies.',
+      },
+      checklist: {
+        name: 'Daily + Weekly Checklists',
+        aliases: 'check, cl',
+        desc: 'Multi-task daily and weekly lists — complete every task for coins and seals.',
+        play: `\`${prefix} checklist\` — daily list\n\`${prefix} checklist weekly\` — weekly list\n\`${prefix} checklist claim\` — claim daily rewards`,
+        tips: 'Tasks: hunt, battle wins, hatch eggs, gamble, gain gems. Finishing daily gives 50k + 1 seal; weekly gives 300k + 3 seals. Seals are a collectible currency.',
       },
       crate: {
         name: 'Loot Crates',
