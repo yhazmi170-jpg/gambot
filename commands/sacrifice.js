@@ -34,6 +34,7 @@ module.exports = {
     if (result.skipped > 0) lines.push(`${result.skipped} team animal(s) were skipped`);
     db.addQuestProgress(userId, 'sacrifice', result.sacrificed);
     db.addBountyProgress(userId, 'sacrifice', result.sacrificed);
+    db.addPassXp(userId, db.PASS_XP.sacrifice * result.sacrificed);
     lines.push('`v upgrade <trait>` to boost hunts · `v autohuntbot` to upgrade the autohunt bot');
 
     message.channel.send({ embeds: [success(lines.join('\n'))] });

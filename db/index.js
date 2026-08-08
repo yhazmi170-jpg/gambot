@@ -232,6 +232,21 @@ async function init() {
     gems INTEGER NOT NULL DEFAULT 0,
     claimed INTEGER NOT NULL DEFAULT 0
   )`);
+  db.run(`CREATE TABLE IF NOT EXISTS pass_state (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    season INTEGER NOT NULL DEFAULT 1,
+    ends_at INTEGER NOT NULL DEFAULT 0
+  )`);
+  db.run(`CREATE TABLE IF NOT EXISTS battlepass (
+    user_id TEXT NOT NULL,
+    season INTEGER NOT NULL,
+    xp INTEGER NOT NULL DEFAULT 0,
+    premium INTEGER NOT NULL DEFAULT 0,
+    free_claimed TEXT NOT NULL DEFAULT '',
+    prem_claimed TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (user_id, season)
+  )`);
+  try { db.run(`INSERT OR IGNORE INTO pass_state (id, season, ends_at) VALUES (1, 1, ${Math.floor(Date.now() / 1000) + 14 * 86400})`); } catch (e) {}
   db.run(`CREATE TABLE IF NOT EXISTS vaults (
     guild_id TEXT PRIMARY KEY,
     balance INTEGER NOT NULL DEFAULT 0
@@ -579,12 +594,14 @@ function addGambled(userId, amount) {
   addWeeklyLb(userId, amount, 0);
   addChecklistProgress(userId, 'daily', 'gamble', amount);
   addChecklistProgress(userId, 'weekly', 'gamble', amount);
+  addPassXp(userId, PASS_XP.gamble_per_1k ? Math.floor(amount / 1000) * PASS_XP.gamble_per_1k : 0);
   save();
 }
 
 function addWon(userId, amount) {
   db.run(`UPDATE users SET total_won = total_won + ${amount} WHERE user_id = '${userId}'`);
   addWeeklyLb(userId, 0, amount);
+  addPassXp(userId, PASS_XP.win_per_10k ? Math.floor(amount / 10000) * PASS_XP.win_per_10k : 0);
   save();
 }
 
@@ -1145,6 +1162,13 @@ function expForLevel(level) { return level * 100; }
 const XP_PER_LEVEL = 100;
 const XP_COOLDOWN = 30;
 const LEVEL_REWARD = 1000;
+
+// ---------- Battle pass (seasonal progression) ----------
+const PASS_DURATION = 14 * 86400; // a season lasts 14 days
+const PASS_MAX_LEVEL = 25;
+const PASS_PREM_COST = 25; // seals to unlock premium track
+const PASS_XP = { hunt: 2, battle: 3, hatch: 4, sacrifice: 1, give: 2, work: 3, gamble_per_1k: 1, win_per_10k: 1, quest: 15, bounty: 30, checklist_daily: 10, checklist_weekly: 25 };
+function passXpForLevel(level) { return level * 150; }
 
 function xpForLevel(level) { return level * XP_PER_LEVEL; }
 
@@ -1882,6 +1906,7 @@ function claimQuest(userId) {
   db.run(`UPDATE quests SET claimed = 1 WHERE user_id = '${userId}'`);
   const reward = hasPerk(userId, 'double_quest') ? q.reward * 2 : q.reward;
   addBalance(userId, reward);
+  addPassXp(userId, PASS_XP.quest);
   save();
   return { ...q, reward };
 }
@@ -1912,6 +1937,7 @@ function claimBounty(userId) {
   db.run(`UPDATE bounties SET claimed = 1 WHERE user_id = '${userId}'`);
   const reward = hasPerk(userId, 'double_quest') ? b.reward * 2 : b.reward;
   addBalance(userId, reward);
+  addPassXp(userId, PASS_XP.bounty);
   save();
   return { ...b, reward };
 }
@@ -1988,8 +2014,134 @@ function claimChecklist(userId, period) {
   db.run(`UPDATE ${CHECKLIST_DEFS[period].table} SET claimed = 1 WHERE user_id = '${userId}'`);
   addBalance(userId, c.reward);
   addSeals(userId, c.seals);
+  addPassXp(userId, period === 'weekly' ? PASS_XP.checklist_weekly : PASS_XP.checklist_daily);
   save();
   return { ...c, claimed: true };
+}
+
+// ---------- Battle pass (seasonal progression + reward tracks) ----------
+function currentSeason() {
+  const rows = db.exec(`SELECT season, ends_at FROM pass_state WHERE id = 1`);
+  const now = Math.floor(Date.now() / 1000);
+  if (!rows.length || !rows[0].values.length) {
+    const ends = now + PASS_DURATION;
+    db.run(`INSERT OR REPLACE INTO pass_state (id, season, ends_at) VALUES (1, 1, ${ends})`);
+    save();
+    return { season: 1, endsAt: ends };
+  }
+  let [season, endsAt] = rows[0].values[0];
+  if (now >= endsAt) {
+    season += 1;
+    endsAt = now + PASS_DURATION;
+    db.run(`UPDATE pass_state SET season = ${season}, ends_at = ${endsAt} WHERE id = 1`);
+    save();
+  }
+  return { season, endsAt };
+}
+
+function passRow(userId, season, ensure) {
+  let rows = db.exec(`SELECT user_id, season, xp, premium, free_claimed, prem_claimed FROM battlepass WHERE user_id = '${userId}' AND season = ${season}`);
+  if (rows.length && rows[0].values.length) return rows[0].values[0];
+  if (ensure) {
+    db.run(`INSERT OR REPLACE INTO battlepass (user_id, season, xp, premium, free_claimed, prem_claimed) VALUES ('${userId}', ${season}, 0, 0, '', '')`);
+    save();
+    rows = db.exec(`SELECT user_id, season, xp, premium, free_claimed, prem_claimed FROM battlepass WHERE user_id = '${userId}' AND season = ${season}`);
+    return rows[0].values[0];
+  }
+  return null;
+}
+
+function passLevel(xp) {
+  let level = 0;
+  let remaining = xp;
+  while (level < PASS_MAX_LEVEL && remaining >= passXpForLevel(level + 1)) {
+    remaining -= passXpForLevel(level + 1);
+    level++;
+  }
+  return { level, into: remaining, need: level >= PASS_MAX_LEVEL ? 0 : passXpForLevel(level + 1) };
+}
+
+function passProgress(userId) {
+  const { season, endsAt } = currentSeason();
+  const raw = passRow(userId, season, true);
+  const xp = raw[2];
+  const premium = raw[3] === 1;
+  const freeClaimed = (raw[4] || '').split(',').filter(Boolean).map(Number);
+  const premClaimed = (raw[5] || '').split(',').filter(Boolean).map(Number);
+  const { level, into, need } = passLevel(xp);
+  return { season, endsAt, xp, premium, level, maxLevel: PASS_MAX_LEVEL, into, need, freeClaimed, premClaimed };
+}
+
+function addPassXp(userId, amount) {
+  if (!amount || amount <= 0) return passProgress(userId);
+  const { season } = currentSeason();
+  const raw = passRow(userId, season, true);
+  const newXp = raw[2] + amount;
+  db.run(`UPDATE battlepass SET xp = ${newXp} WHERE user_id = '${userId}' AND season = ${season}`);
+  save();
+  return passProgress(userId);
+}
+
+function buyPassPremium(userId) {
+  const { season } = currentSeason();
+  const raw = passRow(userId, season, true);
+  if (raw[3] === 1) return { ok: false, reason: 'owned' };
+  const seals = getSeals(userId);
+  if (seals < PASS_PREM_COST) return { ok: false, reason: 'seals' };
+  addSeals(userId, -PASS_PREM_COST);
+  db.run(`UPDATE battlepass SET premium = 1 WHERE user_id = '${userId}' AND season = ${season}`);
+  save();
+  return { ok: true };
+}
+
+function passReward(level, premium) {
+  // returns { coins, gems, seals } for unlocking `level` on a track
+  const coins = premium ? 12000 * level : 4000 * level;
+  const gems = premium ? level * 2 : 0;
+  const seals = premium && level % 5 === 0 ? 1 : 0;
+  return { coins, gems, seals };
+}
+
+function claimPassLevel(userId, level, track) {
+  const { season } = currentSeason();
+  const raw = passRow(userId, season, true);
+  const { level: curLevel } = passLevel(raw[2]);
+  if (level > curLevel) return { ok: false, reason: 'locked' };
+  if (track === 'premium' && raw[3] !== 1) return { ok: false, reason: 'no_premium' };
+  const claimed = track === 'premium' ? (raw[5] || '').split(',').filter(Boolean).map(Number) : (raw[4] || '').split(',').filter(Boolean).map(Number);
+  if (claimed.includes(level)) return { ok: false, reason: 'claimed' };
+  claimed.push(level);
+  const col = track === 'premium' ? 'prem_claimed' : 'free_claimed';
+  db.run(`UPDATE battlepass SET ${col} = '${claimed.join(',')}' WHERE user_id = '${userId}' AND season = ${season}`);
+  const r = passReward(level, track === 'premium');
+  if (r.coins) addBalance(userId, r.coins);
+  if (r.gems) addGems(userId, r.gems);
+  if (r.seals) addSeals(userId, r.seals);
+  save();
+  return { ok: true, reward: r };
+}
+
+function claimAllPass(userId) {
+  const prog = passProgress(userId);
+  const claimed = [];
+  for (let lvl = 1; lvl <= prog.level; lvl++) {
+    if (!prog.freeClaimed.includes(lvl)) {
+      const r = claimPassLevel(userId, lvl, 'free');
+      if (r.ok) claimed.push({ level: lvl, track: 'free', ...r.reward });
+    }
+    if (prog.premium && !prog.premClaimed.includes(lvl)) {
+      const r = claimPassLevel(userId, lvl, 'premium');
+      if (r.ok) claimed.push({ level: lvl, track: 'premium', ...r.reward });
+    }
+  }
+  return claimed;
+}
+
+function passTop(limit = 10) {
+  const { season } = currentSeason();
+  const rows = db.exec(`SELECT user_id, xp FROM battlepass WHERE season = ${season} ORDER BY xp DESC LIMIT ${limit}`);
+  if (!rows.length) return [];
+  return rows[0].values.map(v => ({ userId: v[0], xp: v[1], ...passLevel(v[1]) }));
 }
 
 // ---- v1.7.x: Player-funded PvP bounties ----
@@ -3197,6 +3349,8 @@ module.exports = {
   rollEggDrop, getEggs, addEgg, hatchEgg, transferAnimal, EGG_DROP_CHANCE, EGG_HATCH_RARITY,
   getQuest, addQuestProgress, claimQuest, getBounty, addBountyProgress, claimBounty,
   getChecklist, addChecklistProgress, claimChecklist, getSeals, addSeals,
+  currentSeason, addPassXp, passProgress, buyPassPremium, claimPassLevel, claimAllPass, passTop, passReward,
+  PASS_MAX_LEVEL, PASS_DURATION, PASS_PREM_COST, PASS_XP,
   createPvpBounty, getPvpBounty, listActiveBounties, getPvpBountyBetween, recordPvpDuelWin, cancelPvpBounty, pruneExpiredBounties, PVP_BOUNTY_LIFETIME,
   currentLbWeek, getWeeklyLb, finalizeWeeklyLb, getLbState, setLbState, setLbChannel, getAllLbChannels, WEEKLY_LB_REWARDS,
   getVault, vaultDeposit, vaultWithdraw, getVaultTop,

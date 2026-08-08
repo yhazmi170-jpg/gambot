@@ -33,6 +33,7 @@ module.exports = {
     db.claimWork(message.author.id, raw);
     db.addQuestProgress(message.author.id, 'work', 1);
     db.addBountyProgress(message.author.id, 'work', 1);
+    db.addPassXp(message.author.id, db.PASS_XP.work);
     message.channel.send({
       embeds: [success(`you worked **${job}** and earned **${amount}** ${config.currency}${doubled ? ' (2x perk!)' : ''}${workMult > 1 ? ` (event x${workMult})` : ''}${married > 1 ? ' (❤️ married +10%)' : ''}${factor < 1 ? ` (${Math.round((1 - factor) * 100)}% reduction)` : ''}`)],
     });

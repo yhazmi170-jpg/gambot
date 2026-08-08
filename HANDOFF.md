@@ -5,7 +5,7 @@
 
 ## Status
 - **Branch**: `master`
-- **Version**: `1.7.1` — latest pushed commit `3e0028c` (weekly gambling LB ranks by NET win/loss; LIVE on Render). Previous `cbc98ea` (clanwar fix) also live.
+- **Version**: `1.7.2` — battle pass + checklist XP wiring + gamehelp entry (LIVE on Render once pushed).
 - **Roles (v two-agent workflow):** chat agent (orchestrator, is the user's main driver) delegates coding to Claude Code CLI; git is the message bus.
 - **Change log**: complete history of every update lives in `CHANGELOG.md` (newest first) — keep it in sync with the version bump + `update_msg.txt`
 - **Host migration**: Replit → Render (free, Blueprint from `render.yaml`). Replit repl was stopped by user. **Render URL: `https://gambot-o2o4.onrender.com`** — keepalive pinger repointed to it.
@@ -54,8 +54,10 @@
 - [x] Blackjack owo-style board (`Dealer [10+?]`, cardback, `Name [total]`)
 - [x] Help descriptions on all cmds + gamehelp poker/bj + standing “always update help” rule
 
+- [x] **v1.7.2 — battle pass + pass XP wiring:** New `battlepass` + `pass_state` tables. `v battlepass` (`pass`/`bp`/`season`) = 25-tier seasonal progression (14-day seasons, auto-roll via `currentSeason`). XP from hunt/battle/hatch/sacrifice/give/work (in command files) + gambled/wins (in `addGambled`/`addWon`) + quest/bounty/checklist claims. Free + premium track (`buyPassPremium`, 25 seals). Rewards per tier via `passReward(level, premium)`; `claimAllPass` grabs all due. Wired into gamehelp. Bumped 1.7.1 → 1.7.2, `update_msg.txt`, flushed `pending_updates.txt`. AGENTS.md economy section updated.
+
 ## Next / open
-- [ ] **Update policy active (v1.5.0 rule):** big updates = version bump + `update_msg.txt` + announce; small updates = push silently + append to `pending_updates.txt`, flush together after ~10. See AGENTS.md. Current pending_updates count: 0 (flushed into v1.6.0).
+- [ ] **Update policy active (v1.5.0 rule):** big updates = version bump + `update_msg.txt` + announce; small updates = push silently + append to `pending_updates.txt`, flush together after ~10. See AGENTS.md. Current pending_updates count: 0 (flushed into v1.7.2).
 - [ ] **Friend has no `auto_react` perk** (confirmed 2026-08-06) — if @伤害 is supposed to auto-react, either they buy it (`v shop`) + `v autoreact <emoji>`, or grant via admin. The "self react" report is still unexplained — user hasn't described the exact symptom.
 - [ ] **Do NOT restart the Replit repl** (double instance = double responses).
 

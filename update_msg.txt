@@ -1,17 +1,10 @@
-v1.7.1 — Bounties & Fixes
+v1.7.2 — Battle Pass & Checklists
 
 NEW
-- `v bounty create @player <goal> <amount>` — player-funded PvP bounty: you put up the prize, first to reach the duel-win goal against the other takes the whole pot. `v bounty list` for the board, `v bounty info <id>`, `v bounty cancel <id>` (before any duels are fought). Duel wins now show bounty progress live.
-- `v wheel <amount>` — spin the wheel of fortune, multipliers up to a x10 jackpot.
-- `v streak` — daily logon streak bonus that scales to day 7 (miss 48h and it resets).
-- `v loan take|shark|pay` — borrow coins from the bank (30% interest, up to 2x your balance+bank) or hit the loan shark (50%, up to 2M). Winnings auto-repay your loan.
-- `Aovo events #channel` — put random server events in their own channel (falls back to update channel).
-- More random events (15 now): Hot Streak, Gem Bonanza, Hatch Madness, Essence Flood, Double Payday + more.
+- `v pass` — **Seasonal Battle Pass**: earn XP from hunting, battling, hatching, sacrificing, giving, working, gambling, wins, and quest/bounty/checklist completions. Level up a free track + a premium track (25 seals) and claim coins, gems, and seals at every tier (25 tiers, 14-day season). Sub-commands: `v pass buy`, `v pass claim`, `v pass top`, `v pass rewards`.
+- `v checklist` — multi-task daily + weekly checklists (hunt / battle / hatch / gamble / gems). Finish all tasks for coins + collectible **seals** (`v checklist claim` for daily, `v checklist weekly claim` for weekly).
+- `v snailgarden <bet>` — plant garden rows one at a time; the payout multiplier grows ~1.25x per row while the failure chance climbs. Cash out with the Sell button before a row fails (button-based, like mines).
 
-FIXES
-- Mines: board was missing the bottom-right tile (4x4 but 15 buttons) — all 16 tiles now show + a dedicated cash-out row; unplayed games refund your bet instead of silently eating it (5 min window).
-- Giveaways: no more silent no-winner endings — giveaways are saved to the DB and a sweep always draws, pays and announces the winner, even after a restart.
-- `v zooshop buy flower garden` now works (multi-word item names).
-- PvP battles 'your team is empty' bug fixed.
-
-NOTE: the owner boot-DM only fires once per version now, so no more spam DMs on every restart.
+NOTES
+- Seals are a new collectible currency: earn them from daily/weekly checklist rewards and from premium pass tiers (every 5th tier). Spend 25 seals to unlock the premium pass track for the season.
+- The pass tracks your level + progress, shows the season timer, and the top command shows who's ranked highest this season.

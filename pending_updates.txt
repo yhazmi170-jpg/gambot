@@ -5,14 +5,3 @@ flush: move them into update_msg.txt as ONE combined log + bump package.json ver
 then push (the boot announcement posts it once).
 
 Format: one line per change, terse, no AI fluff.
-- Clan creation now costs 5M coins (was 500k).
-- New weekly Gambling Leaderboard: `Aovo lb #channel` picks a channel, bot auto-posts the top 10 gamblers every week and pays rewards (1st 1M â†’ 10th 40k). Owner stays hidden. View anytime with `v glb`.
-- Clans are now PLAYER-based, not server-based: `v clan create` makes a clan owned by you, `v clan join @me|name` joins anyone's clan, `v clan delete` disbands (50% treasury back). One clan per player, 5M to create.
-- NEW `v pokertournament <buy-in>` â€” 5-card poker showdown table (9 seats), best hand wins the whole pot (90%), join via button.
-- NEW Travelling merchant â€” rolls in every ~90min, sells 1 rare pet + gems + essence, first come first served via `v merchant`.
-- NEW Clan Wars â€” `v clanwar challenge <name> <stake>`: both clans pay a treasury stake, members click Fight, the winning clan takes both stakes. 1Mâ€“25%. No-show = refunded.
-- Custom roles now force-stack directly under the anchor role (failed position moves are logged instead of silently ignored).
-- FIXED: `v clanwar challenge` crashed with "an error occurred" right after creating the war (the accept/decline buttons failed to build). Challenges now post their board, and stale/unanswered challenges auto-expire after 60s.
-- Weekly Gambling Leaderboard now ranks by NET win/loss (wins - bets) instead of total bet volume — best gamblers of the week, not biggest spenders. Rewards unchanged.
-- NEW \ checklist\ — multi-task daily + weekly checklists (hunt/battle/eggs/gamble/gems), rewards coins + collectible seals (\ checklist weekly claim\ for the weekly one).
-- NEW \ snailgarden <bet>\ — plant garden rows step by step, multiplier grows ~1.25x/row while failure chance climbs; Sell to cash out before a row fails (buttons, like mines).

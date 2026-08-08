@@ -69,6 +69,7 @@ module.exports = {
     db.addBountyProgress(userId, 'hunt', count);
     db.addChecklistProgress(userId, 'daily', 'hunt', count);
     db.addChecklistProgress(userId, 'weekly', 'hunt', count);
+    db.addPassXp(userId, db.PASS_XP.hunt * count);
 
     const fields = results.map((a, i) => [
       `#${i + 1}`,

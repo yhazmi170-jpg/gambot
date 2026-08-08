@@ -166,6 +166,13 @@ heist: {
         play: `\`${prefix} checklist\` — daily list\n\`${prefix} checklist weekly\` — weekly list\n\`${prefix} checklist claim\` — claim daily rewards`,
         tips: 'Tasks: hunt, battle wins, hatch eggs, gamble, gain gems. Finishing daily gives 50k + 1 seal; weekly gives 300k + 3 seals. Seals are a collectible currency.',
       },
+      battlepass: {
+        name: 'Seasonal Battle Pass',
+        aliases: 'pass, bp, season',
+        desc: 'Earn XP from every action, level up a free + premium track, and claim coins/gems/seals each tier.',
+        play: `\`${prefix} pass\` — your progress\n\`${prefix} pass buy\` — unlock premium (25 seals)\n\`${prefix} pass claim\` — collect due rewards\n\`${prefix} pass top\` — season leaderboard\n\`${prefix} pass rewards\` — all tiers`,
+        tips: 'XP sources: hunt, battle, hatch, sacrifice, give, work, gambling, wins, quest/bounty/checklist. Premium gives roughly 3x coins + gems + bonus seals every 5 tiers. A season lasts 14 days.',
+      },
       crate: {
         name: 'Loot Crates',
         aliases: 'lootbox, box',

@@ -25,6 +25,7 @@ module.exports = {
     if (results.length > 0) {
       db.addChecklistProgress(userId, 'daily', 'eggs', results.length);
       db.addChecklistProgress(userId, 'weekly', 'eggs', results.length);
+      db.addPassXp(userId, db.PASS_XP.hatch * results.length);
     }
     if (!results.length) return message.channel.send({ embeds: [error('nothing hatched — you ran out of eggs')] });
 
