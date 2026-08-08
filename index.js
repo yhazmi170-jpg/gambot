@@ -163,7 +163,7 @@ client.on('ready', () => {
       if (res.paid.length) console.log(`[lb] week ${prev} rewards paid: ${res.paid.map(p => `${p.user_id}:${p.reward}`).join(', ')}`);
       const channels = db.getAllLbChannels();
       if (channels.length) {
-        const lines = res.list.slice(0, 10).map((x, i) => `${i < 3 ? ['🥇', '🥈', '🥉'][i] : '▫️'} **${x.amount.toLocaleString()}** <@${x.user_id}>`).join('\n');
+        const lines = res.list.slice(0, 10).map((x, i) => `${i < 3 ? ['🥇', '🥈', '🥉'][i] : '▫️'} **${x.net >= 0 ? '+' : ''}${x.net.toLocaleString()}** <@${x.user_id}> (bet ${x.amount.toLocaleString()})`).join('\n');
         const rewardNote = res.paid.map(p => `🥇/🥈/🥉`.split('/')[p.place - 1] + ` <@${p.user_id}> won **${p.reward.toLocaleString()}**`).join('\n');
         for (const { channel_id } of channels) {
           client.channels.fetch(channel_id).then(ch => {

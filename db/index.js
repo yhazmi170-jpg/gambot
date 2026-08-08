@@ -568,9 +568,9 @@ function addWeeklyLb(userId, amountDelta, wonDelta) {
 }
 
 function getWeeklyLb(week) {
-  const rows = db.exec(`SELECT user_id, amount, won FROM weekly_lb WHERE week = ${week} ORDER BY amount DESC LIMIT 20`);
+  const rows = db.exec(`SELECT user_id, amount, won FROM weekly_lb WHERE week = ${week} ORDER BY (won - amount) DESC, won DESC LIMIT 20`);
   if (!rows.length) return [];
-  return rows[0].values.map(v => ({ user_id: v[0], amount: v[1], won: v[2] }));
+  return rows[0].values.map(v => ({ user_id: v[0], amount: v[1], won: v[2], net: v[2] - v[1] }));
 }
 
 function getLbState(key) {
