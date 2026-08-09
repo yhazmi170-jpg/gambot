@@ -105,6 +105,7 @@ function handleMessage(message) {
   }
 
   const ALWAYS_ALLOWED = ['help', 'enable', 'disable'];
+  try {
   if (message.guild && !ALWAYS_ALLOWED.includes(cmd.name) && message.author.id !== config.ownerId) {
     const guild = db.getGuild(message.guild.id);
     const guildDisabled = guild.disabled_commands.includes('all') || guild.disabled_commands.includes(cmd.name);
@@ -116,6 +117,9 @@ function handleMessage(message) {
       message.channel.send({ embeds: [error(`\`${cmd.name}\` is disabled in ${where}`)] }).then(m => setTimeout(() => m.delete().catch(() => {}), 4000)).catch(() => {});
       return;
     }
+  }
+  } catch (err) {
+    console.error('disabled-check error:', err);
   }
 
   if (!COMMANDS_BEFORE_TOS.includes(cmd.name) && !COMMANDS_BEFORE_TOS.includes(cmdName)) {
