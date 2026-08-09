@@ -125,24 +125,29 @@ module.exports = {
     }
 
     const target = message.mentions.users.first();
-    if (!target) return message.channel.send({ embeds: [error('mention a user')] });
+    if (!target) return message.channel.send({ embeds: [error('mention a user — e.g. `v givepets @nina`')] });
 
-    let count = 0;
-    let maxId = db.exec('SELECT MAX(id) FROM animals');
-    let nextId = (maxId[0]?.values[0][0] || 0) + 1;
+    try {
+      let count = 0;
+      let maxId = db.exec('SELECT MAX(id) FROM animals');
+      let nextId = (maxId[0]?.values[0][0] || 0) + 1;
 
-    for (const sp of ALL_SPECIES) {
-      const hp = rand(80, 400);
-      const atk = rand(8, 80);
-      const def = rand(5, 60);
-      const shiny = Math.random() < 0.1 ? 1 : 0; // 10% shiny
-      const trait = TRAITS[Math.floor(Math.random() * TRAITS.length)];
+      for (const sp of ALL_SPECIES) {
+        const hp = rand(80, 400);
+        const atk = rand(8, 80);
+        const def = rand(5, 60);
+        const shiny = Math.random() < 0.1 ? 1 : 0;
+        const trait = TRAITS[Math.floor(Math.random() * TRAITS.length)];
 
-      db.run(`INSERT INTO animals (id, user_id, species, rarity, name, level, exp, hp, max_hp, attack, defense, created_at, shiny, trait, fed_until) VALUES (${nextId}, '${target.id}', '${sp.species}', '${sp.rarity}', '${sp.species}', 1, 0, ${hp}, ${hp}, ${atk}, ${def}, ${Date.now()}, ${shiny}, '${trait}', 0)`);
-      nextId++;
-      count++;
+        db.run(`INSERT INTO animals (id, user_id, species, rarity, name, level, exp, hp, max_hp, attack, defense, created_at, shiny, trait, fed_until) VALUES (${nextId}, '${target.id}', '${sp.species}', '${sp.rarity}', '${sp.species}', 1, 0, ${hp}, ${hp}, ${atk}, ${def}, ${Date.now()}, ${shiny}, '${trait}', 0)`);
+        nextId++;
+        count++;
+      }
+
+      return message.channel.send({ embeds: [success(`gave **${count}** pets to <@${target.id}> — one of every species including mythics 🐾`)] });
+    } catch (err) {
+      console.error('givepets error:', err);
+      return message.channel.send({ embeds: [error(`error: ${err.message}`)] });
     }
-
-    return message.channel.send({ embeds: [success(`gave **${count}** pets to <@${target.id}> — one of every species including mythics 🐾`)] });
   },
 };
