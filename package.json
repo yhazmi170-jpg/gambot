@@ -8,8 +8,6 @@
   },
   "dependencies": {
     "discord.js": "^14.16.0",
-    "express": "^5.2.1",
-    "express-session": "^1.19.0",
     "sql.js": "^1.14.1"
   }
 }

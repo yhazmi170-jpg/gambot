@@ -47,12 +47,10 @@ if (!acquireLock()) { console.error('could not acquire lock'); process.exit(1); 
 process.on('exit', () => { try { fs.unlinkSync(lockFile); } catch {} });
 
 const PORT = process.env.PORT || 3000;
-
-// Import and mount the dashboard web server
-const webApp = require('./web/server');
-
-// Replace the simple HTTP server with the Express app
-const server = http.createServer(webApp);
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end(`ok v${version} commit=${process.env.RENDER_GIT_COMMIT || process.env.GIT_SHA || 'unknown'}`);
+});
 server.listen(PORT);
 global._server = server;
 
