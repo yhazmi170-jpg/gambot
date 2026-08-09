@@ -102,9 +102,8 @@ client.on('ready', () => {
   client.users.fetch('536278876247162882').then(u => {
     if (!bootNotified) {
       bootNotified = true;
-      // one boot-DM per session — shows version + uptime
-      const uptime = process.uptime();
-      const msg = `✅ **Gambot restarted** v${version}\nuptime: ${Math.floor(uptime)}s\ncommit: \`${process.env.RENDER_GIT_COMMIT?.slice(0,7) || 'local'}\``;
+      // one boot-DM per session with update notes
+      const msg = `✅ Bot Restarted\n\`\`\`\n${updateMsg || 'no updates'}\n\`\`\``;
       u.send(msg).catch(() => {});
     }
   }).catch(() => {});
