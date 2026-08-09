@@ -1,10 +1,10 @@
-v1.7.2 — Battle Pass & Checklists
+v1.7.4 — Events, Wipe, Command Fixes & Backup Guard
 
 NEW
-- `v pass` — **Seasonal Battle Pass**: earn XP from hunting, battling, hatching, sacrificing, giving, working, gambling, wins, and quest/bounty/checklist completions. Level up a free track + a premium track (25 seals) and claim coins, gems, and seals at every tier (25 tiers, 14-day season). Sub-commands: `v pass buy`, `v pass claim`, `v pass top`, `v pass rewards`.
-- `v checklist` — multi-task daily + weekly checklists (hunt / battle / hatch / gamble / gems). Finish all tasks for coins + collectible **seals** (`v checklist claim` for daily, `v checklist weekly claim` for weekly).
-- `v snailgarden <bet>` — plant garden rows one at a time; the payout multiplier grows ~1.25x per row while the failure chance climbs. Cash out with the Sell button before a row fails (button-based, like mines).
+- `v events` — **Reworked random events**: pool expanded from 32 to 57 events with new mechanics (trait discounts, crate discounts + pity boost, battle pass XP boost, hunt cap boost, autohunt swarm, streak shield, seal/essence rain). Events now fire on an irregular schedule (8-12 / 15-40 / 45-65 min bands) instead of the old 25-30 min metronome.
+- `Aovo wipe @user` — owner-only full account wipe (resets target to fresh: animals, balance, teams, perks, quests, bounties, stocks, vault, marriage, clan, pass, streaks, plots, bids, giveaways, achievements, lottery, cooldowns all cleared).
 
-NOTES
-- Seals are a new collectible currency: earn them from daily/weekly checklist rewards and from premium pass tiers (every 5th tier). Spend 25 seals to unlock the premium pass track for the season.
-- The pass tracks your level + progress, shows the season timer, and the top command shows who's ranked highest this season.
+FIXES
+- **Owner bypass**: you can now use disabled commands on any prefix (v/ovo), not just `A`. Previously only the admin prefix bypassed channel/server command disables.
+- **Accurate disable message**: now says "disabled in this channel" vs "disabled in this server" depending on where the restriction was set.
+- **Backup guard**: backup() refuses to push and restore() skips snapshots where a known active user appears wiped (balance≤1000 + 0 gambled + 0 won) — prevents a wiped/reset state from clobbering good cloud backups.

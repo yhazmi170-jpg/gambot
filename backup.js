@@ -26,14 +26,31 @@ async function countUsers(buf) {
   } catch { return -1; }
 }
 
-async function detectWipedUser(buf) {
+async function detectCorruption(buf) {
   try {
     const initSqlJs = require('sql.js');
     const SQL = await initSqlJs();
     const db = new SQL.Database(new Uint8Array(buf));
-    const res = db.exec("SELECT user_id FROM users WHERE user_id IN ('1518469610335244339') AND balance <= 1000 AND total_gambled = 0 AND total_won = 0");
+
+    // Check 1: known active user in wiped state (fresh-default stats)
+    const wiped = db.exec("SELECT user_id FROM users WHERE user_id = '1518469610335244339' AND balance <= 1000 AND total_gambled = 0 AND total_won = 0");
+    if (wiped.length && wiped[0].values.length) return `wiped:${wiped[0].values[0][0]}`;
+
+    // Check 2: any user with absurdly high balance (>1T = corruption/overflow)
+    const absurd = db.exec("SELECT user_id, balance FROM users WHERE balance > 1000000000000 ORDER BY balance DESC LIMIT 3");
+    if (absurd.length && absurd[0].values.length) {
+      const list = absurd[0].values.map(r => `${r[0]}=${Number(r[1]).toLocaleString()}`).join(', ');
+      return `absurd:${list}`;
+    }
+
+    // Check 3: negative balances
+    const neg = db.exec("SELECT user_id, balance FROM users WHERE balance < 0 LIMIT 3");
+    if (neg.length && neg[0].values.length) {
+      const list = neg[0].values.map(r => `${r[0]}=${Number(r[1]).toLocaleString()}`).join(', ');
+      return `negative:${list}`;
+    }
+
     db.close();
-    if (res.length && res[0].values.length) return res[0].values[0][0];
     return null;
   } catch { return null; }
 }
@@ -44,9 +61,9 @@ async function backup() {
   // Guard: never upload an empty/corrupt DB as the newest snapshot — it would clobber good data on next restore
   const users = await countUsers(buf);
   if (users === 0) { console.error('backup: SKIPPED — local DB has 0 users (empty/corrupt); not overwriting cloud backups'); return; }
-  // Guard: refuse to push if a known active user is in a wiped state (fresh-default stats)
-  const wiped = await detectWipedUser(buf);
-  if (wiped) { console.error(`backup: SKIPPED — user ${wiped} appears wiped (balance<=1000 + 0 gambled + 0 won); not overwriting good cloud backups`); return; }
+  // Guard: refuse to push if DB shows signs of corruption (wiped users, absurd balances, negatives)
+  const corrupt = await detectCorruption(buf);
+  if (corrupt) { console.error(`backup: SKIPPED — DB corruption detected (${corrupt}); not overwriting good cloud backups`); return; }
   const content = buf.toString('base64');
 
   try {
@@ -132,8 +149,8 @@ async function restore() {
         try {
           const buf = await download(p);
           if (buf && (await countUsers(buf)) > 0) {
-            const wiped = await detectWipedUser(buf);
-            if (wiped) { console.error(`restore: skipped wiped snapshot ${p} (user ${wiped} reset)`); continue; }
+            const corrupt = await detectCorruption(buf);
+            if (corrupt) { console.error(`restore: skipped corrupt snapshot ${p} (${corrupt})`); continue; }
             fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
             fs.writeFileSync(DB_PATH, buf);
             console.log(`restored db from github backup (${p})`);
