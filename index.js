@@ -201,8 +201,7 @@ client.on('ready', () => {
     if (Math.floor(Date.now() / 1000) >= db.getNextMerchantArrival()) {
       const arrivals = db.refreshMerchant();
       console.log(`[merchant] new stock — ${arrivals.slots.length} items, leaves at ${new Date(arrivals.next_at * 1000).toISOString()}`);
-      let mc = db.getAllEventChannels();
-      if (!mc.length) mc = db.getAllUpdateChannels();
+      const mc = db.getAllEventChannels();
       for (const { channel_id } of mc) {
         client.channels.fetch(channel_id).then(ch => {
           if (ch && typeof ch.send === 'function') ch.send('🛍️ **The travelling merchant has arrived!** Rare stock up for grabs — `v merchant`, first come first served!').catch(() => {});
