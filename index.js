@@ -93,23 +93,20 @@ async function start() {
 
 start();
 
-client.on('ready', () => {
-  console.log(`logged in as ${client.user.tag}`);
-  setLogClient(client);
-  const fs2 = require('fs');
-  const updateMsg = (() => { try { return fs2.readFileSync(path.join(__dirname, 'update_msg.txt'), 'utf8').trim(); } catch { return ''; } })();
-  const startupMsg = updateMsg ? `✅ **Bot Restarted**\n\`\`\`\n${updateMsg}\n\`\`\`` : '✅ bot restarted successfully';
-  client.users.fetch('536278876247162882').then(u => {
-    if (!bootNotified) {
-      bootNotified = true;
-      // one boot-DM per session with update notes
+  // Use once instead of on to prevent duplicate ready events
+  client.once('ready', () => {
+    console.log(`logged in as ${client.user.tag}`);
+    setLogClient(client);
+    const fs2 = require('fs');
+    const updateMsg = (() => { try { return fs2.readFileSync(path.join(__dirname, 'update_msg.txt'), 'utf8').trim(); } catch { return ''; } })();
+    client.users.fetch('536278876247162882').then(u => {
       const msg = `✅ Bot Restarted\n\`\`\`\n${updateMsg || 'no updates'}\n\`\`\``;
       u.send(msg).catch(() => {});
-    }
-  }).catch(() => {});
-  client.user.setPresence({
-    activities: [{ name: `v${version} | /ravine | ${config.prefixes[0]} help` }],
-    status: 'online',
+    }).catch(() => {});
+    client.user.setPresence({
+      activities: [{ name: `v${version} | /ravine | ${config.prefixes[0]} help` }],
+      status: 'online',
+    });
   });
 
   const { backup } = require('./backup');

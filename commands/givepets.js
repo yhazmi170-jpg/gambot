@@ -213,6 +213,21 @@ const ALL_SPECIES = [
   { species: 'Huitzilopochtli', rarity: 'MYTHIC' },
   { species: 'Tlaloc', rarity: 'MYTHIC' },
   { species: 'Xbalanque', rarity: 'MYTHIC' },
+  // SECRET PETS (ultra-rare, special)
+  { species: 'Golden Unicorn', rarity: 'SECRET' },
+  { species: 'Diamond Dragon', rarity: 'SECRET' },
+  { species: 'Rainbow Phoenix', rarity: 'SECRET' },
+  { species: 'Shadow Fenrir', rarity: 'SECRET' },
+  { species: 'Celestial Kirin', rarity: 'SECRET' },
+  { species: 'Abyssal Kraken', rarity: 'SECRET' },
+  { species: 'Eclipse Odin', rarity: 'SECRET' },
+  { species: 'Void Cthulhu', rarity: 'SECRET' },
+  { species: 'Storm Thunderbird', rarity: 'SECRET' },
+  { species: 'Frost Jormungandr', rarity: 'SECRET' },
+  { species: 'Inferno Ifrit', rarity: 'SECRET' },
+  { species: 'Emerald Leviathan', rarity: 'SECRET' },
+  { species: 'Crimson Griffin', rarity: 'SECRET' },
+  { species: 'Spectral Anubis', rarity: 'SECRET' },
 ];
 
 const TRAITS = ['Brave', 'Chill', 'Eager', 'Lucky', 'Calm'];
