@@ -3479,6 +3479,7 @@ module.exports = {
   createAuction, getAuction, listAuctions, placeBid, endAuction, cancelAuction, cleanupExpiredAuctions,
   BOSS_BASE_HP, BOSS_LIFE, getBoss, spawnBoss, attackBoss, addBossPot, getBossContrib, resolveBoss,
   CRATES, getCratePity, setCratePity, rollCrateRarity, openCrate,
-  isMarried, marriedMult,
-  SHINY_CHANCE, PERSONALITIES, rollShiny, rollTrait,
+   isMarried, marriedMult,
+   SHINY_CHANCE, PERSONALITIES, rollShiny, rollTrait,
+   exec: (sql) => db ? db.exec(sql) : null,
 };
