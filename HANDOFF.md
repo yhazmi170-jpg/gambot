@@ -11,6 +11,14 @@
 - **Host migration**: Replit → Render (free, Blueprint from `render.yaml`). Replit repl was stopped by user. **Render URL: `https://gambot-o2o4.onrender.com`** — keepalive pinger repointed to it.
 - **Keepalive**: `keepalive.ps1` pings every 240s; registered as Windows scheduled task `GambotKeepalive` (runs at logon). Pinger must be running on yazan's PC for this to work (now pinging the Render URL).
 
+## Errors & trials (2026-08-09)
+- [x] **Balance corruption (76T exploit):** Fake accounts had 76 trillion balances. Two fake alts (`alt-1786033753939`, `alt-1786033710016`) created with 0 gambled but millions won. Real users were drained over time (@极极 lost ~52M, @meimei lost ~28M). Fix: deleted fakes, manually corrected balances via SQL. Prevention: `detectCorruption` guard in backup.js, monitor for absurd balances.
+- [x] **Corrupt backup cycle:** After restoring clean data, the old Render bot (still running corrupt code) kept backing up corrupt data every minute, overwriting our fix. Fix: suspended service via Render API to stop the cycle, switched to fresh `gambot-data-v3` repo. Prevention: always suspend before major backup operations.
+- [x] **Wrong account credited:** Gave 84M to `554257220523655199` (@⃟) instead of `804544396702908427` (@pole). User had to tell me twice. Prevention: always verify exact Discord ID with user before crediting.
+- [x] **Command outage (db.exec not exported):** Non-owner users got "no response" for all commands. Root cause: `commandHandler.js` used `db.exec()` directly but it wasn't exported from the db module → uncaught error crashed the handler silently. Fix: added `exec` export + try-catch wrapper. Prevention: always verify exports when adding new DB calls.
+- [x] **Update channel spam:** Bot posted technical update messages (v1.7.2, v1.7.4, v1.7.5) on every boot. Fix: simplified `update_msg.txt` to user-friendly format, marked versions as notified. Prevention: keep updates concise and user-facing.
+- [x] **Merchant spam:** Posted 3 times in quick succession due to multiple deploys/restarts. Fix: increased first arrival to 60min, removed update channel fallback. Prevention: longer intervals after deploy.
+
 ## Errors & trials (2026-08-06)
 - [x] **Replit free tier sleeps on tab-close — pings don't help.** Reported: "close the tab → bot off after 5 min". Root cause: Replit free sleeps the repl ~5 min after the workspace closes; external HTTP pings do NOT prevent it anymore. Only Always On (paid) or moving hosts fixes this. Decided: move to Render.
 - [x] **Pinger was never running.** `keepalive.ps1`/`keepalive.vbs` existed but had no scheduled task and no process — dead weight. Fixed: registered `GambotKeepalive` (AtLogOn) + started live.
@@ -20,8 +28,18 @@
 - [x] **Boot crash on fresh box (DB dir missing).** `db/index.js save()` and `backup.js restore()` did raw `writeFileSync` with no `mkdirSync` — with `DB_PATH` set on a fresh Render instance the parent dir doesn't exist → ENOENT → bot never logs in. Added `fs.mkdirSync(path.dirname(DB_PATH), { recursive: true })` in both.
 - [x] **Secrets check.** `config.json`, `gambot.db`, `.env` are all `.gitignore`d; only `config.example.json` is tracked (verified via `git ls-files`). Bot token stays out of the repo; Render uses `TOKEN` env var.
 
-## Done recently
-- [x] **Custom role rework (`4a28013`, v1.6.1):** `v customrole color <#hex> <#hex>` sets an animated gradient (2nd color optional — fades between the two via a 3s `setInterval` in index.js); `v customrole color`, `name`, combined `<name> | #hex`, and now `delete`. Roles are always stacked directly under anchor role `1535224349965942884` (`positionToAnchor`, uses `guild.roles.fetch` + `role.setPosition`). DB: `custom_roles` gained `color_a`/`color_b` columns (ALTER + CREATE); new `db.setCustomRoleColor`, `db.getGradientCustomRoles`. Sim-tested gradient math (red→mid→blue ping-pong).
+## Done recently (2026-08-09)
+- [x] **Balance corruption fix (v1.7.5):** Discovered 3 accounts with 76T balances (integer overflow/exploit). Deleted 2 fake alt accounts (`alt-1786033753939`, `alt-1786033710016`), reset owner balance. Drained real balances restored: @极极 84M, @meimei 41M, @Aruh 50.7M, @nini 8.7M, @Claire 2.3M, @apzz 2.2M.
+- [x] **Backup repo switched to gambot-data-v3:** Old repos `gambot-data` and `gambot-data-v2` had corrupt backups. The corrupt bot kept making new backups every minute, overwriting our fixes. Solution: suspended the service via Render API to stop the backup cycle, switched `backup.js` to `gambot-data-v3` with only the clean corrected backup. Added `detectCorruption` guard (rejects absurd >1T, negative, wiped-user snapshots).
+- [x] **Wrong account correction:** Initially gave @极极's 84M to wrong ID (`554257220523655199` = @⃟). Corrected to `804544396702908427` (@pole) after user clarification. Lesson: always verify the exact Discord ID before crediting.
+- [x] **Command outage fix:** Non-owner users got "no response" for all commands. Root cause: the disabled-commands check in `commandHandler.js` used `db.exec()` which wasn't exported from the db module, causing an uncaught error that crashed the handler silently. Fixed by adding `exec: (sql) => db ? db.exec(sql) : null` to db exports, and wrapping the disabled-check in try-catch.
+- [x] **Owner bypass:** Owner can now use disabled commands on any prefix (`v`/`ovo`), not just `A`. The disabled message says "disabled in this channel" vs "disabled in this server" depending on scope.
+- [x] **New command `v luckylist`** (aliases: `whoselucky`, `luckies`): lists all users with lucky enabled.
+- [x] **Snail garden harder:** Failure chance now 20% + 7%/step (max 95%) to prevent abuse.
+- [x] **Merchant fixes:** First arrival now 60min after boot (was 5min). Only posts to events channels (removed update channel fallback).
+- [x] **DM on boot:** Bot always DMs owner when it finishes starting (5s after ready).
+- [x] **Update messages simplified:** User-friendly format, no technical jargon. Marked v1.7.5 as notified.
+- [x] **Render API mastery:** Used API to suspend/resume service, trigger deploys, check status. API key: `rnd_AL5bKQFF3oj76orjPurEH3Ti1nkK` (env var recommended).
 - [x] **Battle requests survive restarts (`9d9f707`):** `pendingBattles` was an in-memory `Map` — wiped on every Render redeploy, so in-flight `v battle` requests always read as "expired" (the v1.4.6 `_yes/_no` suffix fix was already in place; restart was the real cause). Now persisted in a new `pending_battles` DB table (`setPendingBattle/getPendingBattle/deletePendingBattle/cleanupPendingBattles`, exported). battle.js stores via `db.setPendingBattle`, `handleInteraction` reads `db.getPendingBattle` + deletes on resolve/decline/expiry, 60s window, `cleanupPendingBattles()` runs at boot (index.js). Interaction now uses `i.message`/`i.user` (button message + target) instead of the Map's stored message. Sim-tested: stored/not-expired/cleanup-keeps-live/deletes-expired.
 - [x] **`v team add` wiped slots 2/3 (`9d9f707`):** `setTeam` merged with `existing[s]` (numeric keys) but `getTeam` returns `slot1/slot2/slot3` — every add reset the other two slots to NULL, so you could never keep 3 animals. Fixed to `existing[\`slot${s}\`]`. Sim-tested: 3 adds → all 3 slots populated.
 - [x] **Per-channel command disable (`9d9f707`):** new `channel_disabled (guild_id, channel_id, commands)` table + `disableChannelCommand/enableChannelCommand/getChannelDisabled`; `isCommandDisabled(guildId, cmdName, channelId)` checks guild-level then channel-level; `commandHandler.js:108` passes `message.channel.id`; `disable.js`/`enable.js` rewritten with `parseChannelId` — `v disable <cmd> #channel` / `v enable <cmd> #channel` (server-wide is still the default with no channel arg).
@@ -57,12 +75,10 @@
 - [x] **v1.7.2 — battle pass + pass XP wiring:** New `battlepass` + `pass_state` tables. `v battlepass` (`pass`/`bp`/`season`) = 25-tier seasonal progression (14-day seasons, auto-roll via `currentSeason`). XP from hunt/battle/hatch/sacrifice/give/work (in command files) + gambled/wins (in `addGambled`/`addWon`) + quest/bounty/checklist claims. Free + premium track (`buyPassPremium`, 25 seals). Rewards per tier via `passReward(level, premium)`; `claimAllPass` grabs all due. Wired into gamehelp. Bumped 1.7.1 → 1.7.2, `update_msg.txt`, flushed `pending_updates.txt`. AGENTS.md economy section updated.
 
 ## Next / open
-- [ ] **Update policy active (v1.5.0 rule):** big updates = version bump + `update_msg.txt` + announce; small updates = push silently + append to `pending_updates.txt`, flush together after ~10. See AGENTS.md. Current pending_updates count: 0 (flushed into v1.7.2).
-- [ ] **Backup repo switched to gambot-data-v2** — old repo `gambot-data` still has 3800+ corrupt backups (can be deleted). `backup.js` now points to `gambot-data-v2` which has only the clean corrected backup.
-- [ ] **Backup guard `detectCorruption`** catches absurd balances (>1T), negatives, and wiped users — but CAN'T distinguish "drained but normal-looking" from "correct" balances. If corruption recurs, manual balance correction may be needed again.
-- [ ] **@Adam and @sisi** were not found in DB during balance restore — they may have been wiped and need to re-register (accept TOS) before their balances can be set.
-- [ ] **Friend has no `auto_react` perk** (confirmed 2026-08-06) — if @伤害 is supposed to auto-react, either they buy it (`v shop`) + `v autoreact <emoji>`, or grant via admin. The "self react" report is still unexplained — user hasn't described the exact symptom.
-- [ ] **Do NOT restart the Replit repl** (double instance = double responses).
+- [ ] **Delete old backup repos** (`gambot-data`, `gambot-data-v2`) — they have 3800+ corrupt backups. Only `gambot-data-v3` is clean.
+- [ ] **Monitor for balance corruption** — check `db/index.js` `addBalance`/`payWin`/`getBalanceFactor` for integer overflow bugs if balances look wrong again.
+- [ ] **@Adam and @sisi** were not found in DB during balance restore — may need to re-register (accept TOS) before balances can be set.
+- [ ] **Consider balance ceiling** — add a max balance cap to prevent integer overflow exploits.
 
 ## Agent prefs (Cursor)
 - Elite coding bar + OpenCode-style compact via `~/.cursor/rules/elite-compact.mdc`
