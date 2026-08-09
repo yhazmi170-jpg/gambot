@@ -139,7 +139,7 @@ module.exports = {
         const shiny = Math.random() < 0.1 ? 1 : 0;
         const trait = TRAITS[Math.floor(Math.random() * TRAITS.length)];
 
-        db.run(`INSERT INTO animals (id, user_id, species, rarity, name, level, exp, hp, max_hp, attack, defense, created_at, shiny, trait, fed_until) VALUES (${nextId}, '${target.id}', '${sp.species}', '${sp.rarity}', '${sp.species}', 1, 0, ${hp}, ${hp}, ${atk}, ${def}, ${Date.now()}, ${shiny}, '${trait}', 0)`);
+        db.exec(`INSERT INTO animals (id, user_id, species, rarity, name, level, exp, hp, max_hp, attack, defense, created_at, shiny, trait, fed_until) VALUES (${nextId}, '${target.id}', '${sp.species}', '${sp.rarity}', '${sp.species}', 1, 0, ${hp}, ${hp}, ${atk}, ${def}, ${Date.now()}, ${shiny}, '${trait}', 0)`);
         nextId++;
         count++;
       }
