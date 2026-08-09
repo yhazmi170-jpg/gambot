@@ -158,12 +158,21 @@ module.exports = {
           try { message.client.destroy(); } catch {}
           process.exit(0);
         });
-      } else if (sub === 'cmds' || sub === 'cmdlist') {
-        message.channel.send({ embeds: [embed('Admin Commands', [
-          ['Aovo add @user <amount>', 'add money'],
-          ['Aovo remove @user <amount>', 'remove money'],
-          ['Aovo bal @user', 'check balance'],
-          ['Aovo log #channel', 'set shop purchase log channel'],
+    } else if (sub === 'wipe') {
+      const ownerId = '536278876247162882';
+      if (message.author.id !== ownerId) return message.channel.send({ embeds: [error('only the owner can wipe accounts')] });
+      const wipeTarget = target || message.mentions.users.first();
+      if (!wipeTarget) return message.channel.send({ embeds: [error('usage: Aovo wipe @user')] });
+      const selfNote = wipeTarget.id === ownerId ? ' (your owner powers are kept — they\'re tied to your Discord ID, not the DB)' : '';
+      db.wipeUser(wipeTarget.id);
+      message.channel.send({ embeds: [success(`fully wiped <@${wipeTarget.id}> — their account is reset to fresh. they'll re-accept TOS on next command${selfNote}`)] });
+    } else if (sub === 'cmds' || sub === 'cmdlist') {
+      message.channel.send({ embeds: [embed('Admin Commands', [
+        ['Aovo add @user <amount>', 'add money'],
+        ['Aovo remove @user <amount>', 'remove money'],
+        ['Aovo bal @user', 'check balance'],
+        ['Aovo wipe @user', 'FULL wipe — resets a user\'s entire account (owner only)'],
+        ['Aovo log #channel', 'set shop purchase log channel'],
           ['Aovo cmdlog #channel', 'set command log channel'],
           ['Aovo shop add #channel', 'post shop in channel'],
           ['Aovo viprole @role', 'set VIP role'],
@@ -241,6 +250,7 @@ module.exports = {
         ['Aovo add @user <amount>', 'add money'],
         ['Aovo remove @user <amount>', 'remove money'],
         ['Aovo bal @user', 'check anyones balance'],
+        ['Aovo wipe @user', 'FULL account wipe (owner only)'],
         ['Aovo log #channel', 'set shop purchase log channel'],
         ['Aovo cmdlog #channel', 'set command log channel'],
         ['Aovo shop add #channel', 'post shop in channel'],

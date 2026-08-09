@@ -468,6 +468,40 @@ function mergeUser(srcId, destId) {
   return true;
 }
 
+// Full account wipe — removes the user from every user-scoped table, then deletes
+// the users row. Next command recreates a fresh default row via ensureUser.
+function wipeUser(userId) {
+  if (!userId) return;
+  // animal-linked cleanup first
+  try { db.exec(`DELETE FROM pet_achievements WHERE animal_id IN (SELECT id FROM animals WHERE user_id = '${userId}')`); } catch (e) {}
+  // tables keyed by user_id
+  const userTables = [
+    'animals', 'teams', 'hunt_cooldowns', 'custom_roles', 'autohunts',
+    'stocks', 'quests', 'bounties', 'vault_deposits', 'achievements',
+    'streaks', 'weekly_lb', 'lottery', 'purchases', 'plots',
+    'checklist_daily', 'checklist_weekly', 'battlepass', 'boss_contrib',
+    'clan_members', 'clan_war_fighters',
+  ];
+  for (const t of userTables) {
+    try { db.run(`DELETE FROM ${t} WHERE user_id = '${userId}'`); } catch (e) {}
+  }
+  // bidirectional / foreign references
+  try { db.run(`DELETE FROM marriages WHERE user_id = '${userId}' OR partner_id = '${userId}'`); } catch (e) {}
+  try { db.run(`DELETE FROM adoption WHERE parent_id = '${userId}' OR child_id = '${userId}'`); } catch (e) {}
+  try { db.run(`DELETE FROM pending_battles WHERE challenger_id = '${userId}' OR target_id = '${userId}'`); } catch (e) {}
+  try { db.run(`DELETE FROM pvp_bounties WHERE poster_id = '${userId}' OR target_id = '${userId}'`); } catch (e) {}
+  try { db.run(`DELETE FROM giveaways WHERE host_id = '${userId}'`); } catch (e) {}
+  try { db.run(`DELETE FROM bids WHERE seller_id = '${userId}' OR current_bidder = '${userId}'`); } catch (e) {}
+  // if they owned a clan, delete the clan too (members already cleared above)
+  try { db.run(`DELETE FROM clans WHERE owner_id = '${userId}'`); } catch (e) {}
+  // un-mark any merchant stock they bought
+  try { db.run(`UPDATE merchant_stock SET sold_to = NULL WHERE sold_to = '${userId}'`); } catch (e) {}
+  // notifications rows are keyed by string key, not user — skip
+  // finally the user row itself
+  try { db.run(`DELETE FROM users WHERE user_id = '${userId}'`); } catch (e) {}
+  save();
+}
+
 function calcDailyReward(user, hasCap) {
   const now = Math.floor(Date.now() / 1000);
   let streak = 0;
@@ -3417,6 +3451,7 @@ module.exports = {
   currentSeason, addPassXp, passProgress, buyPassPremium, claimPassLevel, claimAllPass, passTop, passReward,
   PASS_MAX_LEVEL, PASS_DURATION, PASS_PREM_COST, PASS_XP,
   createPvpBounty, getPvpBounty, listActiveBounties, getPvpBountyBetween, recordPvpDuelWin, cancelPvpBounty, pruneExpiredBounties, PVP_BOUNTY_LIFETIME,
+  wipeUser,
   currentLbWeek, getWeeklyLb, finalizeWeeklyLb, getLbState, setLbState, setLbChannel, getAllLbChannels, WEEKLY_LB_REWARDS,
   getVault, vaultDeposit, vaultWithdraw, getVaultTop,
   getAchievements, checkAchievements, getAchievementList,
