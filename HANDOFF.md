@@ -5,7 +5,7 @@
 
 ## Status
 - **Branch**: `master`
-- **Version**: `1.7.2` — battle pass + checklist XP wiring + gamehelp entry (LIVE on Render once pushed).
+- **Version**: `1.7.5` — corruption fix, balance restoration, backup rebuild (LIVE on Render).
 - **Roles (v two-agent workflow):** chat agent (orchestrator, is the user's main driver) delegates coding to Claude Code CLI; git is the message bus.
 - **Change log**: complete history of every update lives in `CHANGELOG.md` (newest first) — keep it in sync with the version bump + `update_msg.txt`
 - **Host migration**: Replit → Render (free, Blueprint from `render.yaml`). Replit repl was stopped by user. **Render URL: `https://gambot-o2o4.onrender.com`** — keepalive pinger repointed to it.

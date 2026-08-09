@@ -1,10 +1,9 @@
-v1.7.4 — Events, Wipe, Command Fixes & Backup Guard
-
-NEW
-- `v events` — **Reworked random events**: pool expanded from 32 to 57 events with new mechanics (trait discounts, crate discounts + pity boost, battle pass XP boost, hunt cap boost, autohunt swarm, streak shield, seal/essence rain). Events now fire on an irregular schedule (8-12 / 15-40 / 45-65 min bands) instead of the old 25-30 min metronome.
-- `Aovo wipe @user` — owner-only full account wipe (resets target to fresh: animals, balance, teams, perks, quests, bounties, stocks, vault, marriage, clan, pass, streaks, plots, bids, giveaways, achievements, lottery, cooldowns all cleared).
+v1.7.5 — Corruption Fix & Cleanup
 
 FIXES
-- **Owner bypass**: you can now use disabled commands on any prefix (v/ovo), not just `A`. Previously only the admin prefix bypassed channel/server command disables.
-- **Accurate disable message**: now says "disabled in this channel" vs "disabled in this server" depending on where the restriction was set.
-- **Backup guard**: backup() refuses to push and restore() skips snapshots where a known active user appears wiped (balance≤1000 + 0 gambled + 0 won) — prevents a wiped/reset state from clobbering good cloud backups.
+- **Economy corruption resolved**: drained balances restored (@极极 84M, @meimei 41M, @Aruh 50.7M, @nini 8.7M, @Claire 2.3M, @apzz 2.2M). Two exploit alt accounts deleted.
+- **Backup system rebuilt**: switched to fresh `gambot-data-v3` repo after old backups were corrupt. New `detectCorruption` guard catches absurd balances (>1T), negative balances, and wiped-user states.
+- **Owner bypass**: you can now use disabled commands on any prefix (v/ovo), not just `A`. "Disabled in this channel" vs "disabled in this server" now shows the correct scope.
+- **Merchant interval**: first arrival is now 60min after boot (was 5min) to prevent spam on every deploy.
+- **Update announcements**: marked v1.7.4 as notified to stop re-posting on every boot.
+- **DM on boot**: bot always DMs you when it finishes starting up.

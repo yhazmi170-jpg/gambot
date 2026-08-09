@@ -4,6 +4,15 @@ Complete list of every update shipped, newest first. Source: git history (`maste
 
 ---
 
+## v1.7.5 — Corruption Fix & Cleanup
+
+- **Economy corruption resolved**: drained balances restored (@极极 84M, @meimei 41M, @Aruh 50.7M, @nini 8.7M, @Claire 2.3M, @apzz 2.2M). Two exploit alt accounts deleted.
+- **Backup system rebuilt**: switched to fresh `gambot-data-v3` repo after old backups were corrupt. New `detectCorruption` guard catches absurd balances (>1T), negative balances, and wiped-user states.
+- **Owner bypass**: you can now use disabled commands on any prefix (v/ovo), not just `A`. "Disabled in this channel" vs "disabled in this server" now shows the correct scope.
+- **Merchant interval**: first arrival is now 60min after boot (was 5min) to prevent spam on every deploy.
+- **DM on boot**: bot always DMs you when it finishes starting up.
+- **Update announcements**: marked v1.7.4 as notified to stop re-posting on every boot.
+
 ## v1.7.1 — Bounties & Fixes
 - Player-funded PvP bounties: `v bounty create @player <goal> <amount>` — fund a prize, first to the duel-win goal takes the pot; `v bounty list|info|cancel`; duel wins show live progress and auto-pay the winner (7-day expiry refunds the poster)
 - `v wheel <amount>` — weighted wheel of fortune, x0 → x10 jackpot, ~1.3% house edge, timeout refunds
