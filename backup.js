@@ -6,7 +6,7 @@ const config = require('./config');
 const DB_PATH = process.env.DB_PATH ? path.join(process.env.DB_PATH, 'gambot.db') : path.join(__dirname, 'gambot.db');
 const TOKEN = process.env.GITHUB_TOKEN || config.github_token;
 const OWNER = 'yhazmi170-jpg';
-const REPO = 'gambot-data-v2';
+const REPO = 'gambot-data-v3';
 const BRANCH = 'main';
 
 // Timestamped snapshot name — sorts lexically = chronologically
