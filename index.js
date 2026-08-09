@@ -100,15 +100,12 @@ client.on('ready', () => {
   const updateMsg = (() => { try { return fs2.readFileSync(path.join(__dirname, 'update_msg.txt'), 'utf8').trim(); } catch { return ''; } })();
   const startupMsg = updateMsg ? `✅ **Bot Restarted**\n\`\`\`\n${updateMsg}\n\`\`\`` : '✅ bot restarted successfully';
   client.users.fetch('536278876247162882').then(u => {
-    // one boot-DM per version, not one per restart (deploys were spamming the owner's DMs)
-    if (!db.wasNotified(`owner_boot_v${version}`)) {
-      u.send(startupMsg).catch(() => {});
-      db.markNotified(`owner_boot_v${version}`);
-    }
-    // DM on first ready only — not on every reconnect
     if (!bootNotified) {
       bootNotified = true;
-      setTimeout(() => u.send('✅ bot is online and ready').catch(() => {}), 5000);
+      // one boot-DM per session — shows version + uptime
+      const uptime = process.uptime();
+      const msg = `✅ **Gambot restarted** v${version}\nuptime: ${Math.floor(uptime)}s\ncommit: \`${process.env.RENDER_GIT_COMMIT?.slice(0,7) || 'local'}\``;
+      u.send(msg).catch(() => {});
     }
   }).catch(() => {});
   client.user.setPresence({
