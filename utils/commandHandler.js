@@ -105,9 +105,17 @@ function handleMessage(message) {
   }
 
   const ALWAYS_ALLOWED = ['help', 'enable', 'disable'];
-  if (message.guild && !ALWAYS_ALLOWED.includes(cmd.name) && db.isCommandDisabled(message.guild.id, cmd.name, message.channel.id)) {
-    message.channel.send({ embeds: [error(`\`${cmd.name}\` is disabled in this server`)] }).then(m => setTimeout(() => m.delete().catch(() => {}), 4000)).catch(() => {});
-    return;
+  if (message.guild && !ALWAYS_ALLOWED.includes(cmd.name) && message.author.id !== config.ownerId) {
+    const guild = db.getGuild(message.guild.id);
+    const guildDisabled = guild.disabled_commands.includes('all') || guild.disabled_commands.includes(cmd.name);
+    const channelRows = db.exec(`SELECT commands FROM channel_disabled WHERE guild_id = '${message.guild.id}' AND channel_id = '${message.channel.id}'`);
+    const channelList = (channelRows.length && channelRows[0].values.length) ? JSON.parse(channelRows[0].values[0][0] || '[]') : [];
+    const channelDisabled = channelList.includes('all') || channelList.includes(cmd.name);
+    if (guildDisabled || channelDisabled) {
+      const where = guildDisabled ? 'this server' : 'this channel';
+      message.channel.send({ embeds: [error(`\`${cmd.name}\` is disabled in ${where}`)] }).then(m => setTimeout(() => m.delete().catch(() => {}), 4000)).catch(() => {});
+      return;
+    }
   }
 
   if (!COMMANDS_BEFORE_TOS.includes(cmd.name) && !COMMANDS_BEFORE_TOS.includes(cmdName)) {
