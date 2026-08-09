@@ -54,6 +54,8 @@ const server = http.createServer((req, res) => {
 server.listen(PORT);
 global._server = server;
 
+let bootNotified = false;
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -103,8 +105,11 @@ client.on('ready', () => {
       u.send(startupMsg).catch(() => {});
       db.markNotified(`owner_boot_v${version}`);
     }
-    // always DM owner when bot finishes booting (so you know it's alive after a deploy)
-    setTimeout(() => u.send('✅ bot is online and ready').catch(() => {}), 5000);
+    // DM on first ready only — not on every reconnect
+    if (!bootNotified) {
+      bootNotified = true;
+      setTimeout(() => u.send('✅ bot is online and ready').catch(() => {}), 5000);
+    }
   }).catch(() => {});
   client.user.setPresence({
     activities: [{ name: `v${version} | /ravine | ${config.prefixes[0]} help` }],
