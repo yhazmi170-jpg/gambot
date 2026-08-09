@@ -26,12 +26,27 @@ async function countUsers(buf) {
   } catch { return -1; }
 }
 
+async function detectWipedUser(buf) {
+  try {
+    const initSqlJs = require('sql.js');
+    const SQL = await initSqlJs();
+    const db = new SQL.Database(new Uint8Array(buf));
+    const res = db.exec("SELECT user_id FROM users WHERE user_id IN ('1518469610335244339') AND balance <= 1000 AND total_gambled = 0 AND total_won = 0");
+    db.close();
+    if (res.length && res[0].values.length) return res[0].values[0][0];
+    return null;
+  } catch { return null; }
+}
+
 async function backup() {
   if (!fs.existsSync(DB_PATH)) { console.log('backup: no db file, skipping'); return; }
   const buf = fs.readFileSync(DB_PATH);
   // Guard: never upload an empty/corrupt DB as the newest snapshot — it would clobber good data on next restore
   const users = await countUsers(buf);
   if (users === 0) { console.error('backup: SKIPPED — local DB has 0 users (empty/corrupt); not overwriting cloud backups'); return; }
+  // Guard: refuse to push if a known active user is in a wiped state (fresh-default stats)
+  const wiped = await detectWipedUser(buf);
+  if (wiped) { console.error(`backup: SKIPPED — user ${wiped} appears wiped (balance<=1000 + 0 gambled + 0 won); not overwriting good cloud backups`); return; }
   const content = buf.toString('base64');
 
   try {
@@ -117,6 +132,8 @@ async function restore() {
         try {
           const buf = await download(p);
           if (buf && (await countUsers(buf)) > 0) {
+            const wiped = await detectWipedUser(buf);
+            if (wiped) { console.error(`restore: skipped wiped snapshot ${p} (user ${wiped} reset)`); continue; }
             fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
             fs.writeFileSync(DB_PATH, buf);
             console.log(`restored db from github backup (${p})`);
