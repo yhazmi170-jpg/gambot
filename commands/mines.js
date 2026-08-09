@@ -97,6 +97,12 @@ module.exports = {
       if ((args[0] || '').toLowerCase() === 'all' && !testMode) { const u = db.ensureUser(message.author.id); amount = Math.min(u.balance, db.getMaxBet(message.author.id)); if (amount <= 0) return message.channel.send({ embeds: [error('you have no money')] }); }
       else { amount = parseAmount(args[0]); if (isNaN(amount) || amount <= 0) amount = testMode ? 1000 : undefined; if (amount === undefined) return message.channel.send({ embeds: [error('bet an amount or use `all`')] }); }
 
+      // Enforce max bet limit
+      if (!testMode) {
+        const maxBet = db.getMaxBet(message.author.id);
+        if (amount > maxBet) return message.channel.send({ embeds: [error(`max bet is **${maxBet.toLocaleString()}** — upgrade with bet cap perks in the shop`)] });
+      }
+
       const user = db.ensureUser(message.author.id);
       if (!testMode && user.balance < amount) return message.channel.send({ embeds: [error('not enough money')] });
       if (activeGames.has(message.author.id)) return message.channel.send({ embeds: [error('you already have an active mines game')] });
