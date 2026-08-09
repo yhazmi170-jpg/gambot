@@ -33,7 +33,21 @@ function requireAuth(req, res, next) {
 // Discord OAuth login
 app.get('/auth/discord', (req, res) => {
   if (!DISCORD_CLIENT_ID || !DISCORD_CLIENT_SECRET) {
-    return res.status(500).send('Discord OAuth not configured. Set DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET env vars.');
+    return res.status(500).send(`
+      <html><head><title>Gambot — OAuth Not Configured</title>
+      <style>body{background:#1a1a2e;color:#eee;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+      .box{background:#16213e;padding:2rem;border-radius:12px;text-align:center;max-width:400px}
+      h1{color:#e94560}code{background:#1a1a2e;padding:2px 6px;border-radius:4px;color:#f5a623}</style></head>
+      <body><div class="box">
+        <h1>🔐 OAuth Not Configured</h1>
+        <p>Discord login hasn't been set up yet.</p>
+        <p>The bot owner needs to set these env vars:</p>
+        <p><code>DISCORD_CLIENT_ID</code></p>
+        <p><code>DISCORD_CLIENT_SECRET</code></p>
+        <p><code>SESSION_SECRET</code></p>
+        <p style="margin-top:1rem;font-size:0.9rem;color:#aaa">Contact the bot owner to set up the dashboard.</p>
+      </div></body></html>
+    `);
   }
   const url = `${DISCORD_API}/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify%20guilds`;
   res.redirect(url);
