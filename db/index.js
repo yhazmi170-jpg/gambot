@@ -2808,7 +2808,7 @@ function eventMult(apply) {
 
 // ---- v1.8.0: Travelling merchant (rare rotating stock) ----
 const MERCHANT_OWNER_ID = '__merchant__';
-const MERCHANT_FIRST_MS = 5 * 60 * 1000;
+const MERCHANT_FIRST_MS = 60 * 60 * 1000;
 const MERCHANT_DWELL_MS = 90 * 60 * 1000;
 const MERCHANT_PET_PRICES = { common: 250000, uncommon: 600000, rare: 1200000, epic: 3000000, legendary: 8000000, mythic: 20000000 };
 

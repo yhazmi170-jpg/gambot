@@ -58,6 +58,9 @@
 
 ## Next / open
 - [ ] **Update policy active (v1.5.0 rule):** big updates = version bump + `update_msg.txt` + announce; small updates = push silently + append to `pending_updates.txt`, flush together after ~10. See AGENTS.md. Current pending_updates count: 0 (flushed into v1.7.2).
+- [ ] **Backup repo switched to gambot-data-v2** — old repo `gambot-data` still has 3800+ corrupt backups (can be deleted). `backup.js` now points to `gambot-data-v2` which has only the clean corrected backup.
+- [ ] **Backup guard `detectCorruption`** catches absurd balances (>1T), negatives, and wiped users — but CAN'T distinguish "drained but normal-looking" from "correct" balances. If corruption recurs, manual balance correction may be needed again.
+- [ ] **@Adam and @sisi** were not found in DB during balance restore — they may have been wiped and need to re-register (accept TOS) before their balances can be set.
 - [ ] **Friend has no `auto_react` perk** (confirmed 2026-08-06) — if @伤害 is supposed to auto-react, either they buy it (`v shop`) + `v autoreact <emoji>`, or grant via admin. The "self react" report is still unexplained — user hasn't described the exact symptom.
 - [ ] **Do NOT restart the Replit repl** (double instance = double responses).
 
