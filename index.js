@@ -103,6 +103,8 @@ client.on('ready', () => {
       u.send(startupMsg).catch(() => {});
       db.markNotified(`owner_boot_v${version}`);
     }
+    // always DM owner when bot finishes booting (so you know it's alive after a deploy)
+    setTimeout(() => u.send('✅ bot is online and ready').catch(() => {}), 5000);
   }).catch(() => {});
   client.user.setPresence({
     activities: [{ name: `v${version} | /ravine | ${config.prefixes[0]} help` }],
