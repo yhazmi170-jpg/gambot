@@ -11,7 +11,7 @@ function multAt(steps) {
 }
 
 function failChanceAt(steps) {
-  return Math.min(10 + steps * 5, 95);
+  return Math.min(20 + steps * 7, 95);
 }
 
 function computeContainer(game, extraSteps) {
