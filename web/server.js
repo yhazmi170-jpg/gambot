@@ -102,56 +102,29 @@ app.get('/auth/logout', (req, res) => {
   res.redirect('/');
 });
 
-// Landing page
+// Landing → go straight to dashboard
 app.get('/', (req, res) => {
-  if (req.session.user) return res.redirect('/dashboard');
-  res.sendFile(path.join(__dirname, 'views', 'index.html'));
+  res.redirect('/dashboard');
 });
 
-// Dashboard (protected)
-app.get('/dashboard', requireAuth, (req, res) => {
+// Dashboard (public)
+app.get('/dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, 'views', 'dashboard.html'));
 });
 
-// API: Get current user's data
-app.get('/api/me', requireAuth, (req, res) => {
-  const userId = req.session.user.id;
-  const user = db.ensureUser(userId);
-  const balance = db.getBalance(userId);
-  const gems = db.getGems(userId);
-  const animals = db.getUserAnimals(userId);
-  const team = db.getTeam(userId);
-  const perks = db.getUserPerks(userId);
-
-  res.json({
-    user: req.session.user,
-    balance,
-    gems,
-    animalCount: animals.length,
-    team: team ? team.filter(Boolean) : [],
-    perks: perks.map(p => p.perk)
-  });
-});
-
-// API: Leaderboard
-app.get('/api/leaderboard', requireAuth, (req, res) => {
-  const top = db.getTop(10);
-  res.json(top);
-});
-
-// API: User's animals
-app.get('/api/animals', requireAuth, (req, res) => {
-  const animals = db.getUserAnimals(req.session.user.id);
-  res.json(animals);
-});
-
-// API: Global stats
-app.get('/api/stats', requireAuth, (req, res) => {
+// API: Global stats (public)
+app.get('/api/stats', (req, res) => {
   const stats = db.exec('SELECT COUNT(*) as users, SUM(balance) as totalBalance FROM users');
   res.json({
     totalUsers: stats[0]?.values[0][0] || 0,
     totalBalance: stats[0]?.values[0][1] || 0
   });
+});
+
+// API: Leaderboard (public)
+app.get('/api/leaderboard', (req, res) => {
+  const top = db.getTop(10);
+  res.json(top);
 });
 
 // Health check

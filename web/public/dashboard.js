@@ -1,23 +1,12 @@
 async function loadData() {
   try {
-    const [meRes, lbRes, statsRes] = await Promise.all([
-      fetch('/api/me'),
+    const [lbRes, statsRes] = await Promise.all([
       fetch('/api/leaderboard'),
       fetch('/api/stats')
     ]);
 
-    if (!meRes.ok) return window.location.href = '/auth/discord';
-
-    const me = await meRes.json();
     const lb = await lbRes.json();
     const stats = await statsRes.json();
-
-    // User info
-    document.getElementById('username').textContent = me.user.global_name || me.user.username;
-    document.getElementById('balance').textContent = me.balance.toLocaleString();
-    document.getElementById('gems').textContent = me.gems.toLocaleString();
-    document.getElementById('animals').textContent = me.animalCount;
-    document.getElementById('perks').textContent = me.perks.length;
 
     // Leaderboard
     const lbEl = document.getElementById('leaderboard');
