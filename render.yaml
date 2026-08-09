@@ -13,3 +13,9 @@ services:
         sync: false
       - key: DB_PATH
         value: ./data
+      - key: DISCORD_CLIENT_ID
+        sync: false
+      - key: DISCORD_CLIENT_SECRET
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
