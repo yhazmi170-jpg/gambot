@@ -26,20 +26,26 @@ module.exports = {
       if (!animals.length) return message.channel.send({ embeds: [require('../utils/embed').error(`you have no ${RARITY_EMOJIS[filterName]} **${filterName}** animals`)] });
     }
 
-    animals = animals.sort((a, b) => (RARITY_RANK[b.rarity] - RARITY_RANK[a.rarity]) || (b.level - a.level));
+    animals = animals.sort((a, b) => (RARITY_RANK[(b.rarity||'').toLowerCase()] - RARITY_RANK[(a.rarity||'').toLowerCase()]) || (b.level - a.level));
 
     const team = db.getTeam(userId);
     const teamIds = team ? new Set([team.slot1, team.slot2, team.slot3].filter(Boolean)) : new Set();
     const lines = animals.map(a => {
       const teamTag = teamIds.has(a.id) ? ' 🛡️' : '';
       const shinyTag = a.shiny ? ' ✨' : '';
-      return `\`#${a.id}\` ${RARITY_EMOJIS[a.rarity]} **${a.species}**${shinyTag} Lv.${a.level} ${a.name !== 'Unnamed' ? `"${a.name}"` : ''} ${teamTag}`;
+      const r = (a.rarity || 'common').toLowerCase();
+      const emoji = RARITY_EMOJIS[r] || '⚪';
+      const nameTag = a.name && a.name !== 'Unnamed' && a.name !== a.species ? `"${a.name}"` : '';
+      return `\`#${a.id}\` ${emoji} **${a.species}**${shinyTag} Lv.${a.level} ${nameTag} ${teamTag}`;
     });
 
     const total = animals.length;
     const rarityCounts = {};
-    for (const a of animals) rarityCounts[a.rarity] = (rarityCounts[a.rarity] || 0) + 1;
-    const summary = Object.entries(rarityCounts).map(([r, c]) => `${RARITY_EMOJIS[r]} ${c}`).join(' · ');
+    for (const a of animals) {
+      const r = (a.rarity || 'common').toLowerCase();
+      rarityCounts[r] = (rarityCounts[r] || 0) + 1;
+    }
+    const summary = Object.entries(rarityCounts).map(([r, c]) => `${RARITY_EMOJIS[r] || '⚪'} ${c}`).join(' · ');
     const pageCount = Math.ceil(lines.length / PER_PAGE);
 
     const decors = db.getZooDecors(userId);
