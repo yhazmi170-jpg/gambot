@@ -1,12 +1,20 @@
 async function loadData() {
   try {
-    const [lbRes, statsRes] = await Promise.all([
+    const [meRes, lbRes, statsRes] = await Promise.all([
+      fetch('/api/me'),
       fetch('/api/leaderboard'),
       fetch('/api/stats')
     ]);
 
+    const me = await meRes.json();
     const lb = await lbRes.json();
     const stats = await statsRes.json();
+
+    // Owner stats
+    document.getElementById('balance').textContent = me.balance.toLocaleString();
+    document.getElementById('gems').textContent = me.gems.toLocaleString();
+    document.getElementById('animals').textContent = me.animalCount;
+    document.getElementById('perks').textContent = me.perks.length;
 
     // Leaderboard
     const lbEl = document.getElementById('leaderboard');
@@ -41,4 +49,4 @@ async function loadData() {
 }
 
 loadData();
-setInterval(loadData, 30000); // refresh every 30s
+setInterval(loadData, 30000);
