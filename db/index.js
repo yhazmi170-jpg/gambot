@@ -1602,8 +1602,8 @@ const ESSENCE_VALUES = { common: 1, uncommon: 3, rare: 8, epic: 25, legendary: 1
 const MAX_HUNT_CAP = 10;
 const HUNT_GEM_DIVISOR = 5;
 const HUNT_COST_BASE = 5;
-const GEM_DROP_BASE = { common: 0.10, uncommon: 0.25, rare: 0.50, epic: 0.75, legendary: 0.90, mythic: 1.0 };
-const GEM_AMOUNT = { common: 1, uncommon: 2, rare: 3, epic: 5, legendary: 8, mythic: 15 };
+const GEM_DROP_BASE = { common: 0.50, uncommon: 0.70, rare: 0.85, epic: 0.95, legendary: 1.0, mythic: 1.0 };
+const GEM_AMOUNT = { common: 3, uncommon: 5, rare: 8, epic: 12, legendary: 20, mythic: 50 };
 
 const TRAIT_COLUMNS = { efficiency: 'hunt_eff', gain: 'hunt_gain', radar: 'hunt_radar', experience: 'hunt_xp' };
 const AUTOHUNT_RANKS = [
