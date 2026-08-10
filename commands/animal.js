@@ -1,7 +1,7 @@
 const db = require('../db');
 const { embed, error } = require('../utils/embed');
 
-const RARITY_EMOJIS = { common: '⚪', uncommon: '🟢', rare: '🔵', epic: '🟣', legendary: '🟡', mythic: '👑' };
+const RARITY_EMOJIS = { common: '⚪', uncommon: '🟢', rare: '🔵', epic: '🟣', legendary: '🟡', mythic: '👑', secret: '🔮' };
 const TRAIT_EMOJIS = { Brave: '⚔️', Chill: '🧊', Eager: '⚡', Lucky: '🍀', Calm: '🌊' };
 
 function findAnimal(userId, query) {
@@ -47,7 +47,7 @@ const team = db.getTeam(message.author.id);
       ? achersList.map(pa => `${achers[pa.key] ? achers[pa.key].name : pa.key}`).join('\n')
       : 'none yet';
 
-    message.channel.send({ embeds: [embed(`${RARITY_EMOJIS[a.rarity]} ${a.name !== 'Unnamed' ? `${a.name} the ` : ''}${a.species}`, [
+    message.channel.send({ embeds: [embed(`${RARITY_EMOJIS[(a.rarity||'').toLowerCase()] || '⚪'} ${a.name && a.name !== 'Unnamed' && a.name !== a.species ? `${a.name} the ` : ''}${a.species}`, [
       ['Info', `${a.rarity.toUpperCase()} · Lv.**${a.level}** · \`#${a.id}\`${onTeam ? ' · 🛡️ on battle team' : ''}${a.shiny ? '\n✨ **SHINY** (2x sell price)' : ''}\npersonality: ${traitEmoji || ''} **${a.trait || 'none'}**${fed ? '\n🍖 **fed** (+10% battle stats)' : ''}`],
       ['Combat', `${traitEmoji || ''} **${a.hp}**/${a.max_hp} HP\n🗡️ **${a.attack}** attack\n🛡️ **${a.defense}** defense`],
       ['XP', `${bar} **${a.exp}/${xpNeed}** (${xpPct}%)`],
