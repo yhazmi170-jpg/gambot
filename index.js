@@ -273,7 +273,6 @@ start();
     for (const mid of db.getExpiredGiveaways(now)) finalizeGiveaway(mid);
   }, 5000);
 
-  const fs = require('fs');
   const ver = version || '1.0.0';
   if (!db.wasNotified(`v${ver}`)) {
     let updateMsg = '';
