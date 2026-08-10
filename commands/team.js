@@ -15,13 +15,16 @@ module.exports = {
       if (!team || (!team.slot1 && !team.slot2 && !team.slot3)) {
         return message.channel.send({ embeds: [require('../utils/embed').error('your team is empty — use `v team add <species>` to add animals')] });
       }
-      const rarityEmojis = { common: '⚪', uncommon: '🟢', rare: '🔵', epic: '🟣', legendary: '🟡' };
+      const rarityEmojis = { common: '⚪', uncommon: '🟢', rare: '🔵', epic: '🟣', legendary: '🟡', mythic: '👑', secret: '🔮' };
       const lines = [];
       for (let i = 1; i <= 3; i++) {
         const id = team[`slot${i}`];
         if (id) {
           const a = db.getAnimal(id);
-          if (a) lines.push(`**Slot ${i}:** ${rarityEmojis[a.rarity]} **${a.species}** Lv.${a.level} ❤️${a.hp} ⚔️${a.attack} 🛡️${a.defense}`);
+          if (a) {
+            const emoji = rarityEmojis[(a.rarity || 'common').toLowerCase()] || '⚪';
+            lines.push(`**Slot ${i}:** ${emoji} **${a.species}** Lv.${a.level} ❤️${a.hp} ⚔️${a.attack} 🛡️${a.defense}`);
+          }
           else lines.push(`**Slot ${i}:** empty`);
         } else {
           lines.push(`**Slot ${i}:** empty`);
