@@ -74,11 +74,26 @@
 
 - [x] **v1.7.2 — battle pass + pass XP wiring:** New `battlepass` + `pass_state` tables. `v battlepass` (`pass`/`bp`/`season`) = 25-tier seasonal progression (14-day seasons, auto-roll via `currentSeason`). XP from hunt/battle/hatch/sacrifice/give/work (in command files) + gambled/wins (in `addGambled`/`addWon`) + quest/bounty/checklist claims. Free + premium track (`buyPassPremium`, 25 seals). Rewards per tier via `passReward(level, premium)`; `claimAllPass` grabs all due. Wired into gamehelp. Bumped 1.7.1 → 1.7.2, `update_msg.txt`, flushed `pending_updates.txt`. AGENTS.md economy section updated.
 
+## Done today (2026-08-09) — v1.7.5
+- [x] Balance corruption fixed (76T exploit deleted, drained balances restored)
+- [x] Backup repo switched to `gambot-data-v3` (old repos corrupt)
+- [x] `detectCorruption` guard in backup.js
+- [x] Owner bypass on disabled commands
+- [x] Boot DM spam fixed (one per session)
+- [x] Mines max bet limit (100k default, up to 5M via shop upgrades)
+- [x] `v givepets @user` command (gives all species including mythics)
+- [x] `v luckylist` command
+- [x] Baloot game added (4 players, teams, bidding)
+- [x] 100 new pet species + 15 secret pets
+- [x] All `undefined` display bugs fixed across commands (uppercase rarity mismatch)
+- [x] Boot message: single DM with update notes
+- [x] Lottery display shows event bonus
+
 ## Next / open
-- [ ] **Delete old backup repos** (`gambot-data`, `gambot-data-v2`) — they have 3800+ corrupt backups. Only `gambot-data-v3` is clean.
-- [ ] **Monitor for balance corruption** — check `db/index.js` `addBalance`/`payWin`/`getBalanceFactor` for integer overflow bugs if balances look wrong again.
-- [ ] **@Adam and @sisi** were not found in DB during balance restore — may need to re-register (accept TOS) before balances can be set.
-- [ ] **Consider balance ceiling** — add a max balance cap to prevent integer overflow exploits.
+- [ ] **Delete old backup repos** (`gambot-data`, `gambot-data-v2`) — 3800+ corrupt backups
+- [ ] **Monitor for balance corruption** — integer overflow bugs
+- [ ] **@Adam and @sisi** — need to re-register (accept TOS) before balances can be set
+- [ ] **Consider balance ceiling** — max balance cap to prevent exploits
 
 ## Agent prefs (Cursor)
 - Elite coding bar + OpenCode-style compact via `~/.cursor/rules/elite-compact.mdc`
