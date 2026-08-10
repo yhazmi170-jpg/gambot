@@ -31,7 +31,7 @@ module.exports = {
 
     const remaining = db.getEggs(userId);
     if (all) {
-      const lines = results.map(a => `${RARITY_EMOJIS[a.rarity]} **${a.species}** (${a.rarity}) Lv.${a.level}`);
+      const lines = results.map(a => `${RARITY_EMOJIS[(a.raliases||').toLowerCase()] || '?'} **${a.species}** (${a.rarity}) Lv.${a.level}`);
       return message.channel.send({ embeds: [embed(`🥚 Hatched ${results.length} egg${results.length > 1 ? 's' : ''}`, [
         ['', lines.join('\n')],
         ['Eggs left', `${remaining}`],
@@ -40,7 +40,7 @@ module.exports = {
 
     const a = results[0];
     return message.channel.send({ embeds: [embed('🥚 Egg Hatched!', [
-      ['', `${RARITY_EMOJIS[a.rarity]} **${a.species}** — ${a.rarity}`],
+      ['', `${RARITY_EMOJIS[(a.raliases||').toLowerCase()] || '?'} **${a.species}** — ${a.rarity}`],
       ['Stats', `Lv.${a.level} · ❤️ ${a.hp}/${a.max_hp} · ⚔️ ${a.attack} · 🛡️ ${a.defense}`],
       ['Eggs left', `${remaining} · \`v hatch all\` to open them all`],
     ], 0x57f287)] });

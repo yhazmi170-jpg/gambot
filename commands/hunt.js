@@ -89,7 +89,7 @@ module.exports = {
     summary.push('`v huntbot` for upgrades · `v sacrifice` for essence');
 
     message.channel.send({
-      embeds: [embed(`${rarityEmojis[results[0].rarity]} Hunt${count > 1 ? ` x${count}` : ''}`, [
+      embeds: [embed(`${rarityEmojis[(results[0].rarity||'').toLowerCase()] || '⚪'} Hunt${count > 1 ? ` x${count}` : ''}`, [
         ...fields,
         ['', summary.join('\n')],
       ], 0x2b2d31)],
