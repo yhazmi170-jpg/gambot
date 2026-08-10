@@ -1688,8 +1688,9 @@ function huntYield(userId) {
 }
 
 function rollGemDrop(rarity, radarMult) {
-  const chance = Math.min(GEM_DROP_BASE[rarity] * (radarMult || 1) * eventMult('gemMult'), 0.95);
-  if (Math.random() < chance) return GEM_AMOUNT[rarity] * eventMult('gemMult');
+  const r = (rarity || '').toLowerCase();
+  const chance = Math.min((GEM_DROP_BASE[r] || 0) * (radarMult || 1) * eventMult('gemMult'), 0.95);
+  if (Math.random() < chance) return (GEM_AMOUNT[r] || 0) * eventMult('gemMult');
   return 0;
 }
 
