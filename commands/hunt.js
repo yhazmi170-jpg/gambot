@@ -73,7 +73,7 @@ module.exports = {
 
     const fields = results.map((a, i) => [
       `#${i + 1}`,
-      `${rarityEmojis[a.rarity]} **${a.species}** — ${a.rarity.toUpperCase()}${a.gemDrop ? ` 💎+${a.gemDrop}` : ''}\n` +
+      `${rarityEmojis[(a.rarity || 'common').toLowerCase()] || '⚪'} **${a.species}** — ${a.rarity.toUpperCase()}${a.gemDrop ? ` 💎+${a.gemDrop}` : ''}\n` +
       `❤️ ${a.hp} ⚔️ ${a.attack} 🛡️ ${a.defense}`,
       true,
     ]);
