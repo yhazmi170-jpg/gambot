@@ -14,8 +14,62 @@ function snapshotName() {
   return `gambot-${new Date().toISOString().replace(/[:.]/g, '-')}.db`;
 }
 
-// Count rows in `users` inside an SQLite buffer (0 = empty/corrupt DB we must never push or restore)
-async function countUsers(buf) {
+// Validate DB structure and integrity
+async function validateDB(buf) {
+  try {
+    const initSqlJs = require('sql.js');
+    const SQL = await initSqlJs();
+    const db = new SQL.Database(new Uint8Array(buf));
+
+    // Check required tables exist
+    const tables = db.exec("SELECT name FROM sqlite_master WHERE type='table'");
+    const tableNames = tables[0]?.values.map(v => v[0]) || [];
+    const required = ['users', 'animals', 'purchases', 'guilds'];
+    for (const t of required) {
+      if (!tableNames.includes(t)) { db.close(); return `missing_table:${t}`; }
+    }
+
+    // Check users table has required columns
+    const cols = db.exec("PRAGMA table_info(users)");
+    const colNames = cols[0]?.values.map(v => v[1]) || [];
+    const requiredCols = ['user_id', 'balance', 'terms_accepted', 'gems'];
+    for (const c of requiredCols) {
+      if (!colNames.includes(c)) { db.close(); return `missing_col:users.${c}`; }
+    }
+
+    // Check for absurd balances
+    const absurd = db.exec("SELECT COUNT(*) FROM users WHERE balance > 1000000000000 OR balance < -1000000000000");
+    if (absurd[0]?.values[0][0] > 0) { db.close(); return 'absurd_balances'; }
+
+    // Check for negative gems/essence
+    const neg = db.exec("SELECT COUNT(*) FROM users WHERE gems < 0 OR essence < 0");
+    if (neg[0]?.values[0][0] > 0) { db.close(); return 'negative_resources'; }
+
+    db.close();
+    return null; // valid
+  } catch (e) { return `parse_error:${e.message}`; }
+}
+
+// Save a "golden" backup — a known-good state that persists
+async function saveGoldenBackup(buf) {
+  try {
+    const content = buf.toString('base64');
+    let sha = null;
+    try {
+      const existing = await request('GET', `/repos/${OWNER}/${REPO}/contents/golden.db`);
+      sha = existing.sha;
+    } catch {}
+    await request('PUT', `/repos/${OWNER}/${REPO}/contents/golden.db`, {
+      message: `golden backup ${new Date().toISOString()}`,
+      content,
+      sha,
+      branch: BRANCH,
+    });
+    console.log('golden backup saved');
+  } catch (e) {
+    console.error('golden backup failed:', e.message);
+  }
+}
   try {
     const initSqlJs = require('sql.js');
     const SQL = await initSqlJs();
@@ -55,15 +109,24 @@ async function detectCorruption(buf) {
   } catch { return null; }
 }
 
+let backupCounter = 0;
+
 async function backup() {
   if (!fs.existsSync(DB_PATH)) { console.log('backup: no db file, skipping'); return; }
   const buf = fs.readFileSync(DB_PATH);
+
+  // Validate DB structure
+  const invalid = await validateDB(buf);
+  if (invalid) { console.error(`backup: SKIPPED — DB validation failed (${invalid}); not pushing corrupt data`); return; }
+
   // Guard: never upload an empty/corrupt DB as the newest snapshot — it would clobber good data on next restore
   const users = await countUsers(buf);
   if (users === 0) { console.error('backup: SKIPPED — local DB has 0 users (empty/corrupt); not overwriting cloud backups'); return; }
+
   // Guard: refuse to push if DB shows signs of corruption (wiped users, absurd balances, negatives)
   const corrupt = await detectCorruption(buf);
   if (corrupt) { console.error(`backup: SKIPPED — DB corruption detected (${corrupt}); not overwriting good cloud backups`); return; }
+
   const content = buf.toString('base64');
 
   try {
@@ -75,6 +138,7 @@ async function backup() {
     const snapPath = `backups/${snapshotName()}`;
     await request('PUT', `/repos/${OWNER}/${REPO}/contents/${encodeURIComponent(snapPath)}`, {
       message: `backup ${new Date().toISOString()}`,
+      content,
       content,
       branch: BRANCH,
     });
@@ -91,6 +155,13 @@ async function backup() {
       sha,
       branch: BRANCH,
     });
+
+    // 3) Golden backup — saved every 10 backups (≈10 min) as a known-good fallback
+    backupCounter++;
+    if (backupCounter >= 10) {
+      backupCounter = 0;
+      await saveGoldenBackup(buf);
+    }
 
     console.log(`backed up to github (${snapPath})`);
   } catch (e) {
@@ -133,30 +204,41 @@ async function restore() {
   const local = fs.existsSync(DB_PATH) && fs.statSync(DB_PATH).size > 100;
   const localMtime = local ? fs.statSync(DB_PATH).mtimeMs : 0;
 
-  // Scan snapshots newest→oldest; download the first one that actually has users.
-  // Never restore an empty/corrupt snapshot — a single bad backup must not nuke the DB.
+  // First: validate local DB — if it's corrupt, force restore from backup
+  if (local) {
+    const localBuf = fs.readFileSync(DB_PATH);
+    const localInvalid = await validateDB(localBuf);
+    const localCorrupt = await detectCorruption(localBuf);
+    if (localInvalid || localCorrupt) {
+      console.log(`local DB is corrupt (${localInvalid || localCorrupt}), forcing restore from backup`);
+      local = false; // force restore
+    }
+  }
+
+  // Scan snapshots newest→oldest; download the first valid one.
   let newest = null;
   try { newest = await newestSnapshot(); } catch (e) { console.error('restore: snapshot lookup failed:', e.message); }
 
-  if (newest) {
-    if (local && newest.date <= localMtime) {
-      console.log('local db is up to date, skipping restore');
-      return true;
-    }
+  if (newest && local && newest.date <= localMtime) {
+    console.log('local db is up to date, skipping restore');
+    return true;
+  }
+
+  if (newest || !local) {
     try {
       const all = await allSnapshots();
       for (const p of all) {
         try {
           const buf = await download(p);
           if (buf && (await countUsers(buf)) > 0) {
+            const invalid = await validateDB(buf);
             const corrupt = await detectCorruption(buf);
-            if (corrupt) { console.error(`restore: skipped corrupt snapshot ${p} (${corrupt})`); continue; }
+            if (invalid || corrupt) { console.error(`restore: skipped bad snapshot ${p} (${invalid || corrupt})`); continue; }
             fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
             fs.writeFileSync(DB_PATH, buf);
             console.log(`restored db from github backup (${p})`);
             return true;
           }
-          if (buf) console.error(`restore: skipped empty/corrupt snapshot ${p} (0 users)`);
         } catch (e) { console.error(`restore: skip ${p}: ${e.message}`); }
       }
     } catch (e) {
@@ -164,16 +246,32 @@ async function restore() {
     }
   }
 
-  // Fallback: legacy single-file backup
+  // Fallback 1: golden backup
+  try {
+    const buf = await download('golden.db');
+    if (buf && (await countUsers(buf)) > 0) {
+      const invalid = await validateDB(buf);
+      if (!invalid) {
+        fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+        fs.writeFileSync(DB_PATH, buf);
+        console.log('restored db from golden backup');
+        return true;
+      }
+    }
+  } catch (e) { console.log('no golden backup available'); }
+
+  // Fallback 2: legacy single-file backup
   try {
     const buf = await download('gambot.db');
     if (buf && (await countUsers(buf)) > 0) {
-      fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-      fs.writeFileSync(DB_PATH, buf);
-      console.log('restored db from github backup (gambot.db mirror)');
-      return true;
+      const invalid = await validateDB(buf);
+      if (!invalid) {
+        fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+        fs.writeFileSync(DB_PATH, buf);
+        console.log('restored db from github backup (gambot.db mirror)');
+        return true;
+      }
     }
-    if (buf) console.error('restore: SKIPPED empty/corrupt mirror gambot.db (0 users)');
   } catch (e) {
     console.log('no backup to restore:', e.message);
   }
@@ -206,4 +304,4 @@ function request(method, url, body) {
   });
 }
 
-module.exports = { backup, restore };
+module.exports = { backup, restore, validateDB, saveGoldenBackup };
