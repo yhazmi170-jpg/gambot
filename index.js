@@ -349,9 +349,8 @@ start();
       role.setColor(color).catch(() => {});
     }
   }, 3000);
-});
 
-client.on('interactionCreate', (i) => {
+  client.on('interactionCreate', (i) => {
   if (!i.customId || !i.isButton()) return;
   if (i.customId.startsWith('shop_')) {
     require('./commands/shop').handleInteraction(i);
