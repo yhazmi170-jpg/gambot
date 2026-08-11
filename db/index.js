@@ -969,7 +969,7 @@ function getMaxBet(userId) {
   if (hasPerk(userId, 'bet_cap_4')) return 2000000;
   if (hasPerk(userId, 'bet_cap_3')) return 1000000;
   if (hasPerk(userId, 'bet_cap_2')) return 500000;
-  if (hasPerk(userId, 'bet_cap')) return 250000;
+  if (hasPerk(userId, 'bet_cap')) return 500000;
   return 100000;
 }
 
