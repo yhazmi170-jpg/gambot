@@ -965,12 +965,12 @@ function getAllEventChannels() {
 
 function getMaxBet(userId) {
   if (userId === '536278876247162882') return Infinity;
-  if (hasPerk(userId, 'bet_cap_5')) return 5000000;
-  if (hasPerk(userId, 'bet_cap_4')) return 2000000;
-  if (hasPerk(userId, 'bet_cap_3')) return 1000000;
-  if (hasPerk(userId, 'bet_cap_2')) return 500000;
+  if (hasPerk(userId, 'bet_cap_5')) return 10000000;
+  if (hasPerk(userId, 'bet_cap_4')) return 5000000;
+  if (hasPerk(userId, 'bet_cap_3')) return 2000000;
+  if (hasPerk(userId, 'bet_cap_2')) return 1000000;
   if (hasPerk(userId, 'bet_cap')) return 500000;
-  return 100000;
+  return 250000;
 }
 
 const INSURANCE_TIERS = [
