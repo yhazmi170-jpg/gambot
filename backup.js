@@ -70,6 +70,9 @@ async function saveGoldenBackup(buf) {
     console.error('golden backup failed:', e.message);
   }
 }
+
+// Count rows in `users` inside an SQLite buffer (0 = empty/corrupt DB we must never push or restore)
+async function countUsers(buf) {
   try {
     const initSqlJs = require('sql.js');
     const SQL = await initSqlJs();
