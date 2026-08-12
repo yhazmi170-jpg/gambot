@@ -723,7 +723,7 @@ function getBattleWins(userId) {
 
 function getTop(limit, excludeUserId) {
   const where = excludeUserId ? `WHERE user_id != '${excludeUserId}'` : '';
-  const rows = db.exec(`SELECT user_id, balance FROM users ${where} ORDER BY balance DESC LIMIT ${limit}`);
+  const rows = db.exec(`SELECT user_id, balance + COALESCE(bank, 0) as total FROM users ${where} ORDER BY total DESC LIMIT ${limit}`);
   if (!rows.length) return [];
   return rows[0].values.map(v => ({ user_id: v[0], balance: v[1] }));
 }
