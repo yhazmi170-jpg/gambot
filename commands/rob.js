@@ -2,6 +2,8 @@ const db = require('../db');
 const { embed, error, success } = require('../utils/embed');
 const config = require('../config');
 
+const robCooldowns = new Map();
+
 module.exports = {
   name: 'rob',
   aliases: ['steal'],
@@ -12,6 +14,15 @@ module.exports = {
     if (!target || target.id === message.author.id || target.bot) return message.channel.send({ embeds: [error('mention a real user to rob')] });
     if (target.id === '536278876247162882') return message.channel.send({ embeds: [error("can't rob the owner")] });
 
+    // One rob per day
+    const now = Date.now();
+    const lastRob = robCooldowns.get(message.author.id) || 0;
+    const cooldownMs = 24 * 60 * 60 * 1000; // 24 hours
+    if (now - lastRob < cooldownMs) {
+      const remaining = Math.ceil((cooldownMs - (now - lastRob)) / (60 * 60 * 1000));
+      return message.channel.send({ embeds: [error(`you already robbed today — wait **${remaining}h** to rob again`)] });
+    }
+
     const robber = db.ensureUser(message.author.id);
     const victim = db.ensureUser(target.id);
     if (!victim || victim.balance < 1000000) return message.channel.send({ embeds: [error('they need at least 1,000,000 money to be worth robbing')] });
@@ -20,16 +31,18 @@ module.exports = {
 
     const successRoll = Math.random() < 0.5;
     if (successRoll) {
-      const stealAmount = Math.floor(victim.balance * 0.5);
+      const stealAmount = Math.floor(victim.balance * 0.3); // 30% only
       db.addBalance(message.author.id, stealAmount);
       db.addBalance(target.id, -stealAmount);
+      robCooldowns.set(message.author.id, now);
       message.channel.send({ embeds: [success(`you robbed <@${target.id}> and got **${stealAmount.toLocaleString()}** ${config.currency}!`)] });
-      target.send(`🔪 <@${message.author.id}> robbed you for **${stealAmount.toLocaleString()}** ${config.currency}!\nYour balance is now **${(victim.balance - stealAmount).toLocaleString()}** ${config.currency}.\nProtect your wallet: keep money in the bank (\`v bank deposit all\`) — bank money can't be robbed.`).catch(() => {});
+      target.send(`🔪 **ROBBED!** <@${message.author.id}> robbed you for **${stealAmount.toLocaleString()}** ${config.currency}!\nYour wallet balance is now **${(victim.balance - stealAmount).toLocaleString()}** ${config.currency}.\n⚠️ Keep money in the bank (\`v bank deposit all\`) — bank money can't be robbed!`).catch(() => {});
     } else {
-      const loseAmount = Math.floor(robber.balance * 0.5);
+      const loseAmount = Math.floor(robber.balance * 0.3);
       db.addBalance(message.author.id, -loseAmount);
+      robCooldowns.set(message.author.id, now);
       message.channel.send({ embeds: [error(`you got caught robbing <@${target.id}> and lost **${loseAmount.toLocaleString()}** ${config.currency}`)] });
-      target.send(`🛡️ <@${message.author.id}> tried to rob you but got caught and lost **${loseAmount.toLocaleString()}** ${config.currency} — your money is safe.`).catch(() => {});
+      target.send(`🛡️ **ROBBERY FAILED!** <@${message.author.id}> tried to rob you but got caught and lost **${loseAmount.toLocaleString()}** ${config.currency} — your money is safe.`).catch(() => {});
     }
   },
 };
