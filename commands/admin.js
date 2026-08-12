@@ -13,12 +13,38 @@ module.exports = {
     const amount = parseAmount(args[2]);
 
     if (sub === 'remove' || sub === 'rm' || sub === 'take') {
-      if (!target || isNaN(amount) || amount <= 0) return message.channel.send({ embeds: [error('usage: Aovo remove @user <amount>')] });
+      const target = message.mentions.users.first();
+      const what = (args[1] || '').toLowerCase();
+      const amount = parseAmount(args[2]);
+
+      // Aovo remove @user wallet <amount>
+      if (what === 'wallet' || what === 'wal') {
+        if (!target || isNaN(amount) || amount <= 0) return message.channel.send({ embeds: [error('usage: Aovo remove @user wallet <amount>')] });
+        const user = db.ensureUser(target.id);
+        if (!user) return message.channel.send({ embeds: [error('user not found')] });
+        const actual = Math.min(amount, user.balance);
+        db.addBalance(target.id, -actual);
+        return message.channel.send({ embeds: [success(`removed **${actual}** money from <@${target.id}>'s wallet`)] });
+      }
+
+      // Aovo remove @user bank <amount>
+      if (what === 'bank' || what === 'ba') {
+        if (!target || isNaN(amount) || amount <= 0) return message.channel.send({ embeds: [error('usage: Aovo remove @user bank <amount>')] });
+        const user = db.ensureUser(target.id);
+        if (!target || !user) return message.channel.send({ embeds: [error('user not found')] });
+        const actual = Math.min(amount, user.bank || 0);
+        db.run(`UPDATE users SET bank = bank - ${actual} WHERE user_id = '${target.id}'`);
+        db.save();
+        return message.channel.send({ embeds: [success(`removed **${actual}** money from <@${target.id}>'s bank`)] });
+      }
+
+      // Aovo remove @user <amount> (wallet, legacy)
+      if (!target || isNaN(amount) || amount <= 0) return message.channel.send({ embeds: [error('usage: Aovo remove @user <amount> or Aovo remove @user wallet/bank <amount>')] });
       const user = db.ensureUser(target.id);
       if (!user) return message.channel.send({ embeds: [error('user not found')] });
       const actual = Math.min(amount, user.balance);
       db.addBalance(target.id, -actual);
-      message.channel.send({ embeds: [success(`removed **${actual}** money from <@${target.id}>`)] });
+      return message.channel.send({ embeds: [success(`removed **${actual}** money from <@${target.id}>`)] });
     } else if (sub === 'add' || sub === 'give') {
       if (!target || isNaN(amount) || amount <= 0) return message.channel.send({ embeds: [error('usage: Aovo add @user <amount>')] });
       db.addBalance(target.id, amount);
