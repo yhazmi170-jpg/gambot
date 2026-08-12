@@ -24,7 +24,7 @@ module.exports = {
     if ((user.essence || 0) < can.cost) return message.channel.send({ embeds: [error(`evolving needs **${can.cost}** essence — you have ${user.essence || 0}`)] });
     const res = db.evolveAnimal(id, user.essence);
     if (!res.ok) return message.channel.send({ embeds: [error('could not evolve')] });
-    return message.channel.send({ embeds: [embed(`${RARITY_EMOJIS[(a.raliases||').toLowerCase()] || '?'} → ${RARITY_EMOJIS[res.rarity]} Evolution!`, [
+    return message.channel.send({ embeds: [embed(`${RARITY_EMOJIS[(a.rarity||'').toLowerCase()] || '⚪'} → ${RARITY_EMOJIS[(res.rarity||'').toLowerCase()] || '⚪'} Evolution!`, [
       ['Before', `${a.species} (${a.rarity}) Lv.${a.level}`],
       ['After', `${res.species} (**${res.rarity}**) — stats +15%`],
       ['Cost', `${res.cost} essence`],

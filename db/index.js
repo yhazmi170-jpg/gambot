@@ -721,6 +721,13 @@ function getBattleWins(userId) {
   return u ? (u.battles_won || 0) : 0;
 }
 
+function getTop(limit, excludeUserId) {
+  const where = excludeUserId ? `WHERE user_id != '${excludeUserId}'` : '';
+  const rows = db.exec(`SELECT user_id, balance + COALESCE(bank, 0) as total FROM users ${where} ORDER BY total DESC LIMIT ${limit}`);
+  if (!rows.length) return [];
+  return rows[0].values.map(v => ({ user_id: v[0], balance: v[1] }));
+}
+
 function getGamblers(limit) {
   const rows = db.exec(`SELECT user_id, total_gambled FROM users WHERE total_gambled > 0 ORDER BY total_gambled DESC LIMIT ${limit}`);
   if (!rows.length) return [];
