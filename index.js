@@ -107,6 +107,20 @@ start();
       activities: [{ name: `v${version} | /ravine | ${config.prefixes[0]} help` }],
       status: 'online',
     });
+
+    // Update announcement check (after db is ready)
+    const ver2 = version || '1.0.0';
+    if (!db.wasNotified(`v${ver2}`)) {
+      if (updateMsg) {
+        postUpdateAnnouncement(client, updateMsg, `v${ver2}`).then(sent => {
+          const channels = db.getAllUpdateChannels();
+          if (sent === channels.length) db.markNotified(`v${ver2}`);
+          else console.error(`update announcement partially sent (${sent}/${channels.length}) — will retry next boot`);
+        });
+      } else {
+        db.markNotified(`v${ver2}`);
+      }
+    }
   });
 
   const { backup } = require('./backup');
@@ -272,31 +286,6 @@ start();
     const now = Math.floor(Date.now() / 1000);
     for (const mid of db.getExpiredGiveaways(now)) finalizeGiveaway(mid);
   }, 5000);
-
-  const ver = version || '1.0.0';
-  if (!db.wasNotified(`v${ver}`)) {
-    let updateMsg = '';
-    try { updateMsg = fs.readFileSync(path.join(__dirname, 'update_msg.txt'), 'utf8').trim(); } catch {}
-    if (updateMsg) {
-      postUpdateAnnouncement(client, updateMsg, `v${ver}`).then(sent => {
-        const channels = db.getAllUpdateChannels();
-        if (sent === channels.length) db.markNotified(`v${ver}`);
-        else console.error(`update announcement partially sent (${sent}/${channels.length}) — will retry next boot`);
-      });
-    } else {
-      db.markNotified(`v${ver}`);
-    }
-  }
-
-  if (!db.wasNotified('custom_role_update')) {
-    const crHolders = db.getPerkHolders('custom_role');
-    for (const uid of crHolders) {
-      client.users.fetch(uid).then(u => {
-        u.send('**Custom Role perk updated!**\nYou can now set your role yourself:\n`v customrole name <name>` · `v customrole color #hex` · `v customrole name | #hex`\n\nExample: `v customrole Cool Guy | #ff0000`\n\nYour existing role will update, or a new one will be created.').catch(() => {});
-      }).catch(() => {});
-    }
-    db.markNotified('custom_role_update');
-  }
 
   setInterval(() => {
     const ticketUsers = db.getLottery();
