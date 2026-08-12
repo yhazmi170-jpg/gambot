@@ -36,8 +36,7 @@ module.exports = {
         const user = db.ensureUser(target.id);
         if (!target || !user) return message.channel.send({ embeds: [error('user not found')] });
         const actual = Math.min(amount, user.bank || 0);
-        db.run(`UPDATE users SET bank = bank - ${actual} WHERE user_id = '${target.id}'`);
-        db.save();
+        db.adminBankRemove(target.id, actual);
         return message.channel.send({ embeds: [success(`removed **${actual}** money from <@${target.id}>'s bank`)] });
       }
 

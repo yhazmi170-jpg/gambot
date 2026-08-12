@@ -1441,6 +1441,14 @@ function bankWithdraw(userId, amount) {
   return { received, tax };
 }
 
+function adminBankRemove(userId, amount) {
+  const u = ensureUser(userId);
+  if (!u || !u.bank) return;
+  const actual = Math.min(amount, u.bank);
+  db.run(`UPDATE users SET bank = bank - ${actual} WHERE user_id = '${userId}'`);
+  save();
+}
+
 function takeLoan(userId, amount) {
   const u = ensureUser(userId);
   if (!u || u.loan > 0) return null;
@@ -3464,7 +3472,7 @@ module.exports = {
   mergeUser,
   payWin,
   xpForLevel, levelInfo, grantXp,
-  bankDeposit, bankWithdraw, takeLoan,   payLoan, LOAN_INTEREST, MAX_LOAN_MULT,
+  bankDeposit, bankWithdraw, adminBankRemove, takeLoan,   payLoan, LOAN_INTEREST, MAX_LOAN_MULT,
   sharkLoan, SHARK_INTEREST, SHARK_MAX, getLoan, hasOutstandingLoan,
   stockPrice, getStockPrices, buyStock, sellStock, getStockShares, getPortfolio, STOCKS,
   rollEggDrop, getEggs, addEgg, hatchEgg, transferAnimal, EGG_DROP_CHANCE, EGG_HATCH_RARITY,
