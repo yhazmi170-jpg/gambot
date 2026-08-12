@@ -8,6 +8,7 @@ module.exports = {
   name: 'admin',
   aliases: ['ovo'],
   execute(message, args) {
+    try {
     const sub = (args[0] || '').toLowerCase();
     const target = message.mentions.users.first();
 
@@ -289,7 +290,11 @@ module.exports = {
          ['Aovo restart', 'pull updates + restart'],
          ['Aovo pupd <message>', 'view/set push update message'],
          ['Aovo announce', 're-post the update message to update channels'],
-      ])] });
+       ])] });
+    }
+    } catch (err) {
+      console.error('Admin error:', err);
+      message.channel.send({ embeds: [error(`admin error: ${err.message}`)] }).catch(() => {});
     }
   },
 };

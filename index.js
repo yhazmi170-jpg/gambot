@@ -125,8 +125,8 @@ start();
 
   const { backup } = require('./backup');
   const doBackup = () => backup().catch(e => console.error('BACKUP FAILED:', e && e.message, e && e.stack || ''));
-  setInterval(doBackup, 60000);
-  setTimeout(doBackup, 10000);
+  setInterval(doBackup, 15000); // backup every 15 seconds (was 60s)
+  setTimeout(doBackup, 5000);
 
   setInterval(() => {
     const expired = db.getExpiredSubs();
