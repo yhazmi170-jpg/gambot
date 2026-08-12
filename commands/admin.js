@@ -10,12 +10,15 @@ module.exports = {
   execute(message, args) {
     const sub = (args[0] || '').toLowerCase();
     const target = message.mentions.users.first();
-    const amount = parseAmount(args[2]);
 
     if (sub === 'remove' || sub === 'rm' || sub === 'take') {
-      const target = message.mentions.users.first();
-      const what = (args[1] || '').toLowerCase();
-      const amount = parseAmount(args[2]);
+      // Find where the mention is in args to parse correctly
+      let mentionIdx = -1;
+      for (let i = 0; i < args.length; i++) {
+        if (args[i].startsWith('<@') || args[i].match(/^\d{17,19}$/)) { mentionIdx = i; break; }
+      }
+      const what = mentionIdx >= 0 ? (args[mentionIdx + 1] || '').toLowerCase() : '';
+      const amount = parseAmount(mentionIdx >= 0 ? args[mentionIdx + 2] : args[2]);
 
       // Aovo remove @user wallet <amount>
       if (what === 'wallet' || what === 'wal') {
