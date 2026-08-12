@@ -1422,9 +1422,11 @@ function bankDeposit(userId, amount) {
 function bankWithdraw(userId, amount) {
   const u = ensureUser(userId);
   if (!u || u.bank < amount) return false;
-  db.run(`UPDATE users SET balance = balance + ${amount}, bank = bank - ${amount} WHERE user_id = '${userId}'`);
+  const tax = Math.floor(amount * 0.05); // 5% withdrawal tax
+  const received = amount - tax;
+  db.run(`UPDATE users SET balance = balance + ${received}, bank = bank - ${amount} WHERE user_id = '${userId}'`);
   save();
-  return true;
+  return { received, tax };
 }
 
 function takeLoan(userId, amount) {

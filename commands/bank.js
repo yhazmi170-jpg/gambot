@@ -40,8 +40,9 @@ module.exports = {
       else amount = parseAmount(args[1]);
       if (!amount || amount <= 0) return message.channel.send({ embeds: [error('usage: `v bank withdraw <amount/all>`')] });
       if (user.bank < amount) return message.channel.send({ embeds: [error('not enough money in bank')] });
-      db.bankWithdraw(uid, amount);
-      return message.channel.send({ embeds: [success(`withdrew **${amount}** ${config.currency} from your bank`)] });
+      const result = db.bankWithdraw(uid, amount);
+      if (!result) return message.channel.send({ embeds: [error('withdrawal failed')] });
+      return message.channel.send({ embeds: [success(`withdrew **${result.received.toLocaleString()}** ${config.currency} from your bank (5% tax: **${result.tax.toLocaleString()}** ${config.currency})`)] });
     }
 
     if (sub === 'loan' || sub === 'loans') {
