@@ -6,3 +6,4 @@ then push (the boot announcement posts it once).
 
 Format: one line per change, terse, no AI fluff.
 (flushed into v1.7.5)
+- Intel sync endpoints: GET/POST /intel?key= records+serves 24/7 message activity to the selfbot (discord-selfy) for alt-link + last-moves tracking. Internal, no player-facing change.

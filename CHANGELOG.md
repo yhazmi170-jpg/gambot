@@ -4,6 +4,12 @@ Complete list of every update shipped, newest first. Source: git history (`maste
 
 ---
 
+## Intel sync (internal, no version bump)
+
+- **24/7 passive message intel**: `intel.js` records every guild message + DM the bot sees into an in-memory ring buffer (dedup by message id, 20k cap, 24h prune). The selfbot (`discord-selfy`) pulls it via `GET /intel?since=<ts>&key=...` every ~2 min and merges it into its big-brother tracker (alt-link detection, last moves, co-presence), and pushes its own events back via `POST /intel` so both sides share the same feed.
+- **Auth**: optional `INTEL_KEY` (env or `config.intelKey`) — `/intel` returns 403 without the right `key` param. Unset = open (local only).
+- **Ephemeral by design**: Render free tier wipes `./data` on deploy, so the buffer is memory-only; the PC selfbot is the durable store.
+
 ## v1.7.5 — Corruption Fix & Cleanup
 
 - **Economy corruption resolved**: drained balances restored (@极极 84M, @meimei 41M, @Aruh 50.7M, @nini 8.7M, @Claire 2.3M, @apzz 2.2M). Two exploit alt accounts deleted.

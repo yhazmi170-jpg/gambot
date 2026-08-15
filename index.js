@@ -47,7 +47,38 @@ if (!acquireLock()) { console.error('could not acquire lock'); process.exit(1); 
 process.on('exit', () => { try { fs.unlinkSync(lockFile); } catch {} });
 
 const PORT = process.env.PORT || 3000;
+const intel = require('./intel');
+const INTEL_KEY = process.env.INTEL_KEY || config.intelKey || null;
+function intelAuth(u) {
+  return !INTEL_KEY || u.searchParams.get('key') === INTEL_KEY;
+}
 const server = http.createServer((req, res) => {
+  const u = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  if (u.pathname === '/intel' && req.method === 'GET') {
+    if (!intelAuth(u)) { res.writeHead(403, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'forbidden' })); return; }
+    const since = u.searchParams.get('since') || '0';
+    const data = intel.getSince(since);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ events: data, now: Date.now(), stats: intel.stats() }));
+    return;
+  }
+  if (u.pathname === '/intel' && req.method === 'POST') {
+    if (!intelAuth(u)) { res.writeHead(403, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'forbidden' })); return; }
+    let body = '';
+    req.on('data', (c) => { body += c; if (body.length > 5e6) req.destroy(); });
+    req.on('end', () => {
+      try {
+        const parsed = JSON.parse(body || '{}');
+        const added = intel.merge(parsed.events || []);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ added, stats: intel.stats() }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'bad json' }));
+      }
+    });
+    return;
+  }
   res.writeHead(200, { 'Content-Type': 'text/plain' });
   res.end(`ok v${version} commit=${process.env.RENDER_GIT_COMMIT || process.env.GIT_SHA || 'unknown'}`);
 });
@@ -375,6 +406,7 @@ client.on('resume', () => console.log('reconnected'));
 
 client.on('messageCreate', (message) => {
   handleMessage(message);
+  intel.recordMessage(message);
   if (message.author.bot) return;
   const perks = db.getUserPerks(message.author.id);
   if (message.channel.type === 0) {
