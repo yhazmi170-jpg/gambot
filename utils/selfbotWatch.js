@@ -2,6 +2,8 @@ const config = require('../config');
 
 const OWNER = config.ownerId || '536278876247162882';
 const INTERVAL = 60000;
+const FAILURE_THRESHOLD = 3;
+const RECOVERY_THRESHOLD = 2;
 
 const state = {
   online: null,
@@ -9,6 +11,9 @@ const state = {
   checkedAt: null,
   data: null,
   error: null,
+  consecutiveFailures: 0,
+  consecutiveSuccesses: 0,
+  checkRunning: false,
 };
 
 function dm(client, text) {
@@ -32,37 +37,51 @@ async function fetchHealth() {
 }
 
 async function check(client) {
+  if (state.checkRunning) return;
+  state.checkRunning = true;
   const h = await fetchHealth();
   state.checkedAt = Date.now();
 
   if (!h || !h.ok) {
-    if (state.online === true) {
+    state.consecutiveFailures++;
+    state.consecutiveSuccesses = 0;
+    if (state.online === true && state.consecutiveFailures >= FAILURE_THRESHOLD) {
       dm(client, '⚠️ **selfbot** went offline — no longer responding to /health');
+      state.online = false;
     }
-    state.online = false;
-    state.uptimeMs = null;
-    state.data = null;
+    if (state.online !== true && state.consecutiveFailures >= FAILURE_THRESHOLD) {
+      state.uptimeMs = null;
+      state.data = null;
+    }
     state.error = (h && h.error) || 'non-200 response';
+    state.checkRunning = false;
     return;
   }
 
+  state.consecutiveFailures = 0;
+  state.consecutiveSuccesses++;
   const uptime = typeof h.uptime === 'number' ? h.uptime : null;
-  const wasOffline = state.online === false;
+  const wasOffline = state.online === false && state.consecutiveSuccesses >= RECOVERY_THRESHOLD;
   const prevUptime = state.uptimeMs;
   const firstEver = state.checkedAt != null && state.online === null;
 
-  state.online = true;
+  if (state.online === null || state.online === true || wasOffline)
+    state.online = true;
   state.uptimeMs = uptime;
   state.data = h;
   state.error = null;
 
-  if (firstEver) return;
+  if (firstEver) {
+    state.checkRunning = false;
+    return;
+  }
 
   if (wasOffline) {
     dm(client, `✅ **selfbot** is back online (${h.clients != null ? h.clients : '?'} clients, v${h.version || '?'})`);
   } else if (prevUptime != null && uptime != null && prevUptime - uptime > 10000) {
     dm(client, `✅ **selfbot** restarted — new deploy live (${h.clients != null ? h.clients : '?'} clients, v${h.version || '?'})`);
   }
+  state.checkRunning = false;
 }
 
 function getStatus() {
