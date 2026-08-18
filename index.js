@@ -139,6 +139,9 @@ start();
       status: 'online',
     });
 
+    // selfbot health watcher — DMs the owner on start/restart/offline, never touches update channels
+    require('./utils/selfbotWatch').start(client);
+
     // Update announcement check (after db is ready)
     const ver2 = version || '1.0.0';
     if (!db.wasNotified(`v${ver2}`)) {

@@ -178,7 +178,39 @@ module.exports = {
           spawnBot();
         }, 300);
       });
-      } else if (sub === 'shutdown' || sub === 'off' || sub === 'kill') {
+      } else if (sub === 'selfbot') {
+        const selfbotWatch = require('../utils/selfbotWatch');
+        const sub2 = (args[1] || '').toLowerCase();
+        if (sub2 === 'restart') {
+          if (!config.renderApiKey || !config.selfbotServiceId) {
+            return message.channel.send({ embeds: [error('selfbot restart is not configured on this instance (missing RENDER_API_KEY / SELFBOT_SERVICE_ID)')] });
+          }
+          message.channel.send({ embeds: [success('triggering selfbot redeploy on Render...')] }).then(() => {
+            selfbotWatch.renderRestart()
+              .then(dep => message.channel.send({ embeds: [success(`selfbot redeploy started — deploy \`${dep.id}\` status \`${dep.status}\``)] }))
+              .catch(e => message.channel.send({ embeds: [error(`selfbot redeploy failed: ${e.message}`)] }));
+          });
+        } else {
+          const s = selfbotWatch.getStatus();
+          if (!s) return message.channel.send({ embeds: [error('selfbot has not been checked yet — wait a few seconds and try again')] });
+          const fmtUptime = (ms) => {
+            if (!ms) return '—';
+            const sec = Math.floor(ms / 1000);
+            const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), r = sec % 60;
+            return `${h ? h + 'h ' : ''}${m ? m + 'm ' : ''}${r}s`;
+          };
+          const fields = [
+            ['State', s.online ? '🟢 online' : '🔴 offline'],
+            ['Clients', s.clients != null ? String(s.clients) : '—'],
+            ['Version', s.version ? `v${s.version}` : '—'],
+            ['Uptime', fmtUptime(s.uptimeMs)],
+            ['Endpoint', s.url],
+            ['Last check', new Date(s.checkedAt).toLocaleString()],
+          ];
+          if (s.error) fields.push(['Error', s.error]);
+          message.channel.send({ embeds: [embed('Selfbot Status', fields)] });
+        }
+    } else if (sub === 'shutdown' || sub === 'off' || sub === 'kill') {
         if (!message.guild) return message.channel.send({ embeds: [error('must be in a server')] });
         const ownerId = '536278876247162882';
         message.channel.send({ embeds: [success('shutting down...')] }).then(() => {
@@ -211,6 +243,8 @@ module.exports = {
           ['Aovo addrole @user name | #color', 'create custom role'],
           ['Aovo shutdown', 'fully stop the bot'],
           ['Aovo restart', 'pull updates + restart'],
+          ['Aovo selfbot', 'selfbot status'],
+          ['Aovo selfbot restart', 'redeploy the selfbot on Render'],
           ['Aovo pupd <message>', 'view/set push update message'],
           ['Aovo announce', 're-post the update message to update channels'],
         ])] });
