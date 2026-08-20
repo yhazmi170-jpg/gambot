@@ -10,7 +10,7 @@
 - **Backups**: `backup.js` writes timestamped snapshots (`backups/gambot-<ts>.db`, never overwritten) + a mirror at `gambot.db`. Restore scans ALL snapshots newest?oldest and restores the first one with >0 users (`countUsers` via sql.js) � a bad/empty backup can never block recovery. Backup **refuses to upload** a 0-user DB (prevents an empty/corrupt instance from clobbering history). `index.js` logs backup failures loudly. Backups run **every 1 min** + on **SIGTERM/SIGINT shutdown** (Render free tier wipes `./data` on every deploy � shutdown backup caps loss at 1 min).
 - **Backup repo**: `gambot-data-v3` on GitHub (old repos `gambot-data` and `gambot-data-v2` were corrupt � do NOT use them). `detectCorruption` in backup.js rejects snapshots with absurd balances (>1T), negative balances, or known-wiped users.
 - **Balance corruption (Aug 2026)**: a bug drained multiple users' balances over time (@?? lost ~52M, @meimei lost ~28M). Root cause unknown � may be integer overflow in balance calculations. If balances look wrong again, check `db/index.js` `addBalance`/`payWin`/`getBalanceFactor` for overflow bugs.
-- **Current version**: see `package.json` (as of last docs sync: **1.7.5**)
+- **Current version**: see `package.json` (as of last docs sync: **1.7.6**)
 - **Change log**: every update ever shipped is documented in `CHANGELOG.md` (newest first) � update it whenever you release, right alongside the version bump + `update_msg.txt`
 
 ## Agent docs (mandatory)

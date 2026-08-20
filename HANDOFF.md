@@ -5,7 +5,7 @@
 
 ## Status
 - **Branch**: `master`
-- **Version**: `1.7.5` — corruption fix, balance restoration, backup rebuild (LIVE on Render).
+- **Version**: `1.7.6` — bet caps capped at 2M (5M/10M tiers removed), caps enforced on explicit bet amounts, removed-tier holders refunded; selfbot restart-spam fixed (LIVE on Render).
 - **Roles (v two-agent workflow):** chat agent (orchestrator, is the user's main driver) delegates coding to Claude Code CLI; git is the message bus.
 - **Change log**: complete history of every update lives in `CHANGELOG.md` (newest first) — keep it in sync with the version bump + `update_msg.txt`
 - **Host migration**: Replit → Render (free, Blueprint from `render.yaml`). Replit repl was stopped by user. **Render URL: `https://gambot-o2o4.onrender.com`** — keepalive pinger repointed to it.
@@ -27,6 +27,24 @@
 - [x] **Blueprint read stale render.yaml.** The deploy page showed $7.25/mo because it loaded the OLD render.yaml (with disk) before the fix was pushed. Lesson: push config fixes BEFORE opening the Render Blueprint.
 - [x] **Boot crash on fresh box (DB dir missing).** `db/index.js save()` and `backup.js restore()` did raw `writeFileSync` with no `mkdirSync` — with `DB_PATH` set on a fresh Render instance the parent dir doesn't exist → ENOENT → bot never logs in. Added `fs.mkdirSync(path.dirname(DB_PATH), { recursive: true })` in both.
 - [x] **Secrets check.** `config.json`, `gambot.db`, `.env` are all `.gitignore`d; only `config.example.json` is tracked (verified via `git ls-files`). Bot token stays out of the repo; Render uses `TOKEN` env var.
+
+## Done recently (2026-08-21)
+- [x] **Selfbot restart-spam fix:** `utils/selfbotWatch.js` was DMing the owner
+  "selfbot restarted — new deploy live" every ~30 min because the selfbot
+  `/health` uptime is NOT monotonic (measured 574k→812k sec swings, ~1900x
+  real-time drift on Render) — those were false alerts, not real restarts.
+  Fix: restart DM only fires on a real version change (first check seeds the
+  last-seen version), and ALL alert types (restart/offline/online) have a 6h
+  cooldown. Deployed (commit a95cfc2).
+- [x] **Bet caps capped (v1.7.6):** removed `bet_cap_4` (5M) and `bet_cap_5`
+  (10M) tiers from `getMaxBet` (db/index.js) and `commands/shop.js` — top tier
+  is now `bet_cap_3` (2M). Added `db.parseBet(userId, input)` so the cap is
+  enforced on EXPLICIT numeric bets too (previously only `all` was capped —
+  real bug). Switched blackjack, coinflip, crash, dice, poker, roulette, slots,
+  snailgarden, wheel to it (mines already enforced). One-time boot migration
+  `bet_cap_cleanup_v1` refunds holders of the removed tiers (20M/50M) and
+  grants bet_cap_3 — verified idempotent on a backup copy + verified live
+  (user 1403284736071172137 refunded +70M). Deployed (commit 719e379).
 
 ## Done recently (2026-08-09)
 - [x] **Intel sync endpoints (no version bump, pending_updates):** `intel.js` + `GET/POST /intel` on the HTTP server. The gambot now passively records every guild message + DM it sees (24/7 on Render) into an in-memory ring buffer and serves it to the selfbot (`discord-selfy`) via `GET /intel?since=<ts>&key=...`; the selfbot merges it into its big-brother tracker (alt-link detection, last-moves, co-presence) and pushes its own events back with `POST /intel`. Optional `INTEL_KEY` (env or `config.intelKey`) gates both endpoints (403 without key). Buffer is memory-only (Render disk is ephemeral) — the PC selfbot is the durable store.
