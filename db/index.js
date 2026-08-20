@@ -1,6 +1,7 @@
 const initSqlJs = require('sql.js');
 const fs = require('fs');
 const path = require('path');
+const { parseAmount } = require('../utils/embed');
 
 const DB_PATH = process.env.DB_PATH || process.env.RENDER_DISK_PATH ? path.join(process.env.DB_PATH || process.env.RENDER_DISK_PATH, 'gambot.db') : path.join(__dirname, '..', 'gambot.db');
 let db = null;
@@ -186,6 +187,24 @@ async function init() {
     db.run(`DELETE FROM clans`);
     db.run(`DELETE FROM clan_members`);
     markNotified('clan_v2_wipe');
+    save();
+  }
+  // v1.8.x: bet cap tiers above 2M were removed (5M/10M max bets broke the economy).
+  // Refund holders of the removed tiers in full and promote them to the top remaining tier.
+  if (!wasNotified('bet_cap_cleanup_v1')) {
+    const removedTiers = { bet_cap_4: 20000000, bet_cap_5: 50000000 };
+    const rows = db.exec(`SELECT user_id, perk FROM purchases WHERE perk = 'bet_cap_4' OR perk = 'bet_cap_5'`);
+    if (rows.length && rows[0].values.length) {
+      for (const [userId, perk] of rows[0].values) {
+        const refund = removedTiers[perk] || 0;
+        ensureUser(userId);
+        db.run(`UPDATE users SET balance = balance + ${refund} WHERE user_id = '${userId}'`);
+        removePerk(userId, perk);
+        addPerk(userId, 'bet_cap_3', 0);
+        console.log(`[migrate] refunded ${refund} to ${userId} for removed ${perk}, granted bet_cap_3`);
+      }
+    }
+    markNotified('bet_cap_cleanup_v1');
     save();
   }
   db.run(`CREATE TABLE IF NOT EXISTS stocks (
@@ -977,12 +996,27 @@ function getAllEventChannels() {
 
 function getMaxBet(userId) {
   if (userId === '536278876247162882') return Infinity;
-  if (hasPerk(userId, 'bet_cap_5')) return 10000000;
-  if (hasPerk(userId, 'bet_cap_4')) return 5000000;
   if (hasPerk(userId, 'bet_cap_3')) return 2000000;
   if (hasPerk(userId, 'bet_cap_2')) return 1000000;
   if (hasPerk(userId, 'bet_cap')) return 500000;
   return 250000;
+}
+
+// Bet parsing with max-bet enforcement on EVERY bet path (explicit amounts AND
+// `all`). Numeric bets used to bypass getMaxBet entirely — the shop bet-cap
+// perks are now real for all bets, not just `all`.
+function parseBet(userId, input) {
+  if ((input || '').toLowerCase() === 'all') {
+    const u = ensureUser(userId);
+    const amount = Math.min(u.balance, getMaxBet(userId));
+    if (amount <= 0) return { error: 'you have no money' };
+    return { amount };
+  }
+  const amount = parseAmount(input);
+  if (isNaN(amount) || amount <= 0) return { error: 'bet an amount or use `all`' };
+  const maxBet = getMaxBet(userId);
+  if (amount > maxBet) return { error: `max bet is ${maxBet.toLocaleString()} — upgrade with bet cap perks in the shop` };
+  return { amount };
 }
 
 const INSURANCE_TIERS = [
@@ -3444,6 +3478,7 @@ module.exports = {
   getInsuranceRefund,
   addBattleWin, getBattleWins,
   getMaxBet,
+  parseBet,
   getMarriage,
   setMarriage,
   deleteMarriage,

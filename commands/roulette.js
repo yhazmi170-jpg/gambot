@@ -1,5 +1,5 @@
 const db = require('../db');
-const { error, parseAmount } = require('../utils/embed');
+const { error } = require('../utils/embed');
 const config = require('../config');
 
 const red = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
@@ -12,15 +12,8 @@ module.exports = {
   description: 'spin the roulette wheel',
   aliases: ['roul', 'wheel'],
   execute(message, args) {
-    let amount;
-    if ((args[0] || '').toLowerCase() === 'all') {
-      const u = db.ensureUser(message.author.id);
-      amount = Math.min(u.balance, db.getMaxBet(message.author.id));
-      if (amount <= 0) return message.channel.send({ embeds: [error('you have no money')] });
-    } else {
-      amount = parseAmount(args[0]);
-      if (isNaN(amount) || amount <= 0) return message.channel.send({ embeds: [error('bet an amount or use `all`')] });
-    }
+    const { amount, error: betError } = db.parseBet(message.author.id, args[0]);
+    if (betError) return message.channel.send({ embeds: [error(betError)] });
 
     const user = db.ensureUser(message.author.id);
     if (user.balance < amount) return message.channel.send({ embeds: [error('not enough money')] });

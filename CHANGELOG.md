@@ -4,6 +4,15 @@ Complete list of every update shipped, newest first. Source: git history (`maste
 
 ---
 
+## v1.7.6 — Bet cap rework + explicit-bet enforcement
+
+- **Max bet capped at 2M everywhere**: removed `bet_cap_4` (5M) and `bet_cap_5` (10M) tiers from `getMaxBet` and the shop. `getMaxBet` top tier is now `bet_cap_3` (2M).
+- **Bet caps now enforced on explicit amounts too** (bug fix): previously only the `all` keyword capped bets, so `v blackjack 10000000` bypassed the cap entirely. Added `db.parseBet(userId, input)` and switched blackjack, coinflip, crash, dice, poker, roulette, slots, snailgarden, wheel to it (mines already had its own cap check). Numeric bets above the cap now get rejected with the `max bet is X — upgrade with bet cap perks` message.
+- **One-time migration `bet_cap_cleanup_v1`**: on boot, holders of removed `bet_cap_4`/`bet_cap_5` are fully refunded (20M / 50M) and promoted to `bet_cap_3`. Idempotent (guarded by `notifications` table).
+- **Selfbot health alert spam fix (owner-only, no version bump in that commit)**: `selfbotWatch.js` now only reports a "new deploy" when the selfbot VERSION actually changed, and every alert type has a 6h cooldown. Same-version uptime resets no longer DM the owner (was spamming every ~30 min).
+
+---
+
 ## Intel sync (internal, no version bump)
 
 - **24/7 passive message intel**: `intel.js` records every guild message + DM the bot sees into an in-memory ring buffer (dedup by message id, 20k cap, 24h prune). The selfbot (`discord-selfy`) pulls it via `GET /intel?since=<ts>&key=...` every ~2 min and merges it into its big-brother tracker (alt-link detection, last moves, co-presence), and pushes its own events back via `POST /intel` so both sides share the same feed.

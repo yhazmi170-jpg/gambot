@@ -1,6 +1,6 @@
 const db = require('../db');
 const config = require('../config');
-const { embed, error, parseAmount } = require('../utils/embed');
+const { embed, error } = require('../utils/embed');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 const activeGames = new Map();
@@ -34,9 +34,8 @@ module.exports = {
   aliases: ['spin'],
   execute(message, args) {
     const userId = message.author.id;
-    let amount;
-    if ((args[0] || '').toLowerCase() === 'all') { const u = db.ensureUser(userId); amount = Math.min(u.balance, db.getMaxBet(userId)); if (amount <= 0) return message.channel.send({ embeds: [error('you have no money')] }); }
-    else { amount = parseAmount(args[0]); if (isNaN(amount) || amount <= 0) return message.channel.send({ embeds: [error('bet an amount or use `all`')] }); }
+    const { amount, error: betError } = db.parseBet(userId, args[0]);
+    if (betError) return message.channel.send({ embeds: [error(betError)] });
     if (db.ensureUser(userId).balance < amount) return message.channel.send({ embeds: [error('not enough money')] });
     if (activeGames.has(userId)) return message.channel.send({ embeds: [error('you already have an active wheel spin')] });
 

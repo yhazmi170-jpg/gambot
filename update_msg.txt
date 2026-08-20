@@ -1,8 +1,8 @@
-v1.7.5 — What's New
+v1.7.6 — What's New
 
-- 🌻 Snail Garden is now much harder (failure chance starts at 20% and grows fast)
-- 🍀 New command: v luckylist — see who has lucky enabled
-- 🛍️ Merchant now arrives 1 hour after bot restart (no more spam)
-- 🔧 Fixed some bugs with balances and commands
+- 🎲 Max bet is now capped at 2,000,000 in all games (the 5M/10M bet-cap tiers were removed — they broke the economy)
+- 🛡️ Bet limits now apply to EVERY bet, not just `all` — typing a number above your cap will be rejected
+- 💰 Anyone who bought the removed 5M/10M tiers got a full refund + the top remaining tier
+- 🔧 Stability fixes under the hood
 
 Enjoy!

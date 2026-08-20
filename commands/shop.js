@@ -13,8 +13,6 @@ const SHOP = [
       { id: 'bet_cap', name: 'Bet Cap II (500k)', price: 2000000, desc: 'bet up to 500k in games', use: 'Use v <game> all to bet up to 500k' },
       { id: 'bet_cap_2', name: 'Bet Cap III (1M)', price: 5000000, desc: 'bet up to 1M in games', use: 'Use v <game> all to bet up to 1M' },
       { id: 'bet_cap_3', name: 'Bet Cap IV (2M)', price: 10000000, desc: 'bet up to 2M in games', use: 'Use v <game> all to bet up to 2M' },
-      { id: 'bet_cap_4', name: 'Bet Cap V (5M)', price: 20000000, desc: 'bet up to 5M in games', use: 'Use v <game> all to bet up to 5M' },
-      { id: 'bet_cap_5', name: 'Bet Cap VI (10M)', price: 50000000, desc: 'bet up to 10M in games', use: 'Use v <game> all to bet up to 10M' },
       { id: 'lottery_ticket', name: 'Free lottery ticket/draw', price: 7000000, desc: 'get a free ticket every lottery draw', use: 'You will auto-get 1 free ticket each lottery draw' },
       { id: 'vip_games', name: 'VIP game modes access', price: 8000000, desc: 'unlocks exclusive games (poker)', use: 'Use v poker <amount> to play video poker' },
       { id: 'gem', name: 'Gem', price: 2000000, gems: 1, desc: 'every 5 gems you hold = +1 extra animal per hunt (v hunt)', use: 'v hunt — more gems = more animals per hunt' },

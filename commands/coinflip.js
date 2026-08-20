@@ -1,5 +1,5 @@
 const db = require('../db');
-const { error, parseAmount } = require('../utils/embed');
+const { error } = require('../utils/embed');
 const config = require('../config');
 
 module.exports = {
@@ -9,15 +9,8 @@ module.exports = {
   description: '50/50 coinflip',
   aliases: ['cf', 'coin', 'flip'],
   execute(message, args) {
-    let amount;
-    if ((args[0] || '').toLowerCase() === 'all') {
-      const u = db.ensureUser(message.author.id);
-      amount = Math.min(u.balance, db.getMaxBet(message.author.id));
-      if (amount <= 0) return message.channel.send({ embeds: [error('you have no money')] });
-    } else {
-      amount = parseAmount(args[0]);
-      if (isNaN(amount) || amount <= 0) return message.channel.send({ embeds: [error('bet an amount or use `all`')] });
-    }
+    const { amount, error: betError } = db.parseBet(message.author.id, args[0]);
+    if (betError) return message.channel.send({ embeds: [error(betError)] });
 
     const user = db.ensureUser(message.author.id);
     if (user.balance < amount) return message.channel.send({ embeds: [error('not enough money')] });

@@ -1,5 +1,5 @@
 const db = require('../db');
-const { embed, error, parseAmount } = require('../utils/embed');
+const { embed, error } = require('../utils/embed');
 const config = require('../config');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
@@ -68,14 +68,8 @@ module.exports = {
     if (!db.hasPerk(uid, 'vip_games') && uid !== config.ownerId)
       return message.channel.send({ embeds: [error('this game requires the **VIP game modes access** perk — buy it in the shop')] });
 
-    let amount;
-    if ((args[0] || '').toLowerCase() === 'all') {
-      amount = Math.min(user.balance, db.getMaxBet(uid));
-      if (amount <= 0) return message.channel.send({ embeds: [error('you have no money')] });
-    } else {
-      amount = parseAmount(args[0]);
-      if (isNaN(amount) || amount <= 0) return message.channel.send({ embeds: [error('bet an amount or use `all`')] });
-    }
+    const { amount, error: betError } = db.parseBet(uid, args[0]);
+    if (betError) return message.channel.send({ embeds: [error(betError)] });
     if (user.balance < amount) return message.channel.send({ embeds: [error('not enough money')] });
 
     const deck = createDeck();
