@@ -9,3 +9,4 @@ Format: one line per change, terse, no AI fluff.
 - Intel sync endpoints: GET/POST /intel?key= records+serves 24/7 message activity to the selfbot (discord-selfy) for alt-link + last-moves tracking. Internal, no player-facing change.
 - Selfbot health watcher: gambot DMs the owner when the selfbot comes online, restarts (uptime reset), or goes offline — DM-only, never posts to update channels. New `Aovo selfbot` (status) and `Aovo selfbot restart` (Render redeploy) owner commands. Internal/owner-facing.
 - Selfbot health alerts now require 3 failed checks before offline and 2 healthy checks before recovery; overlapping checks are skipped to prevent timeout/recovery DM spam.
+- Selfbot health alerts debounced: restart DM only on version change + 6h cooldown on all alert types (was DMsing the owner every ~30 min on false uptime resets).

@@ -4,6 +4,12 @@ const OWNER = config.ownerId || '536278876247162882';
 const INTERVAL = 60000;
 const FAILURE_THRESHOLD = 3;
 const RECOVERY_THRESHOLD = 2;
+// Hard debounce: never send more than one alert of a given kind per window.
+// The selfbot /health `uptime` value is NOT a reliable monotonic clock
+// (multiple backends / weird clock behavior on Render — observed uptime
+// jumping 574k -> 812k sec within minutes), so an uptime drop alone must
+// never be treated as a deploy. Same-version uptime resets are silently ignored.
+const ALERT_COOLDOWN_MS = 6 * 60 * 60 * 1000; // 6h between identical alerts
 
 const state = {
   online: null,
@@ -14,11 +20,17 @@ const state = {
   consecutiveFailures: 0,
   consecutiveSuccesses: 0,
   checkRunning: false,
+  lastAlerted: { restart: 0, offline: 0, online: 0 },
+  lastAlertedVersion: null,
 };
 
 function dm(client, text) {
   if (!client || !client.user) return;
   client.users.fetch(OWNER).then(u => u.send(text).catch(() => {})).catch(() => {});
+}
+
+function cooldownOk(lastTs) {
+  return Date.now() - lastTs >= ALERT_COOLDOWN_MS;
 }
 
 async function fetchHealth() {
@@ -46,7 +58,10 @@ async function check(client) {
     state.consecutiveFailures++;
     state.consecutiveSuccesses = 0;
     if (state.online === true && state.consecutiveFailures >= FAILURE_THRESHOLD) {
-      dm(client, '⚠️ **selfbot** went offline — no longer responding to /health');
+      if (cooldownOk(state.lastAlerted.offline)) {
+        dm(client, '⚠️ **selfbot** went offline — no longer responding to /health');
+        state.lastAlerted.offline = Date.now();
+      }
       state.online = false;
     }
     if (state.online !== true && state.consecutiveFailures >= FAILURE_THRESHOLD) {
@@ -72,14 +87,26 @@ async function check(client) {
   state.error = null;
 
   if (firstEver) {
+    state.lastAlertedVersion = h.version;
     state.checkRunning = false;
     return;
   }
 
   if (wasOffline) {
-    dm(client, `✅ **selfbot** is back online (${h.clients != null ? h.clients : '?'} clients, v${h.version || '?'})`);
+    if (cooldownOk(state.lastAlerted.online)) {
+      dm(client, `✅ **selfbot** is back online (${h.clients != null ? h.clients : '?'} clients, v${h.version || '?'})`);
+      state.lastAlerted.online = Date.now();
+    }
   } else if (prevUptime != null && uptime != null && prevUptime - uptime > 10000) {
-    dm(client, `✅ **selfbot** restarted — new deploy live (${h.clients != null ? h.clients : '?'} clients, v${h.version || '?'})`);
+    // Only report a "new deploy" when the version actually changed. Same-version
+    // uptime resets are ordinary (free-tier restarts, flaky /health uptime) and
+    // spammed the owner every ~30 min with false "restarted — new deploy live".
+    const versionChanged = h.version && h.version !== state.lastAlertedVersion;
+    if (versionChanged && cooldownOk(state.lastAlerted.restart)) {
+      dm(client, `✅ **selfbot** restarted — new deploy live (${h.clients != null ? h.clients : '?'} clients, v${h.version || '?'})`);
+      state.lastAlerted.restart = Date.now();
+      state.lastAlertedVersion = h.version;
+    }
   }
   state.checkRunning = false;
 }
