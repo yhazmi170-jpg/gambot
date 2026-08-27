@@ -115,6 +115,8 @@ async function postUpdateAnnouncement(client, updateMsg, ver) {
 loadCommands();
 
 async function start() {
+  const { restore } = require('./backup');
+  await restore();
   await db.init();
   db.cleanupPendingBattles();
   await client.login(config.token);
@@ -162,6 +164,12 @@ start();
       db.removePerk(sub.user_id, sub.perk);
     }
   }, 3600000);
+
+  // backup every 5 min + restore on boot (keeps data alive across Render restarts)
+  const { backup } = require('./backup');
+  const doBackup = () => backup().catch(e => console.error('BACKUP FAILED:', e && e.message));
+  setInterval(doBackup, 300000);
+  setTimeout(doBackup, 5000);
 
   // v1.7.0: hourly vault interest
   setInterval(() => {
@@ -353,8 +361,8 @@ async function shutdown(signal) {
   while (activeGames.size > 0 && Date.now() < deadline) {
     await new Promise(r => setTimeout(r, 500));
   }
-  if (activeGames.size > 0) console.log(`[shutdown] ${activeGames.size} game(s) still active — forcing exit`);
-  else console.log('[shutdown] all games finished — exiting');
+  console.log('[shutdown] backing up...');
+  try { await Promise.race([backup(), new Promise(r => setTimeout(r, 10000))]); } catch {}
   process.exit(0);
 }
 process.on('SIGTERM', () => shutdown('SIGTERM'));
