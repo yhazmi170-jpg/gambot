@@ -17,7 +17,7 @@ const perkCmdMap = {
   vip_games: `\`${prefix} poker <amount>\` — video poker (VIP)`,
 };
 
-const CATEGORY_ORDER = ['Economy', 'Games', 'Pets', 'Social', 'Shop'];
+const CATEGORY_ORDER = ['Economy', 'Games', 'Pets', 'Social', 'Fun', 'Shop'];
 
 // Discord caps a single embed field at 1024 chars — chunk long lists across fields.
 function chunkFields(name, lines) {
