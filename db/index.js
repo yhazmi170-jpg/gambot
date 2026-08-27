@@ -2862,10 +2862,8 @@ function startRandomEvent() {
 }
 
 function eventMult(apply) {
-  const ev = getActiveEvent();
-  if (!ev) return 1;
-  const type = EVENT_TYPES[ev.key];
-  return type && type.apply === apply ? type.mult : 1;
+  // Events disabled — always return 1 (no multiplier)
+  return 1;
 }
 
 // ---- v1.8.0: Travelling merchant (rare rotating stock) ----
@@ -2875,13 +2873,8 @@ const MERCHANT_DWELL_MS = 90 * 60 * 1000;
 const MERCHANT_PET_PRICES = { common: 250000, uncommon: 600000, rare: 1200000, epic: 3000000, legendary: 8000000, mythic: 20000000 };
 
 function getNextMerchantArrival() {
-  const rows = db.exec(`SELECT id, next_at FROM merchant_state WHERE id = 1`);
-  if (rows.length && rows[0].values.length) return rows[0].values[0][1];
-  const now = Math.floor(Date.now() / 1000);
-  const ts = now + Math.floor(MERCHANT_FIRST_MS / 1000);
-  db.run(`INSERT OR REPLACE INTO merchant_state (id, next_at) VALUES (1, ${ts})`);
-  save();
-  return ts;
+  // Merchant disabled — return far future so it never triggers
+  return Math.floor(Date.now() / 1000) + 999999999;
 }
 
 function refreshMerchant() {

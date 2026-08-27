@@ -115,8 +115,6 @@ async function postUpdateAnnouncement(client, updateMsg, ver) {
 loadCommands();
 
 async function start() {
-  const { restore } = require('./backup');
-  await restore();
   await db.init();
   db.cleanupPendingBattles();
   await client.login(config.token);
@@ -139,8 +137,7 @@ start();
       status: 'online',
     });
 
-    // selfbot health watcher — DMs the owner on start/restart/offline, never touches update channels
-    require('./utils/selfbotWatch').start(client);
+
 
     // Update announcement check (after db is ready)
     const ver2 = version || '1.0.0';
@@ -157,10 +154,7 @@ start();
     }
   });
 
-  const { backup } = require('./backup');
-  const doBackup = () => backup().catch(e => console.error('BACKUP FAILED:', e && e.message, e && e.stack || ''));
-  setInterval(doBackup, 15000); // backup every 15 seconds (was 60s)
-  setTimeout(doBackup, 5000);
+
 
   setInterval(() => {
     const expired = db.getExpiredSubs();
@@ -183,36 +177,7 @@ start();
     return rm > 0 ? `${h}h ${rm}m` : `${h} hour${h > 1 ? 's' : ''}`;
   }
 
-  // v1.7.0: random server events on an irregular schedule (not clockwork)
-  const fireEvent = () => {
-    const ev = db.startRandomEvent();
-    let channels = db.getAllEventChannels();
-    if (!channels.length) channels = db.getAllUpdateChannels(); // fallback so events aren't missed
-    const rain = ev.apply === 'rain' ? db.applyRain(ev.key) : null;
-    const rainNote = rain ? ` — everyone got the payout instantly` : '';
-    for (const { channel_id } of channels) {
-      client.channels.fetch(channel_id).then(ch => {
-        if (ch && typeof ch.send === 'function') {
-          ch.send({ embeds: [embed(`📢 Random Event: ${ev.emoji || '🎉'} ${ev.name}`, [
-            ['Effect', `${ev.desc}${rainNote}`],
-            ['Duration', ev.apply === 'rain' ? 'instant payout' : formatEventDuration(ev.duration)],
-            ['', `no action needed — it applies automatically across the server`],
-          ], 0x9b59b6)] }).catch(() => {});
-        }
-      }).catch(() => {});
-    }
-  };
-  // irregular interval: mostly 15-40 min, occasionally 8-12 min or 45-65 min (never metronomic)
-  const eventDelay = () => {
-    const r = Math.random();
-    let mins;
-    if (r < 0.2) mins = 8 + Math.random() * 4;          // 20%: quick burst  8-12 min
-    else if (r < 0.75) mins = 15 + Math.random() * 25;   // 55%: normal      15-40 min
-    else mins = 45 + Math.random() * 20;                  // 25%: long gap    45-65 min
-    return Math.floor(mins * 60000);
-  };
-  const startEventTimer = () => setTimeout(() => { fireEvent(); startEventTimer(); }, eventDelay());
-  startEventTimer();
+
 
   // v1.7.0: expire auctions + clean up dead/expired boss raids
   setInterval(() => {
@@ -243,34 +208,8 @@ start();
       db.setLbState('week', String(lbWeek));
     }
     if (!lbPosted) db.setLbState('week', String(lbWeek));
-    // v1.8.0: travelling merchant arrival
-    if (Math.floor(Date.now() / 1000) >= db.getNextMerchantArrival()) {
-      const arrivals = db.refreshMerchant();
-      console.log(`[merchant] new stock — ${arrivals.slots.length} items, leaves at ${new Date(arrivals.next_at * 1000).toISOString()}`);
-      const mc = db.getAllEventChannels();
-      for (const { channel_id } of mc) {
-        client.channels.fetch(channel_id).then(ch => {
-          if (ch && typeof ch.send === 'function') ch.send('🛍️ **The travelling merchant has arrived!** Rare stock up for grabs — `v merchant`, first come first served!').catch(() => {});
-        }).catch(() => {});
-      }
-    }
-    // v1.8.0: clan wars auto-resolve (pay winner if a side fought, else refund both)
-    const warResults = db.resolveClanWars();
-    for (const r of warResults) {
-      console.log(`[clanwar] ${r.code} settled — winner=${r.winner || 'none'} pot=${r.pot} (${r.atPower} vs ${r.dPower})`);
-      (async () => {
-        try {
-          const ch = await client.channels.fetch(r.w.channel_id);
-          const msg = await ch.messages.fetch(r.w.msg_id);
-          const aName = (db.getClan(r.w.attacker) || {}).name || 'unknown';
-          const dName = (db.getClan(r.w.defender) || {}).name || 'unknown';
-          const fields = r.winner
-            ? [['Result', `**${aName}** (${r.atPower.toLocaleString()}) vs **${dName}** (${r.dPower.toLocaleString()})`], ['🏆 Winner', `**${(db.getClan(r.winner) || {}).name || '?'}** — takes the pot of **${r.pot.toLocaleString()}** ${config.currency}!`], ['', 'treasury payout deposited']]
-            : [['Result', `**${aName}** (${r.atPower.toLocaleString()}) vs **${dName}** (${r.dPower.toLocaleString()})`], ['⚖️', 'no clear victory — both stakes refunded']];
-          await msg.edit({ embeds: [embed('⚔️ Clan War — Settled', fields, 0x2ecc71)], components: [] });
-        } catch (e) { console.error('[clanwar] resolve post failed', e.message); }
-      })();
-    }
+
+
     for (const guild of client.guilds.cache.values()) {
       const boss = db.getBoss(guild.id);
       if (boss && (boss.hp <= 0 || Math.floor(Date.now() / 1000) > boss.ends_at)) {
@@ -280,46 +219,7 @@ start();
     }
   }, 60000);
 
-  // v1.7.0: draw + announce giveaways that ended — runs from persisted DB so it
-  // works even if the bot restarted mid-giveaway (winner is ALWAYS drawn + paid)
-  const finalizeGiveaway = async (mid) => {
-    const g = db.getGiveaway(mid);
-    if (!g) return;
-    const eligible = g.entries.filter(id => id !== g.host_id);
-    const ch = await client.channels.fetch(g.channel_id).catch(() => null);
-    if (!eligible.length) {
-      db.addBalance(g.host_id, g.prize);
-      db.finishGiveaway(mid, 'REFUND');
-      if (ch && typeof ch.send === 'function') ch.send({ embeds: [embed('🎉 Giveaway Ended', [
-        ['Host', `<@${g.host_id}>`],
-        ['Prize', `**${g.prize.toLocaleString()}** ${config.currency}`],
-        ['Result', 'nobody entered — prize returned to the host'],
-      ], 0xed4245)] }).catch(() => {});
-      return;
-    }
-    const winnerId = eligible[Math.floor(Math.random() * eligible.length)];
-    db.addBalance(winnerId, g.prize);
-    db.finishGiveaway(mid, winnerId);
-    const status = `🎉 **Winner:** <@${winnerId}> — they won **${g.prize.toLocaleString()}** ${config.currency}!`;
-    if (ch && typeof ch.fetch) {
-      ch.messages.fetch(mid).then(m => m.edit({ embeds: [embed('🎉 Giveaway Ended', [
-        ['Host', `<@${g.host_id}>`],
-        ['Prize', `**${g.prize.toLocaleString()}** ${config.currency}`],
-        ['Entries', `${g.entries.length}`],
-        ['Winner', `<@${winnerId}>`],
-      ], 0x57f287)], components: [] }).catch(() => {})).catch(() => {});
-      ch.send(`🎉 <@${winnerId}> won the giveaway for **${g.prize.toLocaleString()}** ${config.currency}!`).catch(() => {});
-    }
-    client.users.fetch(winnerId).then(u => u.send(`🎉 **You won a giveaway!** You got **${g.prize.toLocaleString()}** ${config.currency}. Congrats!`).catch(() => {})).catch(() => {});
-  };
-  setInterval(() => {
-    const now = Math.floor(Date.now() / 1000);
-    for (const mid of db.getExpiredGiveaways(now)) finalizeGiveaway(mid);
-  }, 30000);
-  setTimeout(() => {
-    const now = Math.floor(Date.now() / 1000);
-    for (const mid of db.getExpiredGiveaways(now)) finalizeGiveaway(mid);
-  }, 5000);
+
 
   setInterval(() => {
     const ticketUsers = db.getLottery();
@@ -352,26 +252,7 @@ start();
     }
   }, config.lotteryInterval || 3600000);
 
-  // animated gradient custom roles — fade each role's color between its two stored colors
-  setInterval(() => {
-    const gradients = db.getGradientCustomRoles();
-    if (!gradients.length) return;
-    const now = Date.now();
-    for (const g of gradients) {
-      const guild = client.guilds.cache.get(g.guildId);
-      if (!guild) continue;
-      const role = guild.roles.cache.get(g.roleId);
-      if (!role) continue;
-      // sin wave over ~12s gives a smooth A->B->A ping-pong every ~6s
-      const t = (Math.sin((now / 3000) * Math.PI) + 1) / 2; // 0..1
-      const r = Math.round(((g.colorA >> 16) & 255) + (((g.colorB >> 16) & 255) - ((g.colorA >> 16) & 255)) * t);
-      const g_ = Math.round(((g.colorA >> 8) & 255) + (((g.colorB >> 8) & 255) - ((g.colorA >> 8) & 255)) * t);
-      const b = Math.round((g.colorA & 255) + ((g.colorB & 255) - (g.colorA & 255)) * t);
-      const color = (r << 16) | (g_ << 8) | b;
-      if (role.color === color) continue;
-      role.setColor(color).catch(() => {});
-    }
-  }, 3000);
+
 
   client.on('interactionCreate', (i) => {
   if (!i.customId || !i.isButton()) return;
@@ -448,21 +329,5 @@ function logCrash(tag, err) {
 process.on('unhandledRejection', (err) => logCrash('UNHANDLED_REJECTION', err));
 process.on('uncaughtException', (err) => logCrash('UNCAUGHT_EXCEPTION', err));
 
-// Render free tier has NO persistent disk — ./data is wiped on every deploy/restart.
-// Back up the live DB right before exit so nothing newer than the last interval backup is lost.
-let shuttingDown = false;
-async function shutdown(signal) {
-  if (shuttingDown) return;
-  shuttingDown = true;
-  console.log(`[${signal}] backing up before exit...`);
-  try {
-    const { backup } = require('./backup');
-    await Promise.race([backup(), new Promise(r => setTimeout(r, 15000))]);
-    console.log('[shutdown] backup done');
-  } catch (e) {
-    console.error('[shutdown] backup failed:', e && e.message);
-  }
-  process.exit(0);
-}
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => process.exit(0));
+process.on('SIGINT', () => process.exit(0));
