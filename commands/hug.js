@@ -1,26 +1,11 @@
 const { EmbedBuilder } = require('discord.js');
 
 const gifs = [
-  'https://media1.tenor.com/m/WFqBN53E0cMAAAAC/anime-hug.gif',
-  'https://media1.tenor.com/m/rvQCQz3xXKsAAAAC/anime-hug.gif',
-  'https://media1.tenor.com/m/H8yzE11jyqoAAAAC/anime-hug.gif',
-  'https://media1.tenor.com/m/30dK1D2fjXIAAAAC/cute-anime-hug.gif',
-  'https://media1.tenor.com/m/O6dJFx1yx1IAAAAC/anime-hug.gif',
-  'https://media1.tenor.com/m/YXf-2QfKpOAAAAA/anime-hug.gif',
-  'https://media1.tenor.com/m/JKyx0aFwQ-sAAAAC/anime-hug.gif',
-  'https://media1.tenor.com/m/mEaFhPwCKsIAAAAC/anime-hug.gif',
-  'https://media1.tenor.com/m/8ZqJcZwz0eAAAAA/anime-hug.gif',
-  'https://media1.tenor.com/m/2CMYV1yZfjIAAAAC/anime-hug.gif',
-  'https://media1.tenor.com/m/pMoLJXn1hXcAAAAC/anime-hug.gif',
-  'https://media1.tenor.com/m/2CEvJRJN5iIAAAAC/anime-hug.gif',
-  'https://media1.tenor.com/m/ZUX1fG8rIcIAAAAC/cute-hug.gif',
-  'https://media1.tenor.com/m/r4VJExQg5lUAAAAC/anime-hug.gif',
-  'https://media1.tenor.com/m/tYjMDNgBrxIAAAAC/hug-anime.gif',
-  'https://media1.tenor.com/m/5Z4Lw6pE-8IAAAAC/anime-hug.gif',
-  'https://media1.tenor.com/m/w-MLB6LqgLoAAAAC/anime-hug.gif',
-  'https://media1.tenor.com/m/1zMiixyeUdsAAAAC/anime-hug.gif',
-  'https://media1.tenor.com/m/3wAvE5HTRXoAAAAC/anime-hug.gif',
-  'https://media1.tenor.com/m/VXFPnMKHRXcAAAAC/anime-hug.gif',
+  'https://media.tenor.com/X6YT2FsV3bAAAAAC/cat.gif',
+  'https://media.tenor.com/SYsRdiK-T7gAAAAC/hug-anime.gif',
+  'https://media.tenor.com/NbBCakbfZnkAAAAC/die-kill.gif',
+  'https://media.tenor.com/EJQN5aosu4gAAAAC/anime-kiss-anime.gif',
+  'https://media.tenor.com/p4pT26zIlmkAAAAC/anime-kiss.gif',
 ];
 
 module.exports = {
