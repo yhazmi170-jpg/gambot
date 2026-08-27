@@ -40,6 +40,8 @@ module.exports = {
       ], 0xfee75c)],
       components: [row],
     }).then(msg => {
+      if (global._interactionOwners) global._interactionOwners.set(msg.id, message.author.id);
+      setTimeout(() => { if (global._interactionOwners) global._interactionOwners.delete(msg.id); }, 300000);
       const filter = i => i.user.id === message.author.id && ['give_confirm', 'give_cancel'].includes(i.customId);
       const col = msg.createMessageComponentCollector({ filter, time: 15000, max: 1 });
       col.on('collect', async (i) => {

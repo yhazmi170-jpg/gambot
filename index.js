@@ -254,8 +254,17 @@ start();
 
 
 
-  client.on('interactionCreate', (i) => {
+// track who owns each interactive message — only they can click the buttons
+const interactionOwners = new Map();
+global._interactionOwners = interactionOwners;
+
+client.on('interactionCreate', (i) => {
   if (!i.customId || !i.isButton()) return;
+  // lock interactions to the person who ran the command
+  const ownerId = interactionOwners.get(i.message?.id);
+  if (ownerId && i.user.id !== ownerId) {
+    return i.reply({ content: 'this isnt your button — run the command yourself!', ephemeral: true });
+  }
   if (i.customId.startsWith('shop_')) {
     require('./commands/shop').handleInteraction(i);
     return;
@@ -329,5 +338,24 @@ function logCrash(tag, err) {
 process.on('unhandledRejection', (err) => logCrash('UNHANDLED_REJECTION', err));
 process.on('uncaughtException', (err) => logCrash('UNCAUGHT_EXCEPTION', err));
 
-process.on('SIGTERM', () => process.exit(0));
-process.on('SIGINT', () => process.exit(0));
+// graceful shutdown — wait for active games to finish before exiting
+let shuttingDown = false;
+const activeGames = new Set();
+function trackGame(id) { activeGames.add(id); }
+function untrackGame(id) { activeGames.delete(id); }
+global._activeGames = { track: trackGame, untrack: untrackGame, list: activeGames };
+
+async function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[${signal}] shutting down — waiting for ${activeGames.size} active game(s)...`);
+  const deadline = Date.now() + 30000;
+  while (activeGames.size > 0 && Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, 500));
+  }
+  if (activeGames.size > 0) console.log(`[shutdown] ${activeGames.size} game(s) still active — forcing exit`);
+  else console.log('[shutdown] all games finished — exiting');
+  process.exit(0);
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

@@ -60,6 +60,8 @@ module.exports = {
     const row = new ActionRowBuilder().addComponents(spinBtn);
 
     message.channel.send({ embeds: [buildEmbed('')], components: [row] }).then(msg => {
+      if (global._interactionOwners) global._interactionOwners.set(msg.id, message.author.id);
+      setTimeout(() => { if (global._interactionOwners) global._interactionOwners.delete(msg.id); }, 300000);
       const col = msg.createMessageComponentCollector({ filter: i => i.user.id === userId, time: 120000 });
       col.on('collect', async (i) => {
         if (!game.active) { await i.deferUpdate().catch(() => {}); return; }

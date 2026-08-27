@@ -104,6 +104,8 @@ module.exports = {
       embeds: [embed('🃏 Video Poker', [['', makeField()]], color)],
       components: makeButtons(),
     }).then(msg => {
+      if (global._interactionOwners) global._interactionOwners.set(msg.id, message.author.id);
+      setTimeout(() => { if (global._interactionOwners) global._interactionOwners.delete(msg.id); }, 300000);
       const filter = i => i.user.id === uid && (i.customId === 'pd' || i.customId.startsWith('ph_'));
       const col = msg.createMessageComponentCollector({ filter, time: 60000 });
 

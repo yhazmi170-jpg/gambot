@@ -85,6 +85,8 @@ module.exports = {
       }
       const w = db.getClanWar(res.code);
       message.channel.send({ embeds: [warEmbed(w)], components: [challengeRows(w.code, def.clan_id)] }).then(msg => {
+      if (global._interactionOwners) global._interactionOwners.set(msg.id, message.author.id);
+      setTimeout(() => { if (global._interactionOwners) global._interactionOwners.delete(msg.id); }, 300000);
         db.setClanWarMsg(w.code, msg.id);
       });
       return;

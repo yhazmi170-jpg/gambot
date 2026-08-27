@@ -80,6 +80,8 @@ module.exports = {
       activeGames.set(message.author.id, game);
 
       message.channel.send(buildContainer(game)).then(msg => {
+      if (global._interactionOwners) global._interactionOwners.set(msg.id, message.author.id);
+      setTimeout(() => { if (global._interactionOwners) global._interactionOwners.delete(msg.id); }, 300000);
         const col = msg.createMessageComponentCollector({ filter: i => i.user.id === message.author.id, time: 300000 });
         col.on('collect', async (i) => {
           if (!game.active) { await i.deferUpdate().catch(() => {}); return; }

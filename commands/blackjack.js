@@ -207,6 +207,8 @@ module.exports = {
       embeds: [bjEmbed(board({ name, player, dealer, reveal: false, bet: amount }))],
       components: [initialButtons],
     }).then(msg => {
+      if (global._interactionOwners) global._interactionOwners.set(msg.id, message.author.id);
+      setTimeout(() => { if (global._interactionOwners) global._interactionOwners.delete(msg.id); }, 300000);
       playLoop(msg, player, dealer, deck, amount, message.author.id, name);
     }).catch(() => {});
   },

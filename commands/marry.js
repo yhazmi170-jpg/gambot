@@ -41,8 +41,12 @@ module.exports = {
           ['', `${target.username}, do you accept?`],
         ], 0xfee75c)],
         components: [row],
-      }).then(msg => {
-        const filter = i => i.user.id === target.id && ['adopt_yes', 'adopt_no'].includes(i.customId);
+    }).then(msg => {
+      if (global._interactionOwners) global._interactionOwners.set(msg.id, message.author.id);
+      setTimeout(() => { if (global._interactionOwners) global._interactionOwners.delete(msg.id); }, 300000);
+      if (global._interactionOwners) global._interactionOwners.set(msg.id, message.author.id);
+      setTimeout(() => { if (global._interactionOwners) global._interactionOwners.delete(msg.id); }, 300000);
+      const filter = i => i.user.id === target.id && ['adopt_yes', 'adopt_no'].includes(i.customId);
         const col = msg.createMessageComponentCollector({ filter, time: 30000, max: 1 });
         col.on('collect', async (i) => {
           await i.deferUpdate().catch(() => {});
@@ -76,6 +80,10 @@ module.exports = {
       ], 0xfee75c)],
       components: [row],
     }).then(msg => {
+      if (global._interactionOwners) global._interactionOwners.set(msg.id, message.author.id);
+      setTimeout(() => { if (global._interactionOwners) global._interactionOwners.delete(msg.id); }, 300000);
+      if (global._interactionOwners) global._interactionOwners.set(msg.id, message.author.id);
+      setTimeout(() => { if (global._interactionOwners) global._interactionOwners.delete(msg.id); }, 300000);
       const filter = i => i.user.id === target.id && ['marry_yes', 'marry_no'].includes(i.customId);
       const col = msg.createMessageComponentCollector({ filter, time: 30000, max: 1 });
       col.on('collect', async (i) => {

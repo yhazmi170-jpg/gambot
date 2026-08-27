@@ -154,6 +154,9 @@ module.exports = {
   handleInteraction,
   execute(message) {
     const uid = message.author.id;
-    message.channel.send({ embeds: [buildMenuEmbed(uid)], components: buildMenuRow(uid) });
+    message.channel.send({ embeds: [buildMenuEmbed(uid)], components: buildMenuRow(uid) }).then(msg => {
+      if (global._interactionOwners) global._interactionOwners.set(msg.id, uid);
+      setTimeout(() => { if (global._interactionOwners) global._interactionOwners.delete(msg.id); }, 300000);
+    });
   },
 };

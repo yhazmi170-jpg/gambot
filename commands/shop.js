@@ -259,6 +259,9 @@ module.exports = { buildShop, postShop, handleInteraction, SHOP, allShopItems, g
   description: 'browse and buy perks',
   aliases: ['store', 'market'],
   execute(message, args) {
-    message.channel.send({ embeds: [buildMenuEmbed()], components: [buildMenuRow()] });
+    message.channel.send({ embeds: [buildMenuEmbed()], components: [buildMenuRow()] }).then(msg => {
+      if (global._interactionOwners) global._interactionOwners.set(msg.id, message.author.id);
+      setTimeout(() => { if (global._interactionOwners) global._interactionOwners.delete(msg.id); }, 300000);
+    });
   },
 };
