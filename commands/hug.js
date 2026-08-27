@@ -1,27 +1,27 @@
 const { EmbedBuilder } = require('discord.js');
-const https = require('https');
 
-const TENOR_KEY = 'LIVDSRZULELA';
-
-function fetchGif(query) {
-  return new Promise((resolve) => {
-    const url = `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(query)}&key=${TENOR_KEY}&limit=50&media_filter=tinygif`;
-    https.get(url, (res) => {
-      let data = '';
-      res.on('data', (c) => data += c);
-      res.on('end', () => {
-        try {
-          const json = JSON.parse(data);
-          const results = json.results || [];
-          if (results.length) {
-            const pick = results[Math.floor(Math.random() * results.length)];
-            resolve(pick.media_formats?.tinygif?.url || pick.url);
-          } else resolve(null);
-        } catch { resolve(null); }
-      });
-    }).on('error', () => resolve(null));
-  });
-}
+const gifs = [
+  'https://media1.tenor.com/m/WFqBN53E0cMAAAAC/anime-hug.gif',
+  'https://media1.tenor.com/m/rvQCQz3xXKsAAAAC/anime-hug.gif',
+  'https://media1.tenor.com/m/H8yzE11jyqoAAAAC/anime-hug.gif',
+  'https://media1.tenor.com/m/30dK1D2fjXIAAAAC/cute-anime-hug.gif',
+  'https://media1.tenor.com/m/O6dJFx1yx1IAAAAC/anime-hug.gif',
+  'https://media1.tenor.com/m/YXf-2QfKpOAAAAA/anime-hug.gif',
+  'https://media1.tenor.com/m/JKyx0aFwQ-sAAAAC/anime-hug.gif',
+  'https://media1.tenor.com/m/mEaFhPwCKsIAAAAC/anime-hug.gif',
+  'https://media1.tenor.com/m/8ZqJcZwz0eAAAAA/anime-hug.gif',
+  'https://media1.tenor.com/m/2CMYV1yZfjIAAAAC/anime-hug.gif',
+  'https://media1.tenor.com/m/pMoLJXn1hXcAAAAC/anime-hug.gif',
+  'https://media1.tenor.com/m/2CEvJRJN5iIAAAAC/anime-hug.gif',
+  'https://media1.tenor.com/m/ZUX1fG8rIcIAAAAC/cute-hug.gif',
+  'https://media1.tenor.com/m/r4VJExQg5lUAAAAC/anime-hug.gif',
+  'https://media1.tenor.com/m/tYjMDNgBrxIAAAAC/hug-anime.gif',
+  'https://media1.tenor.com/m/5Z4Lw6pE-8IAAAAC/anime-hug.gif',
+  'https://media1.tenor.com/m/w-MLB6LqgLoAAAAC/anime-hug.gif',
+  'https://media1.tenor.com/m/1zMiixyeUdsAAAAC/anime-hug.gif',
+  'https://media1.tenor.com/m/3wAvE5HTRXoAAAAC/anime-hug.gif',
+  'https://media1.tenor.com/m/VXFPnMKHRXcAAAAC/anime-hug.gif',
+];
 
 module.exports = {
   name: 'hug',
@@ -34,11 +34,11 @@ module.exports = {
     if (target.id === message.author.id) return message.reply('you hug yourself... aww 🤗');
     if (target.bot) return message.reply('you try to hug a bot... it dont hug back 🤖');
 
-    const gif = await fetchGif('anime hug');
+    const gif = gifs[Math.floor(Math.random() * gifs.length)];
     const embed = new EmbedBuilder()
       .setColor(0x57f287)
       .setDescription(`**${message.author.username}** hugs **${target.username}** 🤗`)
-      .setImage(gif || 'https://media.tenor.com/kYBL5Vwqy5sAAAAC/anime-hug.gif')
+      .setImage(gif)
       .setFooter({ text: `${message.author.username} wants a hug!` });
 
     message.channel.send({ embeds: [embed] });
