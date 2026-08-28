@@ -1,5 +1,11 @@
 const { EmbedBuilder } = require('discord.js');
 
+const gifs = [
+  'https://media.tenor.com/cpWuWnOU64MAAAAC/bofetada.gif',
+  'https://media.tenor.com/N7TeO5bCckkAAAAC/anime-punch.gif',
+  'https://media.tenor.com/XiYuU9h44-AAAAAC/anime-slap-mad.gif',
+];
+
 module.exports = {
   name: 'slap',
   description: 'Slap someone!',
@@ -8,22 +14,13 @@ module.exports = {
   async execute(message, args) {
     const target = message.mentions.users.first();
     if (!target) return message.reply('`v slap @user`');
-    if (target.id === message.author.id) return message.reply('you slap yourself... why? 😭');
-    if (target.bot) return message.reply('you try to slap a bot... your hand hurts 🤖✋');
-
-    const responses = [
-      `**${message.author.username}** slaps **${target.username}** across the face! 👋`,
-      `**${message.author.username}** gives **${target.username}** a big slap! 👋`,
-      `**${message.author.username}** smacks **${target.username}**! 💥`,
-      `**${message.author.username}** slaps **${target.username}** so hard they see stars! ⭐`,
-      `**${message.author.username}**无情地扇了 **${target.username}** 一巴掌! 👋`,
-    ];
-
+    if (target.id === message.author.id) return message.reply('you slap yourself... why?');
+    if (target.bot) return message.reply('you slap a bot... your hand hurts');
+    const gif = gifs[Math.floor(Math.random() * gifs.length)];
     const embed = new EmbedBuilder()
-      .setColor(0xed4245)
-      .setDescription(responses[Math.floor(Math.random() * responses.length)])
-      .setFooter({ text: 'ouch!' });
-
+      .setColor(0xfee75c)
+      .setDescription(`**${message.author.username}** slaps **${target.username}** 👋`)
+      .setImage(gif);
     message.channel.send({ embeds: [embed] });
   },
 };

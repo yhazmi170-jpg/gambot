@@ -1,20 +1,12 @@
-const https = require('https');
-const { AttachmentBuilder } = require('discord.js');
+const { EmbedBuilder } = require('discord.js');
 
 const gifs = [
   'https://media.tenor.com/NbBCakbfZnkAAAAC/die-kill.gif',
+  'https://media.tenor.com/4p2gwNLsxBEAAAAC/whizzy-imposterfox.gif',
+  'https://media.tenor.com/N-hqFXWnMbgAAAAC/aot-attack-on-titan.gif',
+  'https://media.tenor.com/Q5p5qcPPPYoAAAAC/zenin-jjk.gif',
+  'https://media.tenor.com/vn1F8eoL9lEAAAAC/killua-anime.gif',
 ];
-
-function fetchBuffer(url) {
-  return new Promise((resolve, reject) => {
-    https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (res) => {
-      const chunks = [];
-      res.on('data', c => chunks.push(c));
-      res.on('end', () => resolve(Buffer.concat(chunks)));
-      res.on('error', reject);
-    }).on('error', reject);
-  });
-}
 
 module.exports = {
   name: 'kill',
@@ -26,17 +18,11 @@ module.exports = {
     if (!target) return message.reply('`v kill @user`');
     if (target.id === message.author.id) return message.reply('you try to kill yourself... please dont');
     if (target.bot) return message.reply('you cant kill a bot... theyre already dead inside');
-
     const gif = gifs[Math.floor(Math.random() * gifs.length)];
-    try {
-      const buf = await fetchBuffer(gif);
-      const attach = new AttachmentBuilder(buf, { name: 'kill.gif' });
-      message.channel.send({
-        content: `**${message.author.username}** kills **${target.username}**`,
-        files: [attach],
-      });
-    } catch {
-      message.channel.send(`**${message.author.username}** kills **${target.username}**`);
-    }
+    const embed = new EmbedBuilder()
+      .setColor(0xed4245)
+      .setDescription(`**${message.author.username}** kills **${target.username}** 💀`)
+      .setImage(gif);
+    message.channel.send({ embeds: [embed] });
   },
 };

@@ -1,5 +1,10 @@
 const { EmbedBuilder } = require('discord.js');
 
+const gifs = [
+  'https://media.tenor.com/HozyHCAac-kAAAAC/high-five-patrick-star.gif',
+  'https://media.tenor.com/LSnRaq-w0uoAAAAC/portgas-d-ace-ace.gif',
+];
+
 module.exports = {
   name: 'highfive',
   description: 'High five someone!',
@@ -8,21 +13,13 @@ module.exports = {
   async execute(message, args) {
     const target = message.mentions.users.first();
     if (!target) return message.reply('`v highfive @user`');
-    if (target.id === message.author.id) return message.reply('you high five yourself... nice! ✋');
-    if (target.bot) return message.reply('you high five a bot... it beeps! 🤖✋');
-
-    const responses = [
-      `**${message.author.username}** high fives **${target.username}**! ✋`,
-      `**${message.author.username}** and **${target.username}** share a high five! 🙌`,
-      `*slap!* **${message.author.username}** gives **${target.username}** a high five! ✋`,
-      `**${message.author.username}** and **${target.username}** high five — what a team! 🤝`,
-    ];
-
+    if (target.id === message.author.id) return message.reply('you high five yourself... nice');
+    if (target.bot) return message.reply('you high five a bot... it doesnt have hands');
+    const gif = gifs[Math.floor(Math.random() * gifs.length)];
     const embed = new EmbedBuilder()
-      .setColor(0xfee75c)
-      .setDescription(responses[Math.floor(Math.random() * responses.length)])
-      .setFooter({ text: 'nice!' });
-
+      .setColor(0x5865f2)
+      .setDescription(`**${message.author.username}** high fives **${target.username}** ✋`)
+      .setImage(gif);
     message.channel.send({ embeds: [embed] });
   },
 };
