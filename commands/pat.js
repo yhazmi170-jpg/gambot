@@ -1,9 +1,9 @@
 const { EmbedBuilder } = require('discord.js');
 
 const gifs = [
-  'https://media.tenor.com/kIh2QZ7MhBMAAAAC/tsumiki-anime.gif',
-  'https://media.tenor.com/O4fOl9MbuIkAAAAC/pat-good.gif',
-  'https://media.tenor.com/uDUcMSv_rQ8AAAAC/headpat-pat.gif',
+  'https://media.tenor.com/5a4O1hOHucgAAAAC/headpats-anime-headpat.gif',
+  'https://media.tenor.com/gOqySBZJP4MAAAAC/vtuber-vtuber-headpat.gif',
+  'https://media.tenor.com/7t8qMax1jHoAAAAC/chuuketsuki-paiavt.gif',
 ];
 
 module.exports = {

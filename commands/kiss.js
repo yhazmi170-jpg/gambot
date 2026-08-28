@@ -1,14 +1,11 @@
 const { EmbedBuilder } = require('discord.js');
 
 const gifs = [
-  'https://media.tenor.com/EJQN5aosu4gAAAAC/anime-kiss-anime.gif',
-  'https://media.tenor.com/kysTmemwn74AAAAC/anime-kiss-anime.gif',
-  'https://media.tenor.com/p4pT26zIlmkAAAAC/anime-kiss.gif',
-  'https://media.tenor.com/sn-5HBmgdPgAAAAC/kiss-anime-anime.gif',
-  'https://media.tenor.com/RxOLELh65TEAAAAC/kiss-anime-the-villainess-is-adored-by-the-prince-of-the-neighbor-kingdom.gif',
-  'https://media.tenor.com/_ASS-dZqpW4AAAAC/kiss.gif',
+  'https://media.tenor.com/cHJGRakNA7kAAAAC/anime-love.gif',
+  'https://media.tenor.com/GoPV-W2pxMUAAAAC/kiss.gif',
+  'https://media.tenor.com/ImYsZmwu8jYAAAAC/anime-forehead-kiss-anime.gif',
+  'https://media.tenor.com/ZJkYFIlY_ToAAAAC/kissing-sophie-milan-wife.gif',
   'https://media.tenor.com/kmxEaVuW8AoAAAAC/kiss-gentle-kiss.gif',
-  'https://media.tenor.com/yo8aSVqTZh0AAAAC/couple-kiss.gif',
 ];
 
 module.exports = {
@@ -24,7 +21,7 @@ module.exports = {
     const gif = gifs[Math.floor(Math.random() * gifs.length)];
     const embed = new EmbedBuilder()
       .setColor(0xff69b4)
-      .setDescription(`**${message.author.username}** kisses **${target.username}** 💋`)
+      .setDescription(`**${message.author.username}** kisses **${target.username}**`)
       .setImage(gif);
     message.channel.send({ embeds: [embed] });
   },

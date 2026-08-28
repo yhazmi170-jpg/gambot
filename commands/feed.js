@@ -1,8 +1,9 @@
 const { EmbedBuilder } = require('discord.js');
 
 const gifs = [
-  'https://media.tenor.com/b_6n6XgPTpkAAAAC/anime-icecream.gif',
-  'https://media.tenor.com/WFXYVA9FpZkAAAAC/couple-relationship.gif',
+  'https://media.tenor.com/Fh7CJRyjiM4AAAAC/anime-couple-eat-mahiru-and-amne.gif',
+  'https://media.tenor.com/DWuHYVTiuoIAAAAC/kurumi-haraga.gif',
+  'https://media.tenor.com/Xp6sYBk7YD8AAAAC/anime-food-anime-foodie.gif',
 ];
 
 module.exports = {

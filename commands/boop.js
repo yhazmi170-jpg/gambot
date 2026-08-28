@@ -1,8 +1,9 @@
 const { EmbedBuilder } = require('discord.js');
 
 const gifs = [
+  'https://media.tenor.com/Crvvi_2oo10AAAAC/anime-boop.gif',
   'https://media.tenor.com/hSP6oVG2dTMAAAAC/yonomori-kobeni-anime-girl.gif',
-  'https://media.tenor.com/XzFL_M-2AcIAAAAC/bunny-rabbit.gif',
+  'https://media.tenor.com/_Kvpw6_qklMAAAAC/watanare-anime.gif',
 ];
 
 module.exports = {

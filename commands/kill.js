@@ -1,11 +1,9 @@
 const { EmbedBuilder } = require('discord.js');
 
 const gifs = [
-  'https://media.tenor.com/NbBCakbfZnkAAAAC/die-kill.gif',
-  'https://media.tenor.com/4p2gwNLsxBEAAAAC/whizzy-imposterfox.gif',
-  'https://media.tenor.com/N-hqFXWnMbgAAAAC/aot-attack-on-titan.gif',
-  'https://media.tenor.com/Q5p5qcPPPYoAAAAC/zenin-jjk.gif',
-  'https://media.tenor.com/vn1F8eoL9lEAAAAC/killua-anime.gif',
+  'https://media.tenor.com/TG5GWBDw8LsAAAAC/hamster-vegtables.gif',
+  'https://media.tenor.com/HZLeLAMA9TgAAAAC/anime-hurt.gif',
+  'https://media.tenor.com/e4Ezqa83pRYAAAAC/knife-kill.gif',
 ];
 
 module.exports = {
@@ -21,7 +19,7 @@ module.exports = {
     const gif = gifs[Math.floor(Math.random() * gifs.length)];
     const embed = new EmbedBuilder()
       .setColor(0xed4245)
-      .setDescription(`**${message.author.username}** kills **${target.username}** 💀`)
+      .setDescription(`**${message.author.username}** kills **${target.username}**`)
       .setImage(gif);
     message.channel.send({ embeds: [embed] });
   },

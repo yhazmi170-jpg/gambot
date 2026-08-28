@@ -1,10 +1,10 @@
 const { EmbedBuilder } = require('discord.js');
 
 const gifs = [
-  'https://media.tenor.com/kCZjTqCKiggAAAAC/hug.gif',
-  'https://media.tenor.com/8J0wgfvEjgkAAAAC/anime-drawing.gif',
-  'https://media.tenor.com/wnc03mLfwy0AAAAC/cute.gif',
-  'https://media.tenor.com/SYsRdiK-T7gAAAAC/hug-anime.gif',
+  'https://media.tenor.com/zVBcLjKZNmsAAAAC/anime-hug.gif',
+  'https://media.tenor.com/4A9BTa_QLVUAAAAC/hug.gif',
+  'https://media.tenor.com/ZzyVbk_S5ZAAAAAC/gyaru-gyaru-pixel.gif',
+  'https://media.tenor.com/hEdjcUvyj5EAAAAC/anime-girl-blush-weepymiyu-vtuber.gif',
 ];
 
 module.exports = {
@@ -20,7 +20,7 @@ module.exports = {
     const gif = gifs[Math.floor(Math.random() * gifs.length)];
     const embed = new EmbedBuilder()
       .setColor(0x57f287)
-      .setDescription(`**${message.author.username}** hugs **${target.username}** 🤗`)
+      .setDescription(`**${message.author.username}** hugs **${target.username}**`)
       .setImage(gif);
     message.channel.send({ embeds: [embed] });
   },

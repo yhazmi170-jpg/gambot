@@ -1,9 +1,9 @@
 const { EmbedBuilder } = require('discord.js');
 
 const gifs = [
-  'https://media.tenor.com/cpWuWnOU64MAAAAC/bofetada.gif',
-  'https://media.tenor.com/N7TeO5bCckkAAAAC/anime-punch.gif',
-  'https://media.tenor.com/XiYuU9h44-AAAAAC/anime-slap-mad.gif',
+  'https://media.tenor.com/Up9LqtY-AuIAAAAC/anime-chika-fujiwara.gif',
+  'https://media.tenor.com/nT0YsrLM92kAAAAC/mita-miside.gif',
+  'https://media.tenor.com/5yBfcWa5oeEAAAAC/sinon-backroom.gif',
 ];
 
 module.exports = {
@@ -19,7 +19,7 @@ module.exports = {
     const gif = gifs[Math.floor(Math.random() * gifs.length)];
     const embed = new EmbedBuilder()
       .setColor(0xfee75c)
-      .setDescription(`**${message.author.username}** slaps **${target.username}** 👋`)
+      .setDescription(`**${message.author.username}** slaps **${target.username}**`)
       .setImage(gif);
     message.channel.send({ embeds: [embed] });
   },
