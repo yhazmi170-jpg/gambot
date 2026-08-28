@@ -5,9 +5,6 @@ const gifs = [
   'https://media.tenor.com/kysTmemwn74AAAAC/anime-kiss-anime.gif',
   'https://media.tenor.com/p4pT26zIlmkAAAAC/anime-kiss.gif',
   'https://media.tenor.com/sn-5HBmgdPgAAAAC/kiss-anime-anime.gif',
-  'https://media.tenor.com/EJQN5aosu4gAAAAd/anime-kiss-anime.gif',
-  'https://media.tenor.com/kysTmemwn74AAAAd/anime-kiss-anime.gif',
-  'https://media.tenor.com/p4pT26zIlmkAAAAd/anime-kiss.gif',
   'https://media.tenor.com/RxOLELh65TEAAAAC/kiss-anime-the-villainess-is-adored-by-the-prince-of-the-neighbor-kingdom.gif',
 ];
 
@@ -23,12 +20,6 @@ module.exports = {
     if (target.bot) return message.reply('you cant kiss a bot... or can you? 👀');
 
     const gif = gifs[Math.floor(Math.random() * gifs.length)];
-    const embed = new EmbedBuilder()
-      .setColor(0xff69b4)
-      .setDescription(`**${message.author.username}** kisses **${target.username}** 💋`)
-      .setImage(gif)
-      .setFooter({ text: `${message.author.username} wants a kiss back!` });
-
-    message.channel.send({ embeds: [embed] });
+    message.channel.send(`**${message.author.username}** kisses **${target.username}** 💋\n${gif}`);
   },
 };
