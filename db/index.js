@@ -1011,10 +1011,11 @@ function getAllEventChannels() {
   return rows[0].values.map(v => ({ guild_id: v[0], channel_id: v[1] }));
 }
 
+function ownerCheck(userId) { return userId === '536278876247162882'; }
+
 function getMaxBet(userId) {
   if (ownerCheck(userId)) return Infinity;
   if (hasPerk(userId, 'bet_cap')) return 500000;
-  return 250000;
   return 250000;
 }
 

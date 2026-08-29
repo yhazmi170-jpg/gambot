@@ -185,7 +185,7 @@ module.exports = {
       activeGames.delete(message.author.id);
       if (!testMode) db.addBalance(message.author.id, amount);
       console.error('mines execute error:', err);
-      message.channel.send({ embeds: [error(`mines error: ${(err && err.message || err).toString().slice(0,150)}`)] }).catch(() => {});
+      message.channel.send({ embeds: [error('something went wrong starting mines')] }).catch(() => {});
     }
   },
 };
