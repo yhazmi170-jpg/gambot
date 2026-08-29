@@ -144,7 +144,8 @@ function handleMessage(message) {
     });
     } catch (err) {
       console.error(`Error in command ${cmdName}:`, err);
-      message.channel.send({ embeds: [require('./embed').error('an error occurred')] });
+      const detail = err && err.message ? err.message : String(err);
+      message.channel.send({ embeds: [require('./embed').error(`error: ${detail.slice(0, 150)}`)] });
     }
 
   try {
