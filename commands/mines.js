@@ -94,7 +94,9 @@ module.exports = {
       }
 
       let amount;
-      if ((args[0] || '').toLowerCase() === 'all' && !testMode) { const u = db.ensureUser(message.author.id); amount = Math.min(u.balance, db.getMaxBet(message.author.id)); if (amount <= 0) return message.channel.send({ embeds: [error('you have no money')] }); }
+      const u = db.ensureUser(message.author.id);
+      if (!u) return message.channel.send({ embeds: [error('you need to accept terms first — `v agree`')] });
+      if ((args[0] || '').toLowerCase() === 'all' && !testMode) { amount = Math.min(u.balance, db.getMaxBet(message.author.id)); if (amount <= 0) return message.channel.send({ embeds: [error('you have no money')] }); }
       else { amount = parseAmount(args[0]); if (isNaN(amount) || amount <= 0) amount = testMode ? 1000 : undefined; if (amount === undefined) return message.channel.send({ embeds: [error('bet an amount or use `all`')] }); }
 
       // Enforce max bet limit
@@ -104,6 +106,7 @@ module.exports = {
       }
 
       const user = db.ensureUser(message.author.id);
+      if (!user) return message.channel.send({ embeds: [error('you need to accept terms first — `v agree`')] });
       if (!testMode && user.balance < amount) return message.channel.send({ embeds: [error('not enough money')] });
       if (activeGames.has(message.author.id)) return message.channel.send({ embeds: [error('you already have an active mines game')] });
 
