@@ -307,7 +307,7 @@ function ensureUser(userId) {
     const vals = row[0].values[0];
     return {
       user_id: vals[0],
-      balance: vals[1],
+      balance: Number.isFinite(vals[1]) ? vals[1] : 0,
       terms_accepted: vals[2],
       daily_time: vals[3],
       daily_streak: vals[4],
