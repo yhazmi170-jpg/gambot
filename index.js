@@ -136,7 +136,7 @@ start();
       u.send(msg).catch(() => {});
     }).catch(() => {});
     client.user.setPresence({
-      activities: [{ name: `v${version} | /ravine | ${config.prefixes[0]} help` }],
+      activities: [{ name: `v${version} | /marlboro | ${config.prefixes[0]} help` }],
       status: 'online',
     });
 
