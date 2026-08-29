@@ -142,7 +142,6 @@ async function backup() {
     await request('PUT', `/repos/${OWNER}/${REPO}/contents/${encodeURIComponent(snapPath)}`, {
       message: `backup ${new Date().toISOString()}`,
       content,
-      content,
       branch: BRANCH,
     });
 
