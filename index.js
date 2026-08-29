@@ -119,6 +119,7 @@ async function start() {
   await restore();
   await db.init();
   db.cleanupPendingBattles();
+  db.repairNaNBalances();
   await client.login(config.token);
 }
 

@@ -381,12 +381,14 @@ function addBalance(userId, amount) {
     db.run(`INSERT INTO users (user_id, balance) VALUES ('${userId}', 0)`);
     u = ensureUser(userId);
   }
-  const newBal = u.balance + amount;
+  if (typeof amount !== 'number' || !Number.isFinite(amount)) { console.error(`addBalance: NaN/Inf guard for ${userId}, amount=${amount}`); return; }
+  const newBal = Math.max(0, u.balance + amount);
   db.run(`UPDATE users SET balance = ${newBal} WHERE user_id = '${userId}'`);
   save();
 }
 
 function setBalance(userId, amount) {
+  if (typeof amount !== 'number' || !Number.isFinite(amount)) return;
   db.run(`UPDATE users SET balance = ${amount} WHERE user_id = '${userId}'`);
   save();
 }
@@ -645,6 +647,7 @@ function getCooldown(lastTime, cooldownSec) {
 }
 
 function addGambled(userId, amount) {
+  if (typeof amount !== 'number' || !Number.isFinite(amount)) return;
   db.run(`UPDATE users SET total_gambled = total_gambled + ${amount} WHERE user_id = '${userId}'`);
   addWeeklyLb(userId, amount, 0);
   addChecklistProgress(userId, 'daily', 'gamble', amount);
@@ -894,6 +897,20 @@ function deletePendingBattle(id) {
 function cleanupPendingBattles() {
   db.run(`DELETE FROM pending_battles WHERE expires_at < ${Math.floor(Date.now() / 1000)}`);
   save();
+}
+
+function repairNaNBalances() {
+  try {
+    const rows = db.exec(`SELECT user_id, balance FROM users WHERE balance != balance`);
+    if (rows.length && rows[0].values.length) {
+      for (const v of rows[0].values) {
+        console.error(`repairNaNBalances: fixing NaN balance for ${v[0]} (was ${v[1]})`);
+        db.run(`UPDATE users SET balance = 0 WHERE user_id = '${v[0]}'`);
+      }
+      save();
+      console.log(`repairNaNBalances: fixed ${rows[0].values.length} NaN balance(s)`);
+    }
+  } catch (e) { console.error('repairNaNBalances error:', e.message); }
 }
 
 // ---- Giveaways: persisted so a restart never kills an "about to end" giveaway ----
@@ -3459,6 +3476,7 @@ module.exports = {
   getPendingBattle,
   deletePendingBattle,
   cleanupPendingBattles,
+  repairNaNBalances,
   createGiveaway, getGiveaway, getExpiredGiveaways, addGiveawayEntry, finishGiveaway,
   toggleLucky,
   toggleInsurance,
