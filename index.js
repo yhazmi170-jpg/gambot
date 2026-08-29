@@ -167,7 +167,10 @@ start();
 
   // backup every 5 min + restore on boot (keeps data alive across Render restarts)
   const { backup } = require('./backup');
-  const doBackup = () => backup().catch(e => console.error('BACKUP FAILED:', e && e.message));
+  const doBackup = () => {
+    console.log('backup: starting scheduled backup...');
+    backup().then(() => console.log('backup: completed')).catch(e => console.error('BACKUP FAILED:', e && e.message));
+  };
   setInterval(doBackup, 300000);
   setTimeout(doBackup, 5000);
 

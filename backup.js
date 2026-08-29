@@ -115,8 +115,10 @@ async function detectCorruption(buf) {
 let backupCounter = 0;
 
 async function backup() {
+  console.log(`backup: DB_PATH=${DB_PATH}, exists=${fs.existsSync(DB_PATH)}`);
   if (!fs.existsSync(DB_PATH)) { console.log('backup: no db file, skipping'); return; }
   const buf = fs.readFileSync(DB_PATH);
+  console.log(`backup: DB size=${buf.length} bytes`);
 
   // Validate DB structure
   const invalid = await validateDB(buf);
