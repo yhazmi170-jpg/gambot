@@ -79,6 +79,8 @@ async function init() {
   try { db.run(`ALTER TABLE users ADD COLUMN crate_pity INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   try { db.run(`ALTER TABLE users ADD COLUMN zoo_decor TEXT NOT NULL DEFAULT '[]'`); } catch (e) {}
   try { db.run(`ALTER TABLE users ADD COLUMN seals INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN pray_streak INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN last_pray INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   db.run(`CREATE TABLE IF NOT EXISTS pet_achievements (animal_id INTEGER NOT NULL, key TEXT NOT NULL, at INTEGER NOT NULL DEFAULT (strftime('%s','now')), PRIMARY KEY (animal_id, key))`);
   db.run(`CREATE TABLE IF NOT EXISTS clans (clan_id TEXT PRIMARY KEY, name TEXT NOT NULL, owner_id TEXT NOT NULL, balance INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')))`);
   db.run(`CREATE TABLE IF NOT EXISTS clan_members (clan_id TEXT NOT NULL, user_id TEXT NOT NULL, joined_at INTEGER NOT NULL DEFAULT (strftime('%s','now')), PRIMARY KEY (clan_id, user_id))`);
@@ -584,6 +586,33 @@ function claimStreak(userId) {
   db.run(`UPDATE users SET balance = balance + ${reward} WHERE user_id = '${userId}'`);
   save();
   return { count, reward, best, cooldown: 0, maxDay: STREAK_MAX_DAY };
+}
+
+// ---- Pray: daily streak with tiny multiplier ----
+const PRAY_BASE_MIN = 100;
+const PRAY_BASE_MAX = 500;
+
+function claimPray(userId) {
+  const now = Math.floor(Date.now() / 1000);
+  const user = ensureUser(userId);
+  const lastPray = user.last_pray || 0;
+  let streak = user.pray_streak || 0;
+  const sameDay = lastPray > 0 && now - lastPray < 86400;
+  const missed = lastPray > 0 && now - lastPray >= 86400 * 2;
+
+  if (missed) streak = 0;
+  if (!sameDay) streak += 1;
+
+  const mult = 1 + streak * 0.01;
+  const base = Math.floor(Math.random() * (PRAY_BASE_MAX - PRAY_BASE_MIN + 1)) + PRAY_BASE_MIN;
+  const factor = getBalanceFactor(userId);
+  const reward = Math.floor(base * mult * factor);
+  const diff = reward - base;
+  const paid = base + (diff > 0 ? diff : 0);
+
+  db.run(`UPDATE users SET pray_streak = ${streak}, last_pray = ${now}, balance = balance + ${paid} WHERE user_id = '${userId}'`);
+  save();
+  return { streak, mult, reward: paid, base, factor };
 }
 
 function claimWork(userId, amount) {
@@ -3452,6 +3481,7 @@ module.exports = {
   claimWeekly,
   claimWork,
   getStreak, claimStreak, STREAK_BASE, STREAK_MAX_DAY,
+  claimPray,
   getCooldown,
   addGambled,
   addWon,

@@ -24,7 +24,7 @@ module.exports = {
         aliases: 'slot, spin',
         desc: 'A 3-reel slot machine. Match symbols to win multipliers on your bet.',
         play: `\`${prefix} slots <amount>\`\nExample: \`${prefix} slots 1000\``,
-        tips: 'Match 3 rare symbols for the biggest wins. High bal = slightly smaller net wins.',
+        tips: '3-of-a-kind: 🍒2× 🍇2× 🍊3× 🍋3× 🍉5× 💎8× 7️⃣30×\nPairs: 🍒1× 🍇1× 🍊1× 🍋1× 🍉2× 💎3× 7️⃣6×\nHigh bal slightly lowers net wins. Lucky perk pays 3×.',
       },
       dice: {
         name: 'Dice',
