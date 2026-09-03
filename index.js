@@ -229,6 +229,33 @@ start();
         if (res && res.payouts && res.payouts.length) console.log(`[boss] ${res.species} resolved in ${guild.id}: ${res.payouts.length} payouts`);
       }
     }
+
+    // giveaway sweep: draw winners for expired giveaways
+    const expiredGw = db.getExpiredGiveaways(Math.floor(Date.now() / 1000));
+    for (const gwId of expiredGw) {
+      const g = db.getGiveaway(gwId);
+      if (!g || !g.entries.length) {
+        db.finishGiveaway(gwId, '__none__');
+        continue;
+      }
+      const winner = g.entries[Math.floor(Math.random() * g.entries.length)];
+      db.addBalance(winner, g.prize);
+      db.finishGiveaway(gwId, winner);
+      console.log(`[gw] giveaway ${gwId} won by ${winner} (${g.prize} coins)`);
+      client.channels.fetch(g.channel_id).then(ch => {
+        if (!ch || typeof ch.edit !== 'function') return;
+        ch.messages.fetch(g.message_id).then(msg => {
+          msg.edit({
+            embeds: [embed('🎉 Giveaway', [
+              ['Winner', `<@${winner}> 🎉`],
+              ['Prize', `**${g.prize.toLocaleString()}** ${config.currency}`],
+              ['Entries', `${g.entries.length} people entered`],
+            ], 0xfee75c)],
+            components: [],
+          }).catch(() => {});
+        }).catch(() => {});
+      }).catch(() => {});
+    }
   }, 60000);
 
 
