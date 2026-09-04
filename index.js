@@ -145,20 +145,23 @@ async function postUpdateAnnouncement(client, updateMsg, ver) {
 loadCommands();
 
 async function start() {
+  console.log('[START] 1/4 restore...');
   try {
     const { restore } = require('./backup');
     const restored = await restore();
-    console.log(`restore result: ${restored}`);
+    console.log(`[START] restore result: ${restored}`);
   } catch (e) {
-    console.error('restore failed:', e.message);
+    console.error('[START] restore failed:', e.message);
   }
 
+  console.log('[START] 2/4 db.init...');
   await db.init();
 
   // If DB is empty after init, try loading seed.db directly
   try {
     const top = db.getTop(1);
     if (!top || top.length === 0) {
+      console.log('[START] DB empty, trying seed.db...');
       const seedPath = require('path').join(__dirname, 'seed.db');
       if (fs.existsSync(seedPath)) {
         const seedBuf = fs.readFileSync(seedPath);
@@ -168,28 +171,34 @@ async function start() {
           fs.mkdirSync(require('path').dirname(dbFile), { recursive: true });
           fs.writeFileSync(dbFile, seedBuf);
           await db.init();
-          console.log('loaded seed.db directly into DB');
+          console.log('[START] loaded seed.db directly into DB');
         }
       }
     }
   } catch (e) {
-    console.error('seed load failed:', e.message);
+    console.error('[START] seed load failed:', e.message);
   }
 
+  console.log('[START] 3/4 cleanup...');
   db.cleanupPendingBattles();
   db.repairNaNBalances();
 
+  console.log('[START] 4/4 login...');
+  const loginTimeout = setTimeout(() => {
+    console.error('[START] login timed out after 30s!');
+  }, 30000);
+
   try {
-    console.log(`[START] Attempting login with token ending in ...${config.token.slice(-10)}`);
     await client.login(config.token);
-    console.log('[START] Login succeeded');
+    clearTimeout(loginTimeout);
+    console.log('[START] Login SUCCESS');
   } catch (e) {
-    console.error('[START] login failed:', e.message);
-    console.error('[START] login stack:', e.stack);
+    clearTimeout(loginTimeout);
+    console.error('[START] login FAILED:', e.message);
   }
 }
 
-start().catch(e => console.error('start() fatal:', e));
+start().catch(e => console.error('[START] FATAL:', e));
 
   // Use once instead of on to prevent duplicate ready events
   client.once('ready', () => {
