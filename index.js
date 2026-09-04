@@ -99,7 +99,6 @@ const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
   res.end(`ok v${version} commit=${process.env.RENDER_GIT_COMMIT || process.env.GIT_SHA || 'unknown'}`);
 });
-});
 server.listen(PORT);
 global._server = server;
 
