@@ -12,6 +12,13 @@ if (!config.token) {
   process.exit(1);
 }
 
+// Capture all console output for remote debugging
+const _logs = [];
+const _origLog = console.log;
+const _origErr = console.error;
+console.log = (...a) => { _logs.push({ t: Date.now(), l: 'INFO', m: a.join(' ') }); if (_logs.length > 200) _logs.shift(); _origLog.apply(console, a); };
+console.error = (...a) => { _logs.push({ t: Date.now(), l: 'ERR', m: a.join(' ') }); if (_logs.length > 200) _logs.shift(); _origErr.apply(console, a); };
+
 // atomic single-instance lock — exit if another gambot is already running
 const fs = require('fs');
 const lockFile = path.join(__dirname, '.gambot.lock');
@@ -107,6 +114,11 @@ const server = http.createServer((req, res) => {
       res.writeHead(500, { 'Content-Type': 'text/plain' });
       res.end(`status error: ${e.message}`);
     }
+    return;
+  }
+  if (u.pathname === '/logs') {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end(_logs.slice(-50).map(l => `[${new Date(l.t).toISOString()}] ${l.l}: ${l.m}`).join('\n'));
     return;
   }
   res.writeHead(200, { 'Content-Type': 'text/plain' });
