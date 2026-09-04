@@ -205,8 +205,10 @@ async function allSnapshots() {
 }
 
 async function restore() {
+  console.log(`restore: DB_PATH=${DB_PATH}, TOKEN=${TOKEN ? TOKEN.slice(0,8)+'...' : 'MISSING'}`);
   let local = fs.existsSync(DB_PATH) && fs.statSync(DB_PATH).size > 100;
   const localMtime = local ? fs.statSync(DB_PATH).mtimeMs : 0;
+  console.log(`restore: local=${local}, localMtime=${localMtime}`);
 
   // First: validate local DB — if it's corrupt, force restore from backup
   if (local) {
@@ -231,6 +233,7 @@ async function restore() {
   if (newest || !local) {
     try {
       const all = await allSnapshots();
+      console.log(`restore: found ${all.length} snapshots`);
       for (const p of all) {
         try {
           const buf = await download(p);
@@ -250,17 +253,19 @@ async function restore() {
   // Fallback 1: golden backup
   try {
     const buf = await download('golden.db');
+    console.log(`restore: golden.db download ${buf ? buf.length + ' bytes' : 'FAILED'}`);
     if (buf && buf.length > 1000) {
       fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
       fs.writeFileSync(DB_PATH, buf);
       console.log('restored db from golden backup');
       return true;
     }
-  } catch (e) { console.log('no golden backup available'); }
+  } catch (e) { console.log('no golden backup available:', e.message); }
 
   // Fallback 2: legacy single-file backup
   try {
     const buf = await download('gambot.db');
+    console.log(`restore: gambot.db download ${buf ? buf.length + ' bytes' : 'FAILED'}`);
     if (buf && buf.length > 1000) {
       fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
       fs.writeFileSync(DB_PATH, buf);
@@ -270,6 +275,7 @@ async function restore() {
   } catch (e) {
     console.log('no backup to restore:', e.message);
   }
+  console.log('restore: ALL FALLBACKS FAILED');
   return false;
 }
 

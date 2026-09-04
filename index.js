@@ -79,8 +79,26 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
+  if (u.pathname === '/restore') {
+    const { restore } = require('./backup');
+    restore().then(r => {
+      const db2 = require('./db');
+      db2.init().then(() => {
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.end(`restore=${r}`);
+      }).catch(e => {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end(`db init error: ${e.message}`);
+      });
+    }).catch(e => {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end(`restore error: ${e.message}`);
+    });
+    return;
+  }
   res.writeHead(200, { 'Content-Type': 'text/plain' });
   res.end(`ok v${version} commit=${process.env.RENDER_GIT_COMMIT || process.env.GIT_SHA || 'unknown'}`);
+});
 });
 server.listen(PORT);
 global._server = server;
