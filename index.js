@@ -134,7 +134,7 @@ global._server = server;
 let bootNotified = false;
 let _loginInProgress = false;
 
-const client = new Client({
+let client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
