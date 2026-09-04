@@ -1,5 +1,9 @@
 const { Client, GatewayIntentBits, Partials } = require('discord.js');const { loadCommands, handleMessage } = require('./utils/commandHandler');
 const config = require('./config');
+
+// Force IPv4 — Render's IPv6 routing to Discord is broken
+try { require('dns').setDefaultResultOrder('ipv4first'); } catch {}
+
 const db = require('./db');
 const { embed, updateEmbed } = require('./utils/embed');
 const http = require('http');
@@ -128,6 +132,7 @@ server.listen(PORT);
 global._server = server;
 
 let bootNotified = false;
+let _loginInProgress = false;
 
 const client = new Client({
   intents: [
@@ -200,11 +205,69 @@ async function start() {
 }
 
 function attemptLogin(label) {
+  if (_loginInProgress) { console.log(`[${label}] login already in progress, skipping`); return; }
+  _loginInProgress = true;
   console.log(`[${label}] attempting login...`);
+
+  const loginTimeout = setTimeout(() => {
+    console.error(`[${label}] LOGIN TIMED OUT after 30s — destroying and recreating client`);
+    try { client.destroy(); } catch {}
+    _loginInProgress = false;
+    client = new Client({
+      intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
+      partials: [Partials.Message, Partials.Channel, Partials.Reaction],
+    });
+    reattachListeners();
+    setTimeout(() => attemptLogin('RETRY'), 5000);
+  }, 30000);
+
   client.login(config.token).then(() => {
+    clearTimeout(loginTimeout);
     console.log(`[${label}] SUCCESS — ready=${client.isReady()}`);
+    _loginInProgress = false;
   }).catch((e) => {
+    clearTimeout(loginTimeout);
     console.error(`[${label}] FAILED: code=${e.code} name=${e.name} msg=${e.message}`);
+    _loginInProgress = false;
+    setTimeout(() => attemptLogin('RETRY'), 5000);
+  });
+}
+
+function reattachListeners() {
+  client.on('interactionCreate', handleInteraction);
+  client.on('disconnect', (e) => { console.log('[DC] disconnected:', e.code, e.reason); });
+  client.on('reconnecting', () => console.log('[DC] reconnecting...'));
+  client.on('resume', () => console.log('[DC] reconnected'));
+  client.on('error', (e) => console.error('[DC] error:', e.message));
+
+  client.once('ready', () => {
+    console.log(`[REATTACH] logged in as ${client.user.tag}`);
+    setLogClient(client);
+    client.user.setPresence({
+      activities: [{ name: `v${version} | /marlboro | ${config.prefixes[0]} help` }],
+      status: 'online',
+    });
+    client.users.fetch(config.ownerId).then(u => {
+      u.send(`✅ Bot Restarted (reconnected)`).catch(() => {});
+    }).catch(() => {});
+  });
+
+  client.on('messageCreate', (message) => {
+    try { handleMessage(message); } catch (e) { console.error('[MSG] handleMessage error:', e.message); }
+    try { intel.recordMessage(message); } catch (e) {}
+    if (message.author.bot) return;
+    const perks = db.getUserPerks(message.author.id);
+    if (message.channel.type === 0) {
+      const ar = perks.find(p => p.perk === 'auto_react');
+      if (ar) {
+        const emoji = db.getAutoReactEmoji(message.author.id);
+        if (!emoji) return;
+        const resolved = resolveEmoji(message, emoji);
+        if (resolved) {
+          message.react(resolved).catch(() => {});
+        }
+      }
+    }
   });
 }
 
