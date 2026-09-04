@@ -183,16 +183,16 @@ async function start() {
   db.cleanupPendingBattles();
   db.repairNaNBalances();
 
-  console.log('[START] 4/4 login...');
+  console.log('[START] 4/4 login... (token_len=' + (config.token||'').length + ')');
+  attemptLogin('INIT');
+}
 
+function attemptLogin(label) {
+  console.log(`[${label}] attempting login...`);
   client.login(config.token).then(() => {
-    console.log('[START] Login SUCCESS');
+    console.log(`[${label}] SUCCESS — ready=${client.isReady()}`);
   }).catch((e) => {
-    console.error('[START] login FAILED:', e.message);
-    console.log('[START] Retrying login in 10s...');
-    setTimeout(() => {
-      client.login(config.token).then(() => console.log('[START] Retry SUCCESS')).catch(e2 => console.error('[START] Retry FAILED:', e2.message));
-    }, 10000);
+    console.error(`[${label}] FAILED: code=${e.code} name=${e.name} msg=${e.message}`);
   });
 }
 
@@ -414,7 +414,7 @@ client.on('error', (e) => console.error('[DC] error:', e.message));
 setInterval(() => {
   if (!client.isReady()) {
     console.log('[WATCHDOG] not connected, attempting login...');
-    client.login(config.token).then(() => console.log('[WATCHDOG] login OK')).catch(e => console.error('[WATCHDOG] login fail:', e.message));
+    attemptLogin('WATCHDOG');
   }
 }, 30000);
 
