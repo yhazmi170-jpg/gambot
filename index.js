@@ -412,8 +412,8 @@ client.on('reconnecting', () => console.log('reconnecting...'));
 client.on('resume', () => console.log('reconnected'));
 
 client.on('messageCreate', (message) => {
-  handleMessage(message);
-  intel.recordMessage(message);
+  try { handleMessage(message); } catch (e) { console.error('[MSG] handleMessage error:', e.message); }
+  try { intel.recordMessage(message); } catch (e) {}
   if (message.author.bot) return;
   const perks = db.getUserPerks(message.author.id);
   if (message.channel.type === 0) {
