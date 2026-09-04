@@ -102,7 +102,7 @@ const server = http.createServer((req, res) => {
       const top = db2.getTop(5);
       const all = db2.getAllUsers ? db2.getAllUsers() : [];
       res.writeHead(200, { 'Content-Type': 'text/plain' });
-      res.end(`users=${all.length} top=${JSON.stringify(top)} discord=${client.isReady()} node=${process.version}`);
+      res.end(`users=${all.length} top=${JSON.stringify(top)} discord=${client.isReady()} token_len=${(config.token||'').length} node=${process.version}`);
     } catch (e) {
       res.writeHead(500, { 'Content-Type': 'text/plain' });
       res.end(`status error: ${e.message}`);
@@ -189,6 +189,10 @@ async function start() {
     console.log('[START] Login SUCCESS');
   }).catch((e) => {
     console.error('[START] login FAILED:', e.message);
+    console.log('[START] Retrying login in 10s...');
+    setTimeout(() => {
+      client.login(config.token).then(() => console.log('[START] Retry SUCCESS')).catch(e2 => console.error('[START] Retry FAILED:', e2.message));
+    }, 10000);
   });
 }
 
@@ -401,9 +405,18 @@ client.on('interactionCreate', (i) => {
   i._ackFallback = fallback;
 });
 
-client.on('disconnect', () => console.log('disconnected — will auto-reconnect'));
-client.on('reconnecting', () => console.log('reconnecting...'));
-client.on('resume', () => console.log('reconnected'));
+client.on('disconnect', (e) => { console.log('[DC] disconnected:', e.code, e.reason); });
+client.on('reconnecting', () => console.log('[DC] reconnecting...'));
+client.on('resume', () => console.log('[DC] reconnected'));
+client.on('error', (e) => console.error('[DC] error:', e.message));
+
+// Watchdog: if not connected, re-login every 30s
+setInterval(() => {
+  if (!client.isReady()) {
+    console.log('[WATCHDOG] not connected, attempting login...');
+    client.login(config.token).then(() => console.log('[WATCHDOG] login OK')).catch(e => console.error('[WATCHDOG] login fail:', e.message));
+  }
+}, 30000);
 
 client.on('messageCreate', (message) => {
   try { handleMessage(message); } catch (e) { console.error('[MSG] handleMessage error:', e.message); }
