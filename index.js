@@ -232,17 +232,11 @@ function attemptLogin(label) {
   console.log(`[${label}] attempting login...`);
 
   const loginTimeout = setTimeout(() => {
-    console.error(`[${label}] LOGIN TIMED OUT after 120s — destroying and retrying`);
+    console.error(`[${label}] LOGIN TIMED OUT after 120s — likely rate limited (error 1015)`);
+    console.error(`[${label}] Waiting 10 minutes before retry...`);
     try { client.destroy(); } catch {}
-    client = new Client({
-      intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
-      partials: [Partials.Message, Partials.Channel, Partials.Reaction],
-      rest: { timeout: 30000 },
-      ws: { large_threshold: 50, connectionTimeout: 60000, handshakeTimeout: 60000 },
-    });
-    reattachListeners();
-    _loginInProgress = false;
-    setTimeout(() => attemptLogin('RETRY'), 10000);
+    // Keep _loginInProgress true so watchdog doesn't spam
+    setTimeout(() => { _loginInProgress = false; attemptLogin('RETRY'); }, 600000);
   }, 120000);
 
   client.login(config.token).then(() => {
@@ -252,47 +246,16 @@ function attemptLogin(label) {
   }).catch((e) => {
     clearTimeout(loginTimeout);
     console.error(`[${label}] FAILED: code=${e.code} name=${e.name} msg=${e.message}`);
-    _loginInProgress = false;
-    setTimeout(() => attemptLogin('RETRY'), 10000);
+    if (e.code === 0 || e.httpStatus === 429) {
+      console.error(`[${label}] Rate limited — waiting 10 minutes`);
+      setTimeout(() => { _loginInProgress = false; attemptLogin('RETRY'); }, 600000);
+    } else {
+      setTimeout(() => { _loginInProgress = false; attemptLogin('RETRY'); }, 60000);
+    }
   });
 }
 
 start().catch(e => console.error('[START] FATAL:', e));
-
-function reattachListeners() {
-  client.on('disconnect', (e) => { console.log('[DC] disconnected:', e.code, e.reason); });
-  client.on('reconnecting', () => console.log('[DC] reconnecting...'));
-  client.on('resume', () => console.log('[DC] reconnected'));
-  client.on('error', (e) => console.error('[DC] error:', e.message));
-
-  client.once('ready', () => {
-    console.log(`[REATTACH] logged in as ${client.user.tag}`);
-    setLogClient(client);
-    client.user.setPresence({
-      activities: [{ name: `v${version} | /marlboro | ${config.prefixes[0]} help` }],
-      status: 'online',
-    });
-    client.users.fetch(config.ownerId).then(u => {
-      u.send(`✅ Bot reconnected`).catch(() => {});
-    }).catch(() => {});
-  });
-
-  client.on('messageCreate', (message) => {
-    try { handleMessage(message); } catch (e) { console.error('[MSG] handleMessage error:', e.message); }
-    try { intel.recordMessage(message); } catch (e) {}
-    if (message.author.bot) return;
-    const perks = db.getUserPerks(message.author.id);
-    if (message.channel.type === 0) {
-      const ar = perks.find(p => p.perk === 'auto_react');
-      if (ar) {
-        const emoji = db.getAutoReactEmoji(message.author.id);
-        if (!emoji) return;
-        const resolved = resolveEmoji(message, emoji);
-        if (resolved) message.react(resolved).catch(() => {});
-      }
-    }
-  });
-}
 
   // Use once instead of on to prevent duplicate ready events
   client.once('ready', () => {
