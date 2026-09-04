@@ -102,7 +102,7 @@ const server = http.createServer((req, res) => {
       const top = db2.getTop(5);
       const all = db2.getAllUsers ? db2.getAllUsers() : [];
       res.writeHead(200, { 'Content-Type': 'text/plain' });
-      res.end(`users=${all.length} top=${JSON.stringify(top)} discord=${client.isReady()}`);
+      res.end(`users=${all.length} top=${JSON.stringify(top)} discord=${client.isReady()} node=${process.version}`);
     } catch (e) {
       res.writeHead(500, { 'Content-Type': 'text/plain' });
       res.end(`status error: ${e.message}`);
