@@ -275,6 +275,23 @@ async function restore() {
   } catch (e) {
     console.log('no backup to restore:', e.message);
   }
+
+  // Fallback 3: seed.db bundled in repo
+  try {
+    const seedPath = path.join(__dirname, 'seed.db');
+    if (fs.existsSync(seedPath)) {
+      const buf = fs.readFileSync(seedPath);
+      if (buf.length > 1000) {
+        fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+        fs.writeFileSync(DB_PATH, buf);
+        console.log(`restored db from seed.db (${buf.length} bytes)`);
+        return true;
+      }
+    }
+  } catch (e) {
+    console.log('seed fallback failed:', e.message);
+  }
+
   console.log('restore: ALL FALLBACKS FAILED');
   return false;
 }
