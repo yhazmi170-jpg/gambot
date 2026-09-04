@@ -184,18 +184,12 @@ async function start() {
   db.repairNaNBalances();
 
   console.log('[START] 4/4 login...');
-  const loginTimeout = setTimeout(() => {
-    console.error('[START] login timed out after 30s!');
-  }, 30000);
 
-  try {
-    await client.login(config.token);
-    clearTimeout(loginTimeout);
+  client.login(config.token).then(() => {
     console.log('[START] Login SUCCESS');
-  } catch (e) {
-    clearTimeout(loginTimeout);
+  }).catch((e) => {
     console.error('[START] login FAILED:', e.message);
-  }
+  });
 }
 
 start().catch(e => console.error('[START] FATAL:', e));
