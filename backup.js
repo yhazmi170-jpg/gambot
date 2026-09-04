@@ -148,17 +148,27 @@ async function backup() {
     });
 
     // 2) mirror at the legacy single-file path (restore fallback / manual checks)
-    let sha = null;
-    try {
-      const existing = await request('GET', `/repos/${OWNER}/${REPO}/contents/gambot.db`);
-      sha = existing.sha;
-    } catch {}
-    await request('PUT', `/repos/${OWNER}/${REPO}/contents/gambot.db`, {
-      message: `backup ${new Date().toISOString()}`,
-      content,
-      sha,
-      branch: BRANCH,
-    });
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        let sha = null;
+        try {
+          const existing = await request('GET', `/repos/${OWNER}/${REPO}/contents/gambot.db`);
+          sha = existing.sha;
+        } catch {}
+        await request('PUT', `/repos/${OWNER}/${REPO}/contents/gambot.db`, {
+          message: `backup ${new Date().toISOString()}`,
+          content,
+          sha,
+          branch: BRANCH,
+        });
+        break;
+      } catch (e) {
+        if (e.message && e.message.includes('409') && attempt < 2) {
+          console.log(`backup: gambot.db conflict, retry ${attempt + 1}/3`);
+          await new Promise(r => setTimeout(r, 1000));
+        } else { throw e; }
+      }
+    }
 
     // 3) Golden backup — saved every 10 backups (≈10 min) as a known-good fallback
     backupCounter++;
