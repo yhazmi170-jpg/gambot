@@ -141,6 +141,12 @@ let client = new Client({
     GatewayIntentBits.MessageContent,
   ],
   partials: [Partials.Message, Partials.Channel, Partials.Reaction],
+  rest: { timeout: 30000 },
+  ws: { 
+    large_threshold: 50,
+    connectionTimeout: 20000,
+    handshakeTimeout: 20000,
+  },
 });
 
 /** Post an update announcement to every configured update channel. Returns # channels that got it. */
@@ -201,7 +207,23 @@ async function start() {
   db.repairNaNBalances();
 
   console.log('[START] 4/4 login... (token_len=' + (config.token||'').length + ')');
-  attemptLogin('INIT');
+
+  // Test Discord API connectivity first
+  const https = require('https');
+  const testReq = https.get('https://discord.com/api/v10/gateway', { timeout: 15000 }, (res) => {
+    let body = '';
+    res.on('data', c => body += c);
+    res.on('end', () => {
+      console.log(`[NET] Discord API: HTTP ${res.statusCode} — ${body.substring(0, 100)}`);
+      attemptLogin('INIT');
+    });
+  });
+  testReq.on('error', (e) => {
+    console.error(`[NET] Discord API FAILED: ${e.message}`);
+    console.error('[NET] Will still try login...');
+    attemptLogin('INIT');
+  });
+  testReq.on('timeout', () => { testReq.destroy(); console.error('[NET] Discord API timeout (15s)'); attemptLogin('INIT'); });
 }
 
 function attemptLogin(label) {
@@ -210,16 +232,18 @@ function attemptLogin(label) {
   console.log(`[${label}] attempting login...`);
 
   const loginTimeout = setTimeout(() => {
-    console.error(`[${label}] LOGIN TIMED OUT after 30s — destroying and recreating client`);
+    console.error(`[${label}] LOGIN TIMED OUT after 120s — destroying and retrying`);
     try { client.destroy(); } catch {}
-    _loginInProgress = false;
     client = new Client({
       intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
       partials: [Partials.Message, Partials.Channel, Partials.Reaction],
+      rest: { timeout: 30000 },
+      ws: { large_threshold: 50, connectionTimeout: 60000, handshakeTimeout: 60000 },
     });
     reattachListeners();
-    setTimeout(() => attemptLogin('RETRY'), 5000);
-  }, 30000);
+    _loginInProgress = false;
+    setTimeout(() => attemptLogin('RETRY'), 10000);
+  }, 120000);
 
   client.login(config.token).then(() => {
     clearTimeout(loginTimeout);
@@ -229,12 +253,13 @@ function attemptLogin(label) {
     clearTimeout(loginTimeout);
     console.error(`[${label}] FAILED: code=${e.code} name=${e.name} msg=${e.message}`);
     _loginInProgress = false;
-    setTimeout(() => attemptLogin('RETRY'), 5000);
+    setTimeout(() => attemptLogin('RETRY'), 10000);
   });
 }
 
+start().catch(e => console.error('[START] FATAL:', e));
+
 function reattachListeners() {
-  client.on('interactionCreate', handleInteraction);
   client.on('disconnect', (e) => { console.log('[DC] disconnected:', e.code, e.reason); });
   client.on('reconnecting', () => console.log('[DC] reconnecting...'));
   client.on('resume', () => console.log('[DC] reconnected'));
@@ -248,7 +273,7 @@ function reattachListeners() {
       status: 'online',
     });
     client.users.fetch(config.ownerId).then(u => {
-      u.send(`✅ Bot Restarted (reconnected)`).catch(() => {});
+      u.send(`✅ Bot reconnected`).catch(() => {});
     }).catch(() => {});
   });
 
@@ -263,15 +288,11 @@ function reattachListeners() {
         const emoji = db.getAutoReactEmoji(message.author.id);
         if (!emoji) return;
         const resolved = resolveEmoji(message, emoji);
-        if (resolved) {
-          message.react(resolved).catch(() => {});
-        }
+        if (resolved) message.react(resolved).catch(() => {});
       }
     }
   });
 }
-
-start().catch(e => console.error('[START] FATAL:', e));
 
   // Use once instead of on to prevent duplicate ready events
   client.once('ready', () => {
@@ -485,13 +506,13 @@ client.on('reconnecting', () => console.log('[DC] reconnecting...'));
 client.on('resume', () => console.log('[DC] reconnected'));
 client.on('error', (e) => console.error('[DC] error:', e.message));
 
-// Watchdog: if not connected, re-login every 30s
+// Watchdog: if not connected, re-login every 2 minutes
 setInterval(() => {
   if (!client.isReady()) {
     console.log('[WATCHDOG] not connected, attempting login...');
     attemptLogin('WATCHDOG');
   }
-}, 30000);
+}, 120000);
 
 client.on('messageCreate', (message) => {
   try { handleMessage(message); } catch (e) { console.error('[MSG] handleMessage error:', e.message); }
