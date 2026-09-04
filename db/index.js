@@ -1066,10 +1066,10 @@ function parseBet(userId, input) {
 }
 
 const INSURANCE_TIERS = [
-  { perk: 'insurance',  refund: 0.20 },
-  { perk: 'insurance2', refund: 0.30 },
-  { perk: 'insurance3', refund: 0.40 },
-  { perk: 'insurance4', refund: 0.50 },
+  { perk: 'insurance',  refund: 0.10 },
+  { perk: 'insurance2', refund: 0.15 },
+  { perk: 'insurance3', refund: 0.20 },
+  { perk: 'insurance4', refund: 0.25 },
 ];
 
 function getInsuranceLevel(userId) {
@@ -2582,8 +2582,8 @@ function addFreeBet(userId, amount) {
 }
 
 // ---- v1.7.0: Loss streak protection ----
-const LOSS_STREAK_WINDOW = 1800; // 30 min
-const LOSS_STREAK_TIERS = [[5, 0.1], [8, 0.15], [12, 0.2]]; // [streak, extra refund]
+const LOSS_STREAK_WINDOW = 3600; // 60 min
+const LOSS_STREAK_TIERS = [[10, 0.05], [20, 0.08], [30, 0.10]]; // [streak, extra refund]
 
 function registerLoss(userId) {
   const u = ensureUser(userId);
