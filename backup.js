@@ -205,7 +205,7 @@ async function allSnapshots() {
 }
 
 async function restore() {
-  const local = fs.existsSync(DB_PATH) && fs.statSync(DB_PATH).size > 100;
+  let local = fs.existsSync(DB_PATH) && fs.statSync(DB_PATH).size > 100;
   const localMtime = local ? fs.statSync(DB_PATH).mtimeMs : 0;
 
   // First: validate local DB — if it's corrupt, force restore from backup

@@ -116,7 +116,8 @@ loadCommands();
 
 async function start() {
   const { restore } = require('./backup');
-  await restore();
+  const restored = await restore();
+  console.log(`restore result: ${restored}`);
   await db.init();
   db.cleanupPendingBattles();
   db.repairNaNBalances();
