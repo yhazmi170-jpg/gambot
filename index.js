@@ -96,6 +96,19 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
+  if (u.pathname === '/status') {
+    try {
+      const db2 = require('./db');
+      const top = db2.getTop(5);
+      const all = db2.getAllUsers ? db2.getAllUsers() : [];
+      res.writeHead(200, { 'Content-Type': 'text/plain' });
+      res.end(`users=${all.length} top=${JSON.stringify(top)} discord=${client.isReady()}`);
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end(`status error: ${e.message}`);
+    }
+    return;
+  }
   res.writeHead(200, { 'Content-Type': 'text/plain' });
   res.end(`ok v${version} commit=${process.env.RENDER_GIT_COMMIT || process.env.GIT_SHA || 'unknown'}`);
 });
@@ -132,16 +145,48 @@ async function postUpdateAnnouncement(client, updateMsg, ver) {
 loadCommands();
 
 async function start() {
-  const { restore } = require('./backup');
-  const restored = await restore();
-  console.log(`restore result: ${restored}`);
+  try {
+    const { restore } = require('./backup');
+    const restored = await restore();
+    console.log(`restore result: ${restored}`);
+  } catch (e) {
+    console.error('restore failed:', e.message);
+  }
+
   await db.init();
+
+  // If DB is empty after init, try loading seed.db directly
+  try {
+    const top = db.getTop(1);
+    if (!top || top.length === 0) {
+      const seedPath = require('path').join(__dirname, 'seed.db');
+      if (fs.existsSync(seedPath)) {
+        const seedBuf = fs.readFileSync(seedPath);
+        if (seedBuf.length > 1000) {
+          const dbDir = process.env.DB_PATH || process.env.RENDER_DISK_PATH || '.';
+          const dbFile = require('path').join(dbDir, 'gambot.db');
+          fs.mkdirSync(require('path').dirname(dbFile), { recursive: true });
+          fs.writeFileSync(dbFile, seedBuf);
+          await db.init();
+          console.log('loaded seed.db directly into DB');
+        }
+      }
+    }
+  } catch (e) {
+    console.error('seed load failed:', e.message);
+  }
+
   db.cleanupPendingBattles();
   db.repairNaNBalances();
-  await client.login(config.token);
+
+  try {
+    await client.login(config.token);
+  } catch (e) {
+    console.error('login failed:', e.message);
+  }
 }
 
-start();
+start().catch(e => console.error('start() fatal:', e));
 
   // Use once instead of on to prevent duplicate ready events
   client.once('ready', () => {
