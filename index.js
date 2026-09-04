@@ -180,9 +180,12 @@ async function start() {
   db.repairNaNBalances();
 
   try {
+    console.log(`[START] Attempting login with token ending in ...${config.token.slice(-10)}`);
     await client.login(config.token);
+    console.log('[START] Login succeeded');
   } catch (e) {
-    console.error('login failed:', e.message);
+    console.error('[START] login failed:', e.message);
+    console.error('[START] login stack:', e.stack);
   }
 }
 
