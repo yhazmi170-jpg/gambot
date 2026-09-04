@@ -234,10 +234,7 @@ async function restore() {
       for (const p of all) {
         try {
           const buf = await download(p);
-          if (buf && (await countUsers(buf)) > 0) {
-            const invalid = await validateDB(buf);
-            const corrupt = await detectCorruption(buf);
-            if (invalid || corrupt) { console.error(`restore: skipped bad snapshot ${p} (${invalid || corrupt})`); continue; }
+          if (buf && buf.length > 1000) {
             fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
             fs.writeFileSync(DB_PATH, buf);
             console.log(`restored db from github backup (${p})`);
@@ -253,28 +250,22 @@ async function restore() {
   // Fallback 1: golden backup
   try {
     const buf = await download('golden.db');
-    if (buf && (await countUsers(buf)) > 0) {
-      const invalid = await validateDB(buf);
-      if (!invalid) {
-        fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-        fs.writeFileSync(DB_PATH, buf);
-        console.log('restored db from golden backup');
-        return true;
-      }
+    if (buf && buf.length > 1000) {
+      fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+      fs.writeFileSync(DB_PATH, buf);
+      console.log('restored db from golden backup');
+      return true;
     }
   } catch (e) { console.log('no golden backup available'); }
 
   // Fallback 2: legacy single-file backup
   try {
     const buf = await download('gambot.db');
-    if (buf && (await countUsers(buf)) > 0) {
-      const invalid = await validateDB(buf);
-      if (!invalid) {
-        fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-        fs.writeFileSync(DB_PATH, buf);
-        console.log('restored db from github backup (gambot.db mirror)');
-        return true;
-      }
+    if (buf && buf.length > 1000) {
+      fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+      fs.writeFileSync(DB_PATH, buf);
+      console.log('restored db from github backup (gambot.db mirror)');
+      return true;
     }
   } catch (e) {
     console.log('no backup to restore:', e.message);
