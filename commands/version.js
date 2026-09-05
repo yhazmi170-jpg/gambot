@@ -21,6 +21,7 @@ module.exports = {
       try { msg = fs.readFileSync(path.join(__dirname, '..', 'update_msg.txt'), 'utf8').trim(); } catch {}
       if (msg) fields.push([msg]);
     }
+    fields.push(['grahh']);
     message.channel.send({ embeds: [embed('Bot Info', fields, 0x2b2d31)] });
   },
 };
