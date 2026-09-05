@@ -136,6 +136,13 @@ function handleMessage(message) {
     return message.channel.send({ embeds: [error(`wait **${cd}s** before using that again`)] });
   }
 
+  // Check if user is jailed
+  const u = db.ensureUser(message.author.id);
+  if (u.jail_until && u.jail_until > Date.now()) {
+    const remaining = Math.ceil((u.jail_until - Date.now()) / (60 * 1000));
+    return message.channel.send({ embeds: [error(`🔒 you're in jail! wait **${remaining}m** before using commands`)] });
+  }
+
   try {
     const result = cmd.execute(message, args);
     if (result instanceof Promise) result.catch(err => {

@@ -40,8 +40,25 @@ module.exports = {
     } else {
       const loseAmount = Math.min(Math.floor(robber.balance * 0.2), 3000000);
       db.addBalance(message.author.id, -loseAmount);
+      
+      // Jail time: 30 minutes
+      const jailMs = 30 * 60 * 1000;
+      const jailUntil = Date.now() + jailMs;
+      db.run(`UPDATE users SET jail_until = ${jailUntil} WHERE user_id = '${message.author.id}'`);
+      
+      // Nerf insurance: reduce insurance level by 1 (min 0)
+      const u = db.ensureUser(message.author.id);
+      if (u.insurance > 0) {
+        db.run(`UPDATE users SET insurance = insurance - 1 WHERE user_id = '${message.author.id}'`);
+      }
+      
+      // Nerf credit score: reduce by 50 points
+      if (u.credit_score > 0) {
+        db.run(`UPDATE users SET credit_score = credit_score - 50 WHERE user_id = '${message.author.id}'`);
+      }
+      
       robCooldowns.set(message.author.id, now);
-      message.channel.send({ embeds: [error(`you got caught robbing <@${target.id}> and lost **${loseAmount.toLocaleString()}** ${config.currency}`)] });
+      message.channel.send({ embeds: [error(`🚔 **CAUGHT!** You got caught robbing <@${target.id}> and lost **${loseAmount.toLocaleString()}** ${config.currency}!\n🔒 **JAILED for 30 minutes** — you cannot use commands.\n🛡️ Insurance downgraded by 1 tier.\n📉 Credit score reduced by 50 points.`)] });
       target.send(`🛡️ **ROBBERY FAILED!** <@${message.author.id}> tried to rob you but got caught and lost **${loseAmount.toLocaleString()}** ${config.currency} — your money is safe.`).catch(() => {});
     }
   },

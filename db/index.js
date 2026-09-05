@@ -81,6 +81,8 @@ async function init() {
   try { db.run(`ALTER TABLE users ADD COLUMN seals INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   try { db.run(`ALTER TABLE users ADD COLUMN pray_streak INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   try { db.run(`ALTER TABLE users ADD COLUMN last_pray INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN jail_until INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN credit_score INTEGER NOT NULL DEFAULT 700`); } catch (e) {}
   db.run(`CREATE TABLE IF NOT EXISTS pet_achievements (animal_id INTEGER NOT NULL, key TEXT NOT NULL, at INTEGER NOT NULL DEFAULT (strftime('%s','now')), PRIMARY KEY (animal_id, key))`);
   db.run(`CREATE TABLE IF NOT EXISTS clans (clan_id TEXT PRIMARY KEY, name TEXT NOT NULL, owner_id TEXT NOT NULL, balance INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')))`);
   db.run(`CREATE TABLE IF NOT EXISTS clan_members (clan_id TEXT NOT NULL, user_id TEXT NOT NULL, joined_at INTEGER NOT NULL DEFAULT (strftime('%s','now')), PRIMARY KEY (clan_id, user_id))`);
@@ -352,6 +354,8 @@ function ensureUser(userId) {
       crate_pity: vals[41] || 0,
       zoo_decor: vals[42] || '[]',
       seals: vals[43] || 0,
+      jail_until: vals[44] || 0,
+      credit_score: vals[45] || 700,
     };
   }
   return null;
@@ -367,7 +371,7 @@ function acceptTerms(userId) {
   if (existing) {
     db.run(`UPDATE users SET terms_accepted = 1, balance = ${START_BALANCE} WHERE user_id = '${userId}'`);
   } else {
-    db.run(`INSERT INTO users (user_id, balance, terms_accepted) VALUES ('${userId}', ${START_BALANCE}, 1)`);
+    db.run(`INSERT INTO users (user_id, balance, terms_accepted, jail_until, credit_score) VALUES ('${userId}', ${START_BALANCE}, 1, 0, 700)`);
   }
   save();
 }
