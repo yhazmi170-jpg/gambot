@@ -6,7 +6,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 const REELS = ['🍒', '🍇', '🍊', '🍋', '🍉', '💎', '7️⃣'];
 const payouts = {
-  3: { 0: 2, 1: 2, 2: 3, 3: 3, 4: 5, 5: 8, 6: 30 },
+  3: { 0: 3, 1: 3, 2: 4, 3: 4, 4: 5, 5: 10, 6: 30 },
   2: { 0: 1, 1: 1, 2: 1, 3: 1, 4: 2, 5: 3, 6: 6 },
 };
 
@@ -57,7 +57,11 @@ module.exports = {
         ['___SLOTS___', `\`\`\`${slotLine(reels, 0)}\`\`\``],
         ['bet', `${amount} ${config.currency}`],
       ])],
+    }).catch(err => {
+      console.error('Failed to send initial slots message:', err);
+      return null;
     });
+    if (!msg) return;
 
     await sleep(500);
     await msg.edit({
@@ -65,7 +69,7 @@ module.exports = {
         ['___SLOTS___', `\`\`\`${slotLine(reels, 1)}\`\`\``],
         ['bet', `${amount} ${config.currency}`],
       ])],
-    });
+    }).catch(err => console.error('Failed to edit slots message (reel 1):', err));
 
     await sleep(500);
     await msg.edit({
@@ -83,13 +87,14 @@ module.exports = {
       const net = winnings - amount;
       const paid = db.payWin(message.author.id, net);
       const jackpot = reels[0] === 6 && reels[1] === 6 && reels[2] === 6;
+      const displayPaid = paid > 0 ? `+**${paid}**` : 'push';
       await msg.edit({
         embeds: [embed('🎰 Slots', [
           ['___SLOTS___', `\`\`\`${slotLine(reels, 3)}\`\`\``],
           ['bet', `${amount} ${config.currency}`],
           ...(jackpot
             ? [['💰 JACKPOT 💰', '**50x — you just hit the jackpot!**']]
-            : [['payout', `**${amount + paid}** ${config.currency} (+**${paid}**)`]]),
+            : [['payout', `**${amount + paid}** ${config.currency} (${displayPaid})`]]),
         ], jackpot ? 0xfee75c : 0x57f287)],
       });
     } else {

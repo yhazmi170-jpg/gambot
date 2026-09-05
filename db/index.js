@@ -1802,10 +1802,16 @@ function sacrificeAnimals(userId, query, count) {
   const COLOR_TO_RARITY = { gray: 'common', grey: 'common', white: 'common', green: 'uncommon', blue: 'rare', purple: 'epic', yellow: 'legendary', gold: 'legendary' };
   const team = getTeam(userId);
   const teamIds = team ? new Set([team.slot1, team.slot2, team.slot3].filter(Boolean)) : new Set();
+  
+  // Check if query is a numeric ID
+  const isNumericId = /^\d+$/.test(q);
+  
   const matches = animals.filter(a => {
     if (q === 'all') return true;
     const rarityMatch = RARITY_ORDER.includes(q) ? a.rarity === q : COLOR_TO_RARITY[q] ? a.rarity === COLOR_TO_RARITY[q] : null;
     if (rarityMatch !== null) return rarityMatch;
+    // Check for exact ID match if query is numeric
+    if (isNumericId) return a.id === parseInt(q, 10);
     return a.species.toLowerCase() === q || a.species.toLowerCase().startsWith(q);
   });
   const targets = count ? matches.slice(0, count) : matches;
@@ -1817,7 +1823,7 @@ function sacrificeAnimals(userId, query, count) {
     if (teamIds.has(a.id)) { skipped++; continue; }
     let val = ESSENCE_VALUES[a.rarity];
     if (a.shiny) val *= 2;
-    essence += Math.floor(val * surgeMult);
+    essence += Math.floor(val * eventMult('essenceMult'));
     removeAnimal(a.id);
     sacrificed++;
   }

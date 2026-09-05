@@ -29,16 +29,16 @@ module.exports = {
     if (robber.balance < 5000000) return message.channel.send({ embeds: [error('you need at least 5,000,000 money to attempt a robbery')] });
     if (db.hasOutstandingLoan(message.author.id)) return message.channel.send({ embeds: [error('repay your loan first — `v bank loan pay all`')] });
 
-      const successRoll = Math.random() < 0.5;
+      const successRoll = Math.random() < 0.3;
     if (successRoll) {
-      const stealAmount = Math.min(Math.floor(victim.balance * 0.3), 5000000); // 30% max, capped at 5M
+      const stealAmount = Math.min(Math.floor(victim.balance * 0.2), 3000000); // 20% max, capped at 3M
       db.addBalance(message.author.id, stealAmount);
       db.addBalance(target.id, -stealAmount);
       robCooldowns.set(message.author.id, now);
       message.channel.send({ embeds: [success(`you robbed <@${target.id}> and got **${stealAmount.toLocaleString()}** ${config.currency}!`)] });
       target.send(`🔪 **ROBBED!** <@${message.author.id}> robbed you for **${stealAmount.toLocaleString()}** ${config.currency}!\nYour wallet balance is now **${(victim.balance - stealAmount).toLocaleString()}** ${config.currency}.\n⚠️ Keep money in the bank (\`v bank deposit all\`) — bank money can't be robbed!`).catch(() => {});
     } else {
-      const loseAmount = Math.min(Math.floor(robber.balance * 0.3), 5000000);
+      const loseAmount = Math.min(Math.floor(robber.balance * 0.2), 3000000);
       db.addBalance(message.author.id, -loseAmount);
       robCooldowns.set(message.author.id, now);
       message.channel.send({ embeds: [error(`you got caught robbing <@${target.id}> and lost **${loseAmount.toLocaleString()}** ${config.currency}`)] });
