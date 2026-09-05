@@ -8,7 +8,7 @@ const SHOP = [
     category: 'ONE-TIME PURCHASES',
     items: [
       { id: 'custom_role', name: 'Custom Role (name + color)', price: 1500000, desc: 'create a custom-named role with your color', use: 'Use v customrole name <name> · v customrole color <#hex [>#hex]> · v customrole delete' },
-      { id: 'rob', name: 'v rob @user ability', price: 15000000, desc: '50% steal 50% of target / 50% lose 50% of yours', use: 'Use v rob @user to attempt a robbery' },
+      { id: 'rob', name: 'v rob @user ability', price: 15000000, desc: '30% chance to steal 20% of target\'s balance (max 3M) / 70% chance you lose 20% of your balance (max 3M) + 30m jail, insurance downgrade, -50 credit', use: 'Use v rob @user to attempt a robbery (requires rob perk)' },
       { id: 'double_work', name: 'Double work payout (perm)', price: 6000000, desc: 'permanently earn 2x from v work', use: 'Just use v work — it pays double automatically' },
       { id: 'bet_cap', name: 'Bet Cap (500k)', price: 2000000, desc: 'bet up to 500k in games (max)', use: 'Use v <game> all to bet up to 500k' },
       { id: 'lottery_ticket', name: 'Free lottery ticket/draw', price: 7000000, desc: 'get a free ticket every lottery draw', use: 'You will auto-get 1 free ticket each lottery draw' },

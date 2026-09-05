@@ -63,13 +63,13 @@ module.exports = {
       if (role) {
         role.delete('custom role deleted by user').then(() => {
           db.deleteCustomRole(message.author.id, message.guild.id);
-          message.channel.send({ embeds: [success('deleted your custom role')] });
+          message.channel.send({ embeds: [success('🗑️ deleted your custom role')] });
         }).catch(() => {
           message.channel.send({ embeds: [error("can't delete role — check bot permissions")] });
         });
       } else {
         db.deleteCustomRole(message.author.id, message.guild.id);
-        message.channel.send({ embeds: [success('cleared your custom role (was already deleted)')] });
+        message.channel.send({ embeds: [success('✅ cleared your custom role (was already deleted)')] });
       }
       return;
     }
@@ -124,7 +124,7 @@ module.exports = {
           if (!member.roles.cache.has(role.id)) {
             await member.roles.add(role).catch(() => {});
           }
-          return message.channel.send({ embeds: [success(`updated your custom role to **${role.name}**${color !== null ? ` (\`#${color.toString(16).padStart(6, '0')}\`)` : ''}`)] });
+          return message.channel.send({ embeds: [success(`✅ updated your custom role to **${role.name}**${color !== null ? ` (\`#${color.toString(16).padStart(6, '0')}\`)` : ''}`)] });
         } catch (e) {
           return message.channel.send({ embeds: [error(`can't update the role — the bot needs **Manage Roles**, and its highest role must be above yours (it is${botHighest ? ` **${botHighest.name}**` : ''})`)] });
         }
@@ -142,7 +142,7 @@ module.exports = {
         if (colorB !== null) {
           db.setCustomRoleColor(message.author.id, message.guild.id, color, colorB);
         }
-        return message.channel.send({ embeds: [success(`created custom role **${newRole.name}** for you!`)] });
+        return message.channel.send({ embeds: [success(`🎨 created custom role **${newRole.name}** for you!`)] });
       } catch (e) {
         return message.channel.send({ embeds: [error("can't create the role — the bot needs **Manage Roles** permission")] });
       }

@@ -4,6 +4,20 @@ Complete list of every update shipped, newest first. Source: git history (`maste
 
 ---
 
+## v1.7.9 — Lucky perk toggle + UI polish
+
+- **NEW `v lucky` (player-facing)**: self-service toggle for the lucky perk — 90% coinflip win rate with 3× payouts while on (see `commands/lucky.js`). Powered by the existing `users.lucky` column + `db.toggleLucky` (was previously owner-set only). `v help` auto-lists it; coinflip tips in `gamehelp.js` now mention the toggle.
+- **`v rob` shop desc corrected**: now reflects the reworked mechanics — 30% chance to steal 20% (max 3M) / 70% chance you lose 20% (max 3M) + 30m jail + insurance downgrade + -50 credit. The old text still described the legacy 50/50 odds.
+- **Custom role polish**: success messages now carry 🗑️/✅/🎨 emojis.
+
+## v1.7.8 — Rob rework (shipped via deploy churn; docs synced 2026-09-05)
+
+- **Rob nerf**: `v rob` now 30% success — steal 20% of target up to 3M; on failure you lose 20% up to 3M, get 30m jail, insurance downgrade, and -50 credit (commit dd10226).
+- **Rob cooldown persisted to DB** so it survives restarts; fixed a duplicate variable declaration crash (commit 1c91378).
+- **Misc fixes**: `v bal` now shows bank balance, slots fixed silent +0 payout, `v sacrifice <id>` lookup fixed.
+
+---
+
 ## v1.7.6 — Bet cap rework + explicit-bet enforcement
 
 - **Max bet capped at 2M everywhere**: removed `bet_cap_4` (5M) and `bet_cap_5` (10M) tiers from `getMaxBet` and the shop. `getMaxBet` top tier is now `bet_cap_3` (2M).

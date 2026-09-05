@@ -5,7 +5,7 @@
 
 ## Status
 - **Branch**: `master`
-- **Version**: `1.7.6` — bet caps capped at 2M (5M/10M tiers removed), caps enforced on explicit bet amounts, removed-tier holders refunded; selfbot restart-spam fixed (LIVE on Render).
+- **Version**: `1.7.9` — `v lucky` player-facing toggle shipped, rob desc + customrole polish; docs (AGENTS/CHANGELOG/HANDOFF) synced from the 1.7.6 drift. LIVE on Render.
 - **Roles (v two-agent workflow):** chat agent (orchestrator, is the user's main driver) delegates coding to Claude Code CLI; git is the message bus.
 - **Change log**: complete history of every update lives in `CHANGELOG.md` (newest first) — keep it in sync with the version bump + `update_msg.txt`
 - **Host migration**: Replit → Render (free, Blueprint from `render.yaml`). Replit repl was stopped by user. **Render URL: `https://gambot-o2o4.onrender.com`** — keepalive pinger repointed to it.
@@ -27,6 +27,9 @@
 - [x] **Blueprint read stale render.yaml.** The deploy page showed $7.25/mo because it loaded the OLD render.yaml (with disk) before the fix was pushed. Lesson: push config fixes BEFORE opening the Render Blueprint.
 - [x] **Boot crash on fresh box (DB dir missing).** `db/index.js save()` and `backup.js restore()` did raw `writeFileSync` with no `mkdirSync` — with `DB_PATH` set on a fresh Render instance the parent dir doesn't exist → ENOENT → bot never logs in. Added `fs.mkdirSync(path.dirname(DB_PATH), { recursive: true })` in both.
 - [x] **Secrets check.** `config.json`, `gambot.db`, `.env` are all `.gitignore`d; only `config.example.json` is tracked (verified via `git ls-files`). Bot token stays out of the repo; Render uses `TOKEN` env var.
+
+## Done recently (2026-09-05)
+- [x] **v1.7.9 shipped (lucky toggle + polish):** new player-facing `v lucky` self-toggle (90% coinflip + 3x payout, uses `db.toggleLucky`), `v rob` shop desc corrected to the real 30%/3M/ jail mechanics, custom role success emoji polish, gamehelp coinflip tips updated. Version bumped 1.7.8→1.7.9, `update_msg.txt`, `CHANGELOG.md` (incl. retro-filled v1.7.8 from git history), `AGENTS.md` re-synced. Deployed (git push → Render auto-deploy).
 
 ## Done recently (2026-08-21)
 - [x] **Selfbot restart-spam fix:** `utils/selfbotWatch.js` was DMing the owner

@@ -1,8 +1,8 @@
-v1.7.6 — What's New
+v1.7.9 — What's New
 
-- 🎲 Max bet is now capped at 2,000,000 in all games (the 5M/10M bet-cap tiers were removed — they broke the economy)
-- 🛡️ Bet limits now apply to EVERY bet, not just `all` — typing a number above your cap will be rejected
-- 💰 Anyone who bought the removed 5M/10M tiers got a full refund + the top remaining tier
-- 🔧 Stability fixes under the hood
+- 🍀 New command: `v lucky` toggles your personal lucky streak — coinflip wins go up to **90%** with **3× payouts** while it's on (turn it off if you want the old 50/50)
+- 🔫 `v rob` perk info now matches the real odds — 30% chance to steal up to 3M / 70% you lose up to 3M + jail, so read before you buy
+- 🎨 Custom role messages got a little emoji polish
+- 🧹 Under the hood: code cleanup + stability fixes
 
 Enjoy!
