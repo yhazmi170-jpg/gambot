@@ -22,7 +22,6 @@ module.exports = {
       return message.channel.send({ embeds: [error(`you already robbed today — wait **${remaining}h** to rob again`)] });
     }
 
-    const robber = db.ensureUser(message.author.id);
     const victim = db.ensureUser(target.id);
     if (!victim || victim.balance < 5000000) return message.channel.send({ embeds: [error('they need at least 5,000,000 money to be worth robbing')] });
     if (robber.balance < 5000000) return message.channel.send({ embeds: [error('you need at least 5,000,000 money to attempt a robbery')] });
