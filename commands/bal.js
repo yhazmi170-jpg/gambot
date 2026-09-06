@@ -1,5 +1,5 @@
 const db = require('../db');
-const { embed } = require('../utils/embed');
+const { embed, error } = require('../utils/embed');
 const config = require('../config');
 
 module.exports = {
@@ -11,6 +11,7 @@ module.exports = {
   execute(message, args) {
     const target = message.mentions.users.first() || message.author;
     const user = db.ensureUser(target.id);
+    if (!user) return message.channel.send({ embeds: [error('user not found')] });
     message.channel.send({
       embeds: [embed('💰 Balance', [
         ['User', `<@${target.id}>`],
