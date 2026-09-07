@@ -4,6 +4,29 @@ const config = require('../config');
 const logger = require('../utils/logger');
 const { version } = require('../package.json');
 
+// Post an audit log entry whenever the owner manually gives/removes money or gems.
+// Uses each guild's configured log channel (set via `Aovo log #channel`), with a
+// global DMs fallback so manual awards are always on the record.
+function logMoney(message, target, amount, action, kind = 'money') {
+  try {
+    const who = message.author ? `<@${message.author.id}> (${message.author.tag})` : 'unknown';
+    const label = kind === 'gems' ? 'gem(s) 💎' : kind === 'bank' ? 'money (bank)' : 'money (wallet)';
+    const fields = [
+      ['Actor', who],
+      ['Target', `<@${target.id}> (${target.id})`],
+      ['Amount', `${Number(amount).toLocaleString()} ${label}`],
+      ['Action', action],
+    ];
+    if (message.guild) {
+      logger.log(message.guild.id, `💰 Manual ${action}`, fields, 0xf1c40f);
+    } else {
+      logger.log('', `💰 Manual ${action} (DM)`, fields, 0xf1c40f);
+    }
+  } catch (e) {
+    console.error('logMoney failed:', e && e.message);
+  }
+}
+
 module.exports = {
   name: 'admin',
   aliases: ['ovo'],
@@ -28,6 +51,7 @@ module.exports = {
         if (!user) return message.channel.send({ embeds: [error('user not found')] });
         const actual = Math.min(amount, user.balance);
         db.addBalance(target.id, -actual);
+        logMoney(message, target, actual, 'removed');
         return message.channel.send({ embeds: [success(`removed **${actual}** money from <@${target.id}>'s wallet`)] });
       }
 
@@ -38,6 +62,7 @@ module.exports = {
         if (!target || !user) return message.channel.send({ embeds: [error('user not found')] });
         const actual = Math.min(amount, user.bank || 0);
         db.adminBankRemove(target.id, actual);
+        logMoney(message, target, actual, 'removed', 'bank');
         return message.channel.send({ embeds: [success(`removed **${actual}** money from <@${target.id}>'s bank`)] });
       }
 
@@ -47,11 +72,13 @@ module.exports = {
       if (!user) return message.channel.send({ embeds: [error('user not found')] });
       const actual = Math.min(amount, user.balance);
       db.addBalance(target.id, -actual);
+      logMoney(message, target, actual, 'removed');
       return message.channel.send({ embeds: [success(`removed **${actual}** money from <@${target.id}>`)] });
     } else if (sub === 'add' || sub === 'give') {
       if (!target || isNaN(amount) || amount <= 0) return message.channel.send({ embeds: [error('usage: Aovo add @user <amount>')] });
       db.addBalance(target.id, amount);
       message.channel.send({ embeds: [success(`added **${amount}** money to <@${target.id}>`)] });
+      logMoney(message, target, amount, 'added');
     } else if (sub === 'bal' || sub === 'balance') {
       const u = target ? db.ensureUser(target.id) : db.ensureUser(message.author.id);
       if (!u) return message.channel.send({ embeds: [error('user not found')] });
@@ -63,11 +90,13 @@ module.exports = {
         if (!target || isNaN(amt) || amt <= 0) return message.channel.send({ embeds: [error('usage: Aovo gems add @user <amount>')] });
         db.addGems(target.id, amt);
         message.channel.send({ embeds: [success(`added **${amt}** gem${amt > 1 ? 's' : ''} 💎 to <@${target.id}>`)] });
+        logMoney(message, target, amt, 'added', 'gems');
       } else if (gsub === 'remove' || gsub === 'rm' || gsub === 'take') {
         const amt = parseAmount(args[3]);
         if (!target || isNaN(amt) || amt <= 0) return message.channel.send({ embeds: [error('usage: Aovo gems remove @user <amount>')] });
         db.addGems(target.id, -amt);
         message.channel.send({ embeds: [success(`removed **${amt}** gem${amt > 1 ? 's' : ''} from <@${target.id}>`)] });
+        logMoney(message, target, amt, 'removed', 'gems');
       } else if (gsub === 'bal') {
         const u = target ? db.ensureUser(target.id) : db.ensureUser(message.author.id);
         if (!u) return message.channel.send({ embeds: [error('user not found')] });
