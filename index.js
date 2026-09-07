@@ -16,6 +16,13 @@ if (!config.token) {
   process.exit(1);
 }
 
+// HARD GUARD: only run on Render. Prevents the local dev copy from ever
+// booting as the production bot (double-instance wiped player data on 2026-09-07).
+if (!process.env.RENDER) {
+  console.error('refusing to start: this bot is production-only (Render). Local dev copies must NOT run.');
+  process.exit(1);
+}
+
 // Capture all console output for remote debugging
 const _logs = [];
 const _origLog = console.log;
