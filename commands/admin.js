@@ -125,7 +125,7 @@ module.exports = {
       if (!channel) return message.channel.send({ embeds: [error('usage: Aovo shop add #channel')] });
       if (args[1] !== 'add') return message.channel.send({ embeds: [error('usage: Aovo shop add #channel')] });
       const { postShop } = require('./shop');
-      postShop(channel);
+      postShop(channel, message.guild && message.guild.id);
       return message.channel.send({ embeds: [success(`shop posted in ${channel}`)] });
     } else if (sub === 'viprole') {
       if (!message.guild) return message.channel.send({ embeds: [error('must be in a server')] });

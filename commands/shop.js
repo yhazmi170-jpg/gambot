@@ -50,6 +50,17 @@ const SHOP = [
   },
 ];
 
+const CUSTOM_ROLE_BLOCKED_GUILDS = ['1420532695313813566'];
+
+function shopFor(guildId) {
+  if (CUSTOM_ROLE_BLOCKED_GUILDS.includes(guildId)) {
+    return SHOP
+      .map(cat => ({ ...cat, items: cat.items.filter(it => it.id !== 'custom_role') }))
+      .filter(cat => cat.items.length);
+  }
+  return SHOP;
+}
+
 function allShopItems() {
   return SHOP.flatMap(c => c.items);
 }
@@ -64,9 +75,10 @@ function priceStr(p) {
   return String(p);
 }
 
-function buildShop() {
+function buildShop(guildId) {
+  const list = guildId ? shopFor(guildId) : SHOP;
   const containers = [];
-  for (const cat of SHOP) {
+  for (const cat of list) {
     const lines = [`**${cat.category}**`];
     const buttons = [];
     let row = [];
@@ -91,13 +103,15 @@ const pendingShops = new Map();
 
 const CATEGORY_SHORT = ['One-Time', 'Monthly Subs', 'Server Tools', 'Social'];
 
-function buildMenuEmbed() {
-  const lines = SHOP.map((cat, idx) => `**${CATEGORY_SHORT[idx]}** — ${cat.items.length} item${cat.items.length > 1 ? 's' : ''}`).join('\n');
+function buildMenuEmbed(guildId) {
+  const list = guildId ? shopFor(guildId) : SHOP;
+  const lines = list.map((cat, idx) => `**${CATEGORY_SHORT[idx]}** — ${cat.items.length} item${cat.items.length > 1 ? 's' : ''}`).join('\n');
   return new EmbedBuilder().setColor(0x2b2d31).setTitle('Shop').setDescription(`pick a category to browse items\n\n${lines}`);
 }
 
-function buildMenuRow() {
-  return new ActionRowBuilder().addComponents(SHOP.map((cat, idx) =>
+function buildMenuRow(guildId) {
+  const list = guildId ? shopFor(guildId) : SHOP;
+  return new ActionRowBuilder().addComponents(list.map((cat, idx) =>
     new ButtonBuilder().setCustomId(`shop_cat_${idx}`).setLabel(CATEGORY_SHORT[idx]).setStyle(ButtonStyle.Secondary)
   ));
 }
@@ -107,8 +121,8 @@ function buildCategoryEmbed(cat, idx) {
   return new EmbedBuilder().setColor(0x2b2d31).setTitle(cat.category).setDescription(`${lines}\n\nclick a button to purchase — confirm on the next screen`);
 }
 
-function buildCategoryRows(idx) {
-  const cat = SHOP[idx];
+function buildCategoryRows(idx, guildId) {
+  const cat = guildId ? shopFor(guildId)[idx] : SHOP[idx];
   const rows = [];
   let row = [];
   for (const it of cat.items) {
@@ -142,19 +156,21 @@ async function handleInteraction(i) {
 
     if (id.startsWith('shop_cat_')) {
       const idx = parseInt(id.replace('shop_cat_', ''), 10);
-      if (isNaN(idx) || !SHOP[idx]) return;
-      await i.update({ embeds: [buildCategoryEmbed(SHOP[idx], idx)], components: buildCategoryRows(idx) });
+      const list = i.guild ? shopFor(i.guild.id) : SHOP;
+      if (isNaN(idx) || !list[idx]) return;
+      await i.update({ embeds: [buildCategoryEmbed(list[idx], idx)], components: buildCategoryRows(idx, i.guild && i.guild.id) });
       return;
     }
     if (id === 'shop_back') {
-      await i.update({ embeds: [buildMenuEmbed()], components: [buildMenuRow()] });
+      await i.update({ embeds: [buildMenuEmbed(i.guild && i.guild.id)], components: [buildMenuRow(i.guild && i.guild.id)] });
       return;
     }
 
     await i.deferUpdate();
 
     const itemId = id.replace('shop_', '');
-    const item = SHOP.flatMap(c => c.items).find(it => it.id === itemId);
+    const list = i.guild ? shopFor(i.guild.id) : SHOP;
+    const item = list.flatMap(c => c.items).find(it => it.id === itemId);
     if (!item) return;
 
     if (item.gems) {
@@ -246,8 +262,8 @@ const header = new ContainerBuilder()
   .setAccentColor(0x2b2d31)
   .addTextDisplayComponents(new TextDisplayBuilder().setContent('**SHOP**\nClick a button to purchase.\nConfirm on next screen.'));
 
-function postShop(channel) {
-  channel.send({ components: [header, ...buildShop()], flags: MessageFlags.IsComponentsV2 }).catch(() => {});
+function postShop(channel, guildId) {
+  channel.send({ components: [header, ...buildShop(guildId)], flags: MessageFlags.IsComponentsV2 }).catch(() => {});
 }
 
 module.exports = { buildShop, postShop, handleInteraction, SHOP, allShopItems, getShopItem,
@@ -257,7 +273,8 @@ module.exports = { buildShop, postShop, handleInteraction, SHOP, allShopItems, g
   description: 'browse and buy perks',
   aliases: ['store', 'market'],
   execute(message, args) {
-    message.channel.send({ embeds: [buildMenuEmbed()], components: [buildMenuRow()] }).then(msg => {
+    const guildId = message.guild && message.guild.id;
+    message.channel.send({ embeds: [buildMenuEmbed(guildId)], components: [buildMenuRow(guildId)] }).then(msg => {
       if (global._interactionOwners) global._interactionOwners.set(msg.id, message.author.id);
       setTimeout(() => { if (global._interactionOwners) global._interactionOwners.delete(msg.id); }, 300000);
     });
