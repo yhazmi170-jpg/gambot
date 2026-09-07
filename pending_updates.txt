@@ -14,3 +14,4 @@ Format: one line per change, terse, no AI fluff.
 - slb: fetch real server member list on demand (+ GuildMembers intent) so the server leaderboard shows the correct members/amounts for THIS guild only.
 - status endpoint now reports guild ids/member counts (diagnostic for silent-server issue).
 - Owner manual give/remove (Aovo add/give/remove, Aovo gems add/remove) now posts an audit log entry to the guild's log channel (set via 'Aovo log #channel') — records actor, target, amount, action. Internal/owner-facing.
+- Fix silent unregistered-user responses: TOS prompt now wrapped in try/catch so failures can't silently swallow commands (debug the new-server zero-response).

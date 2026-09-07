@@ -33,9 +33,8 @@ function getCommand(name) {
   return null;
 }
 
-function handleMessage(message) {
+async function handleMessage(message) {
   if (message.author.bot) return;
-
   const content = message.content.trim();
   let prefix = null;
   let cmdName = null;
@@ -124,9 +123,13 @@ function handleMessage(message) {
 
   if (!COMMANDS_BEFORE_TOS.includes(cmd.name) && !COMMANDS_BEFORE_TOS.includes(cmdName)) {
     if (!db.isRegistered(message.author.id)) {
-      sendTosPrompt(message, () => {
-        cmd.execute(message, args);
-      });
+      try {
+        await sendTosPrompt(message, () => {
+          cmd.execute(message, args);
+        });
+      } catch (err) {
+        console.error(`TOS prompt failed for ${message.author.id}:`, err && err.message);
+      }
       return;
     }
   }
