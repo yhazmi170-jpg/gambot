@@ -2,6 +2,7 @@ const db = require('../db');
 
 module.exports = {
   name: 'lucky',
+  aliases: ['lck'],
   helpCategory: 'Games',
   helpArgs: '',
   description: 'toggle your personal lucky streak (90% win rate on coinflip / 50% otherwise)',

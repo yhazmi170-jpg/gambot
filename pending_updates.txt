@@ -20,3 +20,6 @@ Format: one line per change, terse, no AI fluff.
 
 (flushed into v1.8.0)
 - Pet weapons shipped (weaponcrate + weapon list/equip/upgrade + battle effects + hunt/battle drops + shop item). Full detail in CHANGELOG / update_msg.
+
+(small, unannounced)
+- Short aliases for under-alias'd commands: weaponcrate `wc`, weapon `wep`, zoo `z`, bid `bd`, heist `hst`, lucky `lck`, rename `rn`, setbadge `sb`, reward `rwd`, givepets `gp`.

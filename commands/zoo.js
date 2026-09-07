@@ -9,6 +9,7 @@ const PER_PAGE = 10;
 
 module.exports = {
   name: 'zoo',
+  aliases: ['z'],
   helpCategory: 'Pets',
   helpArgs: '[rarity|color]',
   description: 'view your animals (optional rarity filter, e.g. `v zoo green`)',

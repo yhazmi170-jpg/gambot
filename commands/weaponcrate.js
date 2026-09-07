@@ -6,7 +6,7 @@ module.exports = {
   helpCategory: 'Pets',
   helpArgs: '[buy|open]',
   description: 'buy or open a weapon crate — weapons you can equip on your team',
-  aliases: ['wcrate', 'wepcrate'],
+  aliases: ['wcrate', 'wepcrate', 'wc'],
   execute(message, args) {
     const userId = message.author.id;
     const action = (args[0] || '').toLowerCase();

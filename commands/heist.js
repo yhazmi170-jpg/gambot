@@ -8,6 +8,7 @@ const JOIN_TIME = 45000;
 
 module.exports = {
   name: 'heist',
+  aliases: ['hst'],
   helpCategory: 'Games',
   helpArgs: '<amount>',
   description: 'start a heist — others join, roll success for a big payout',

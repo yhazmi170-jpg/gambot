@@ -3,6 +3,7 @@ const { embed, error, success } = require('../utils/embed');
 
 module.exports = {
   name: 'setbadge',
+  aliases: ['sb'],
   helpCategory: 'Shop',
   helpArgs: '<emoji>',
   description: 'set your badge emoji (requires badge perk)',

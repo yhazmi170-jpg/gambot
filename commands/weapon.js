@@ -6,7 +6,7 @@ module.exports = {
   helpCategory: 'Pets',
   helpArgs: '<list|equip|upgrade>',
   description: 'view and equip weapons on your battle team',
-  aliases: ['weps', 'armory'],
+  aliases: ['weps', 'armory', 'wep'],
   execute(message, args) {
     const userId = message.author.id;
     const sub = (args[0] || '').toLowerCase();

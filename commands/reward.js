@@ -5,6 +5,7 @@ const logger = require('../utils/logger');
 
 module.exports = {
   name: 'reward',
+  aliases: ['rwd'],
   description: 'give a perk to a user (owner only)',
   execute(message, args) {
     if (message.author.id !== config.ownerId) return;

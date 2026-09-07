@@ -3,6 +3,7 @@ const { embed } = require('../utils/embed');
 
 module.exports = {
   name: 'rename',
+  aliases: ['rn'],
   helpCategory: 'Pets',
   helpArgs: '<id> <name>',
   description: 'rename an animal in your zoo',

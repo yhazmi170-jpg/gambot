@@ -4,6 +4,7 @@ const config = require('../config');
 
 module.exports = {
   name: 'bid',
+  aliases: ['bd'],
   helpCategory: 'Pets',
   helpArgs: '<auction_id> <amount>',
   description: 'place a bid on an auction — highest bid wins when time runs out',
