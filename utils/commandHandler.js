@@ -91,6 +91,8 @@ async function handleMessage(message) {
   const cmd = getCommand(cmdName);
   if (!cmd) return;
 
+  console.log(`[CMD] guild=${message.guild ? message.guild.id : 'dm'} chan=${message.channel.id} user=${message.author.id} cmd=${cmd.name} prefix=${prefix}`);
+
   try { db.catchUpAutohunt(message.author.id); } catch (err) {}
   try { db.breedSnails(message.author.id); } catch (err) {}
 

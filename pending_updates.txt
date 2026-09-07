@@ -15,3 +15,4 @@ Format: one line per change, terse, no AI fluff.
 - status endpoint now reports guild ids/member counts (diagnostic for silent-server issue).
 - Owner manual give/remove (Aovo add/give/remove, Aovo gems add/remove) now posts an audit log entry to the guild's log channel (set via 'Aovo log #channel') — records actor, target, amount, action. Internal/owner-facing.
 - Fix silent unregistered-user responses: TOS prompt now wrapped in try/catch so failures can't silently swallow commands (debug the new-server zero-response).
+- Debug: log every parsed command (guild/chan/user/cmd) + capture async handleMessage rejections; diagnosing members getting no reply in snowed #cmds.

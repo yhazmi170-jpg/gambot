@@ -533,7 +533,9 @@ setInterval(() => {
 }, 120000);
 
 client.on('messageCreate', (message) => {
-  try { handleMessage(message); } catch (e) { console.error('[MSG] handleMessage error:', e.message); }
+  try {
+    Promise.resolve(handleMessage(message)).catch(e => console.error('[MSG] handleMessage error:', (e && e.stack) || e));
+  } catch (e) { console.error('[MSG] handleMessage error:', e.message); }
   try { intel.recordMessage(message); } catch (e) {}
   if (message.author.bot) return;
   const perks = db.getUserPerks(message.author.id);
