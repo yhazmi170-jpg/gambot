@@ -113,7 +113,8 @@ const server = http.createServer((req, res) => {
       const top = db2.getTop(5);
       const all = db2.getAllUsers ? db2.getAllUsers() : [];
       res.writeHead(200, { 'Content-Type': 'text/plain' });
-      res.end(`users=${all.length} top=${JSON.stringify(top)} discord=${client.isReady()} token_len=${(config.token||'').length} node=${process.version}`);
+      const guilds = Array.from(client.guilds.cache.values()).map(g => `${g.id}:${g.name}:${g.memberCount}`);
+      res.end(`users=${all.length} top=${JSON.stringify(top)} discord=${client.isReady()} token_len=${(config.token||'').length} node=${process.version} guilds=${guilds.length} list=[${guilds.join(' | ')}]`);
     } catch (e) {
       res.writeHead(500, { 'Content-Type': 'text/plain' });
       res.end(`status error: ${e.message}`);
@@ -139,6 +140,7 @@ let client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMembers,
   ],
   partials: [Partials.Message, Partials.Channel, Partials.Reaction],
   rest: { timeout: 30000 },

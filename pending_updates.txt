@@ -11,3 +11,5 @@ Format: one line per change, terse, no AI fluff.
 - Selfbot health alerts now require 3 failed checks before offline and 2 healthy checks before recovery; overlapping checks are skipped to prevent timeout/recovery DM spam.
 - Selfbot health alerts debounced: restart DM only on version change + 6h cooldown on all alert types (was DMsing the owner every ~30 min on false uptime resets).
 - bal: crash on `v bal @user` for users with no account (null ensureUser) -> now graceful 'user not found'
+- slb: fetch real server member list on demand (+ GuildMembers intent) so the server leaderboard shows the correct members/amounts for THIS guild only.
+- status endpoint now reports guild ids/member counts (diagnostic for silent-server issue).

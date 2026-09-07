@@ -8,12 +8,23 @@ module.exports = {
   helpArgs: '',
   description: 'server leaderboard — richest players in this server',
   aliases: ['serverlb', 'local'],
-  execute(message, args) {
+  async execute(message, args) {
     if (!message.guild) return message.channel.send({ embeds: [error('this only works in servers')] });
     const limit = Math.min(parseInt(args[0]) || 10, 20);
 
-    // Get members of this server
-    const memberIds = message.guild.members.cache.map(m => m.id);
+    // Get this server's real member list. The in-memory members cache is often
+    // incomplete (no GuildMembers intent / large servers), so fetch on demand —
+    // but only count users that have actually joined THIS guild.
+    let memberIds;
+    try {
+      const members = await message.guild.members.fetch();
+      memberIds = members.map(m => m.id);
+    } catch (err) {
+      // fall back to whatever is already cached if the fetch fails
+      console.error(`[slb] member fetch failed in ${message.guild.id}:`, err && err.message);
+      memberIds = message.guild.members.cache.map(m => m.id);
+    }
+
     const allUsers = db.getAllUsers();
     const serverUsers = allUsers.filter(u => memberIds.includes(u.user_id));
 
