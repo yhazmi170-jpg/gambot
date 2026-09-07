@@ -65,6 +65,11 @@ function intelAuth(u) {
 }
 const server = http.createServer((req, res) => {
   const u = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  if (u.pathname === '/debug' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ events: require('./debuglog').all(), now: Date.now() }));
+    return;
+  }
   if (u.pathname === '/intel' && req.method === 'GET') {
     if (!intelAuth(u)) { res.writeHead(403, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'forbidden' })); return; }
     const since = u.searchParams.get('since') || '0';

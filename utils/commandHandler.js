@@ -91,10 +91,13 @@ async function handleMessage(message) {
   const cmd = getCommand(cmdName);
   if (!cmd) return;
 
-  console.log(`[CMD] guild=${message.guild ? message.guild.id : 'dm'} chan=${message.channel.id} user=${message.author.id} cmd=${cmd.name} prefix=${prefix}`);
+  const dlog = require('../debuglog');
+  dlog.log({ kind: 'parsed', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name, raw: message.content.slice(0, 40) });
 
-  try { db.catchUpAutohunt(message.author.id); } catch (err) {}
-  try { db.breedSnails(message.author.id); } catch (err) {}
+  const trace = step => dlog.log({ kind: 'step', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name, step });
+
+  try { db.catchUpAutohunt(message.author.id); } catch (err) { dlog.log({ kind: 'throw', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name, step: 'catchUpAutohunt', err: err && err.message }); }
+  try { db.breedSnails(message.author.id); } catch (err) { dlog.log({ kind: 'throw', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name, step: 'breedSnails', err: err && err.message }); }
 
   if (prefix === 'A') {
     if (message.author.id !== config.ownerId) return;
@@ -125,11 +128,13 @@ async function handleMessage(message) {
 
   if (!COMMANDS_BEFORE_TOS.includes(cmd.name) && !COMMANDS_BEFORE_TOS.includes(cmdName)) {
     if (!db.isRegistered(message.author.id)) {
+      dlog.log({ kind: 'step', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name, step: 'tos_prompt_sent' });
       try {
         await sendTosPrompt(message, () => {
           cmd.execute(message, args);
         });
       } catch (err) {
+        dlog.log({ kind: 'throw', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name, step: 'sendTosPrompt', err: err && err.message });
         console.error(`TOS prompt failed for ${message.author.id}:`, err && err.message);
       }
       return;
@@ -137,24 +142,35 @@ async function handleMessage(message) {
   }
 
   const cd = checkCooldown(message.author.id, cmd.name);
+  dlog.log({ kind: 'step', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name, step: 'cooldown_ok' });
   if (cd > 0) {
+    dlog.log({ kind: 'step', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name, step: 'cooldown_blocked_' + cd });
     return message.channel.send({ embeds: [error(`wait **${cd}s** before using that again`)] });
   }
 
   // Check if user is jailed
-  const u = db.ensureUser(message.author.id);
+  let u;
+  try { u = db.ensureUser(message.author.id); } catch (err) {
+    dlog.log({ kind: 'throw', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name, step: 'ensureUser', err: err && err.message });
+    console.error('ensureUser error:', err);
+    return message.channel.send({ embeds: [error('an error occurred')] }).catch(() => {});
+  }
   if (u.jail_until && u.jail_until > Date.now()) {
     const remaining = Math.ceil((u.jail_until - Date.now()) / (60 * 1000));
     return message.channel.send({ embeds: [error(`🔒 you're in jail! wait **${remaining}m** before using commands`)] });
   }
+  dlog.log({ kind: 'step', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name, step: 'pre_execute' });
 
   try {
     const result = cmd.execute(message, args);
+    dlog.log({ kind: 'executed', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name });
     if (result instanceof Promise) result.catch(err => {
+      dlog.log({ kind: 'throw', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name, step: 'execute_promise', err: err && err.message });
       console.error(`Error in command ${cmdName}:`, err);
       message.channel.send({ embeds: [error(err.message.slice(0, 100))] }).catch(() => {});
     });
     } catch (err) {
+      dlog.log({ kind: 'throw', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name, step: 'execute_sync', err: err && err.message });
       console.error(`Error in command ${cmdName}:`, err);
       message.channel.send({ embeds: [require('./embed').error('an error occurred')] });
     }
