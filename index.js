@@ -121,7 +121,44 @@ const server = http.createServer((req, res) => {
     }
     return;
   }
-  if (u.pathname === '/logs') {
+  if (u.pathname === '/guilddebug') {
+    async function flush() { return; }
+    try {
+      const gid = '1420532695313813566';
+      const g = client.guilds.cache.get(gid);
+      const out = [];
+      if (!g) { out.push('guild not found'); }
+      else {
+        out.push(`guild=${g.name} (${g.id})`);
+        const me = g.members.me;
+        out.push(`bot tag: ${g.members.me ? g.members.me.user.tag : 'null'}`);
+        out.push(`bot perms (guild-level): ${me ? me.permissions.toArray().join(',') : 'n/a'}`);
+        const chans = [...g.channels.cache.values()];
+        out.push(`cached channels: ${chans.length}`);
+        let viewable = 0, text = 0, below = 0;
+        const botRole = me ? me.roles.highest : null;
+        for (const c of chans) {
+          if (!c.viewable) continue;
+          viewable++;
+          if (c.isTextBased && c.isTextBased()) {
+            text++;
+            try {
+              const p = c.permissionsFor(me);
+              const send = p && p.has('SendMessages') ? 'S' : 'noSend';
+              const embed = p && p.has('EmbedLinks') ? 'E' : 'noEmbed';
+              out.push(`\n#${c.name} (${c.id}) ${send}${embed}`);
+            } catch (e) { out.push(`\n#${c.name} perm-err`); }
+          }
+        }
+        out.push(`\nviewable=${viewable} text=${text}`);
+        out.push(`bot highestRole: ${botRole ? botRole.name : 'n/a'} at pos ${botRole ? botRole.position : -1}`);
+      }
+      res.writeHead(200, { 'Content-Type': 'text/plain' });
+      res.end(out.join('\n'));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end(`guilddebug error: ${e.message}`);
+    }
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end(_logs.slice(-50).map(l => `[${new Date(l.t).toISOString()}] ${l.l}: ${l.m}`).join('\n'));
     return;
