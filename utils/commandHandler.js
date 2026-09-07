@@ -155,7 +155,7 @@ async function handleMessage(message) {
     console.error('ensureUser error:', err);
     return message.channel.send({ embeds: [error('an error occurred')] }).catch(() => {});
   }
-  if (u.jail_until && u.jail_until > Date.now()) {
+  if (u && u.jail_until && u.jail_until > Date.now()) {
     const remaining = Math.ceil((u.jail_until - Date.now()) / (60 * 1000));
     return message.channel.send({ embeds: [error(`🔒 you're in jail! wait **${remaining}m** before using commands`)] });
   }
