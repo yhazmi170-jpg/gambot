@@ -169,37 +169,52 @@ loadCommands();
 
 async function start() {
   console.log('[START] 1/4 restore...');
+  const { restore } = require('./backup');
+  let restored = null;
   try {
-    const { restore } = require('./backup');
-    const restored = await restore();
-    console.log(`[START] restore result: ${restored}`);
+    restored = await restore();
+    console.log(`[START] restore result: ${JSON.stringify(restored)}`);
   } catch (e) {
     console.error('[START] restore failed:', e.message);
+  }
+
+  // PERMANENT RULE: on Render production, NEVER boot on a seed/fresh/empty DB.
+  // Valid production backup -> restore -> validate -> start Discord.
+  // No valid production backup -> refuse to boot (fail loudly, no silent seed).
+  const onRender = !!(process.env.RENDER || process.env.RENDER_SERVICE_ID || process.env.RENDER_EXTERNAL_URL);
+  if (onRender && (!restored || !restored.ok || restored.seed)) {
+    console.error('[START] FATAL: RENDER production has NO valid production DB (restore source=' + (restored && restored.source) + ').');
+    console.error('[START] FATAL: Refusing to start the bot with seed/fresh data. Set a valid GITHUB_TOKEN to restore the real backup.');
+    process.exit(1);
   }
 
   console.log('[START] 2/4 db.init...');
   await db.init();
 
-  // If DB is empty after init, try loading seed.db directly
-  try {
-    const top = db.getTop(1);
-    if (!top || top.length === 0) {
-      console.log('[START] DB empty, trying seed.db...');
-      const seedPath = require('path').join(__dirname, 'seed.db');
-      if (fs.existsSync(seedPath)) {
-        const seedBuf = fs.readFileSync(seedPath);
-        if (seedBuf.length > 1000) {
-          const dbDir = process.env.DB_PATH || process.env.RENDER_DISK_PATH || '.';
-          const dbFile = require('path').join(dbDir, 'gambot.db');
-          fs.mkdirSync(require('path').dirname(dbFile), { recursive: true });
-          fs.writeFileSync(dbFile, seedBuf);
-          await db.init();
-          console.log('[START] loaded seed.db directly into DB');
+  // If DB is empty after init, try loading seed.db directly — LOCAL DEV ONLY.
+  // On Render production this must NEVER happen: the no-seed-boot rule above has already exited.
+  const onRender2 = !!(process.env.RENDER || process.env.RENDER_SERVICE_ID || process.env.RENDER_EXTERNAL_URL);
+  if (!onRender2) {
+    try {
+      const top = db.getTop(1);
+      if (!top || top.length === 0) {
+        console.log('[START] DB empty, trying seed.db (local dev only)...');
+        const seedPath = require('path').join(__dirname, 'seed.db');
+        if (fs.existsSync(seedPath)) {
+          const seedBuf = fs.readFileSync(seedPath);
+          if (seedBuf.length > 1000) {
+            const dbDir = process.env.DB_PATH || process.env.RENDER_DISK_PATH || '.';
+            const dbFile = require('path').join(dbDir, 'gambot.db');
+            fs.mkdirSync(require('path').dirname(dbFile), { recursive: true });
+            fs.writeFileSync(dbFile, seedBuf);
+            await db.init();
+            console.log('[START] loaded seed.db directly into DB (LOCAL DEV ONLY — NOT production)');
+          }
         }
       }
+    } catch (e) {
+      console.error('[START] seed load failed:', e.message);
     }
-  } catch (e) {
-    console.error('[START] seed load failed:', e.message);
   }
 
   console.log('[START] 3/4 cleanup...');
@@ -298,14 +313,15 @@ start().catch(e => console.error('[START] FATAL:', e));
     }
   }, 3600000);
 
-  // backup every 5 min + restore on boot (keeps data alive across Render restarts)
+  // backup every 5 min + restore on boot (keeps data alive across Render restarts).
+  // NOTE: NO setTimeout kick here — the very first backup must NOT race restore()/db.init(),
+  // and a seed/fresh DB must never be pushed. First backup lands ~5 min after ready.
   const { backup } = require('./backup');
   const doBackup = () => {
     console.log('backup: starting scheduled backup...');
     backup().then(() => console.log('backup: completed')).catch(e => console.error('BACKUP FAILED:', e && e.message));
   };
   setInterval(doBackup, 300000);
-  setTimeout(doBackup, 5000);
 
   // v1.7.0: hourly vault interest
   setInterval(() => {

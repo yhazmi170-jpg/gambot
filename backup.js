@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const crypto = require('crypto');
 const config = require('./config');
 
 const DB_PATH = process.env.DB_PATH ? path.join(process.env.DB_PATH, 'gambot.db') : path.join(__dirname, 'gambot.db');
@@ -12,6 +13,28 @@ const BRANCH = 'main';
 // Timestamped snapshot name — sorts lexically = chronologically
 function snapshotName() {
   return `gambot-${new Date().toISOString().replace(/[:.]/g, '-')}.db`;
+}
+
+// sha256 of a DB buffer — used for seed detection + metadata, never for auth
+function sha256(buf) {
+  return crypto.createHash('sha256').update(buf).digest('hex');
+}
+
+// Bundled dev/test seed DB — must NEVER be pushed as production or booted silently
+const SEED_PATH = path.join(__dirname, 'seed.db');
+let _seedHash = null;
+function seedHash() {
+  if (_seedHash === null) {
+    if (fs.existsSync(SEED_PATH)) {
+      try { _seedHash = sha256(fs.readFileSync(SEED_PATH)); _seedHash = _seedHash || ''; }
+      catch { _seedHash = ''; }
+    } else { _seedHash = ''; }
+  }
+  return _seedHash;
+}
+function isSeed(buf) {
+  const sh = seedHash();
+  return !!sh && sh === sha256(buf);
 }
 
 // Validate DB structure and integrity
@@ -119,6 +142,14 @@ async function backup() {
   if (!fs.existsSync(DB_PATH)) { console.log('backup: no db file, skipping'); return; }
   const buf = fs.readFileSync(DB_PATH);
   console.log(`backup: DB size=${buf.length} bytes`);
+  const dbHash = sha256(buf).slice(0, 16);
+  console.log(`backup: sha256=${dbHash}`);
+
+  // Guard: NEVER upload the bundled seed DB as production data
+  if (isSeed(buf)) {
+    console.error(`backup: SKIPPED — DB is byte-identical to bundled seed.db (${dbHash}); refusing to push seed as production backup`);
+    return;
+  }
 
   // Validate DB structure
   const invalid = await validateDB(buf);
@@ -142,7 +173,7 @@ async function backup() {
     // 1) versioned snapshot — never overwrites, so a stale/bad state can't destroy history
     const snapPath = `backups/${snapshotName()}`;
     await request('PUT', `/repos/${OWNER}/${REPO}/contents/${encodeURIComponent(snapPath)}`, {
-      message: `backup ${new Date().toISOString()}`,
+      message: `backup ${new Date().toISOString()} db_hash=${dbHash}`,
       content,
       branch: BRANCH,
     });
@@ -156,7 +187,7 @@ async function backup() {
           sha = existing.sha;
         } catch {}
         await request('PUT', `/repos/${OWNER}/${REPO}/contents/gambot.db`, {
-          message: `backup ${new Date().toISOString()}`,
+          message: `backup ${new Date().toISOString()} db_hash=${dbHash}`,
           content,
           sha,
           branch: BRANCH,
@@ -214,96 +245,120 @@ async function allSnapshots() {
     .sort((a, b) => b.localeCompare(a)); // newest filename first
 }
 
+// Validate a downloaded/local DB buffer before it is accepted: structure + real users + not the bundled seed
+async function tryAccept(buf, source) {
+  if (!buf || buf.length < 1000) { console.error(`restore: skip ${source} — empty/short (${buf ? buf.length : 0} bytes)`); return null; }
+  const err = await validateDB(buf);
+  if (err) { console.error(`restore: skip ${source} — invalid (${err})`); return null; }
+  const users = await countUsers(buf);
+  if (users <= 0) { console.error(`restore: skip ${source} — 0 users (empty/corrupt)`); return null; }
+  if (isSeed(buf)) { console.error(`restore: skip ${source} — equals bundled seed.db; refusing seed as production`); return null; }
+  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+  const tmp = `${DB_PATH}.tmp-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  fs.writeFileSync(tmp, buf);
+  fs.renameSync(tmp, DB_PATH); // atomic swap — no partial DB
+  return { users, sha256: sha256(buf) };
+}
+
 async function restore() {
   console.log(`restore: DB_PATH=${DB_PATH}, TOKEN=${TOKEN ? TOKEN.slice(0,8)+'...' : 'MISSING'}`);
   let local = fs.existsSync(DB_PATH) && fs.statSync(DB_PATH).size > 100;
   const localMtime = local ? fs.statSync(DB_PATH).mtimeMs : 0;
   console.log(`restore: local=${local}, localMtime=${localMtime}`);
+  const info = { ok: false, source: null, seed: false, users: 0, sha256: null };
 
-  // First: validate local DB — if it's corrupt, force restore from backup
+  let localBuf = null;
   if (local) {
-    const localBuf = fs.readFileSync(DB_PATH);
-    const localInvalid = await validateDB(localBuf);
+    localBuf = fs.readFileSync(DB_PATH);
+    const localErr = await validateDB(localBuf);
     const localCorrupt = await detectCorruption(localBuf);
-    if (localInvalid || localCorrupt) {
-      console.log(`local DB is corrupt (${localInvalid || localCorrupt}), forcing restore from backup`);
-      local = false; // force restore
+    if (localErr || localCorrupt) {
+      console.log(`local DB is corrupt (${localErr || localCorrupt}), forcing restore from backup`);
+      local = false;
+      localBuf = null;
     }
   }
 
-  // Scan snapshots newest→oldest; download the first valid one.
+  // Remote newest snapshot date (only meaningful when token works)
   let newest = null;
   try { newest = await newestSnapshot(); } catch (e) { console.error('restore: snapshot lookup failed:', e.message); }
 
-  if (newest && local && newest.date <= localMtime) {
-    console.log('local db is up to date, skipping restore');
-    return true;
+  // A valid local DB that's not seed is usable as long as it's at least as new as the cloud.
+  if (local && localBuf && !isSeed(localBuf)) {
+    if (newest && newest.date > localMtime) {
+      const remote = await tryRemoteRestore(newest);
+      if (remote) { Object.assign(info, remote); return info; }
+      console.log('restore: cloud restore failed; keeping valid local DB');
+    } else {
+      console.log('restore: local DB is valid and up to date — keeping it');
+    }
+    const users = await countUsers(localBuf);
+    Object.assign(info, { ok: true, source: 'local', seed: false, users, sha256: sha256(localBuf) });
+    return info;
   }
 
+  // No valid local DB — restore from remote sources (newest→oldest snapshots, then golden, then mirror).
   if (newest || !local) {
-    try {
-      const all = await allSnapshots();
-      console.log(`restore: found ${all.length} snapshots`);
-      for (const p of all) {
-        try {
-          const buf = await download(p);
-          if (buf && buf.length > 1000) {
-            fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-            fs.writeFileSync(DB_PATH, buf);
-            console.log(`restored db from github backup (${p})`);
-            return true;
-          }
-        } catch (e) { console.error(`restore: skip ${p}: ${e.message}`); }
-      }
-    } catch (e) {
-      console.error('restore: snapshot listing failed:', e.message);
+    const remote = await tryRemoteRestore(newest);
+    if (remote) { Object.assign(info, remote); return info; }
+  }
+
+  // Last resort ONLY if this is not a production host: bundled seed (index.js enforces the no-seed-boot rule).
+  const onRender = !!(process.env.RENDER || process.env.RENDER_SERVICE_ID || process.env.RENDER_EXTERNAL_URL);
+  if (!onRender && fs.existsSync(SEED_PATH)) {
+    const buf = fs.readFileSync(SEED_PATH);
+    if (buf.length > 1000) {
+      fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+      fs.writeFileSync(DB_PATH, buf);
+      const users = await countUsers(buf);
+      console.log(`restore: WARNING — fell back to bundled seed.db (${buf.length} bytes, users=${users}); this is NOT production data`);
+      Object.assign(info, { ok: true, source: 'seed', seed: true, users, sha256: sha256(buf) });
+      return info;
     }
   }
 
-  // Fallback 1: golden backup
+  console.log('restore: ALL FALLBACKS FAILED — no valid production backup available');
+  return info;
+}
+
+async function tryRemoteRestore(newest) {
+  // Newest → oldest snapshots; accept the first VALID non-seed DB
+  try {
+    const all = await allSnapshots();
+    console.log(`restore: scanning ${all.length} snapshots (newest→oldest)`);
+    for (const p of all) {
+      try {
+        const buf = await download(p);
+        const acc = await tryAccept(buf, `snapshot ${p}`);
+        if (acc) {
+          console.log(`restored DB from cloud snapshot ${p} (users=${acc.users}, sha256=${acc.sha256.slice(0,16)})`);
+          return { ok: true, source: `snapshot:${path.basename(p)}`, seed: false, ...acc };
+        }
+      } catch (e) { console.error(`restore: skip ${p}: ${e.message}`); }
+    }
+  } catch (e) { console.error('restore: snapshot listing failed:', e.message); }
+
+  // Golden fallback
   try {
     const buf = await download('golden.db');
-    console.log(`restore: golden.db download ${buf ? buf.length + ' bytes' : 'FAILED'}`);
-    if (buf && buf.length > 1000) {
-      fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-      fs.writeFileSync(DB_PATH, buf);
-      console.log('restored db from golden backup');
-      return true;
+    const acc = await tryAccept(buf, 'golden.db');
+    if (acc) {
+      console.log(`restored DB from golden backup (users=${acc.users}, sha256=${acc.sha256.slice(0,16)})`);
+      return { ok: true, source: 'golden', seed: false, ...acc };
     }
   } catch (e) { console.log('no golden backup available:', e.message); }
 
-  // Fallback 2: legacy single-file backup
+  // Legacy mirror fallback
   try {
     const buf = await download('gambot.db');
-    console.log(`restore: gambot.db download ${buf ? buf.length + ' bytes' : 'FAILED'}`);
-    if (buf && buf.length > 1000) {
-      fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-      fs.writeFileSync(DB_PATH, buf);
-      console.log('restored db from github backup (gambot.db mirror)');
-      return true;
+    const acc = await tryAccept(buf, 'gambot.db mirror');
+    if (acc) {
+      console.log(`restored DB from gambot.db mirror (users=${acc.users}, sha256=${acc.sha256.slice(0,16)})`);
+      return { ok: true, source: 'mirror', seed: false, ...acc };
     }
-  } catch (e) {
-    console.log('no backup to restore:', e.message);
-  }
+  } catch (e) { console.log('no mirror backup available:', e.message); }
 
-  // Fallback 3: seed.db bundled in repo
-  try {
-    const seedPath = path.join(__dirname, 'seed.db');
-    if (fs.existsSync(seedPath)) {
-      const buf = fs.readFileSync(seedPath);
-      if (buf.length > 1000) {
-        fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-        fs.writeFileSync(DB_PATH, buf);
-        console.log(`restored db from seed.db (${buf.length} bytes)`);
-        return true;
-      }
-    }
-  } catch (e) {
-    console.log('seed fallback failed:', e.message);
-  }
-
-  console.log('restore: ALL FALLBACKS FAILED');
-  return false;
+  return null;
 }
 
 function request(method, url, body) {
@@ -332,4 +387,4 @@ function request(method, url, body) {
   });
 }
 
-module.exports = { backup, restore, validateDB, saveGoldenBackup };
+module.exports = { backup, restore, validateDB, saveGoldenBackup, isSeed, sha256, countUsers };
