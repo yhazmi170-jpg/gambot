@@ -5,11 +5,16 @@
 
 ## Status
 - **Branch**: `master`
-- **Version**: `1.7.9` — `v lucky` player-facing toggle shipped, rob desc + customrole polish; docs (AGENTS/CHANGELOG/HANDOFF) synced from the 1.7.6 drift. LIVE on Render.
+- **Version**: `1.8.0` — Pet Weapons shipped (OwO-style weapon system): `v weaponcrate` buy/open, `v weapon` list/equip/upgrade, battle effects + hunt/battle drops + shop item. Docs synced. Ready to deploy.
 - **Roles (v two-agent workflow):** chat agent (orchestrator, is the user's main driver) delegates coding to Claude Code CLI; git is the message bus.
 - **Change log**: complete history of every update lives in `CHANGELOG.md` (newest first) — keep it in sync with the version bump + `update_msg.txt`
 - **Host migration**: Replit → Render (free, Blueprint from `render.yaml`). Replit repl was stopped by user. **Render URL: `https://gambot-o2o4.onrender.com`** — keepalive pinger repointed to it.
 - **Keepalive**: `keepalive.ps1` pings every 240s; registered as Windows scheduled task `GambotKeepalive` (runs at logon). Pinger must be running on yazan's PC for this to work (now pinging the Render URL).
+
+## Done recently (2026-09-07)
+- [x] **v1.8.0 Pet Weapons (built, tested, ready to deploy):** new OwO-style weapon system. `v weaponcrate` (buy 15k / open), `v weapon` (list/equip/upgrade). 8 weapon types (Great Sword splash, Poison Dagger + Flame Staff DoT, Vampiric Staff lifesteal, Healing Staff team heal, Defender Aegis taunt+DEF, Bow, Rune). 7 rarities common→fabled w/ quality %. Flat ATK/DEF added on top of trait/fed % mods in `commands/battle.js`; effects wired into the combat loop. Crates drop ~8%/animal from `v hunt` + on `v battle` win; shop `Weapon Crate` item. Equipped weapons shown in `v team`. New tables `weapons_inv` / `animals_weapon` / `weapon_crates` + helpers in `db/index.js`. Verified via `scripts/test-battle-weapons.js` (real battle ran, weapon effects + image produced) + DB helper harness. Version 1.7.9→1.8.0, `update_msg.txt` + `CHANGELOG.md` + `AGENTS.md` + `pending_updates.txt` synced. Deploy = push via `deploy-gambot.sh`.
+- [x] **New-server zero-response root-caused + fixed (commits edf4b40 & earlier):** `ensureUser` returns null for unregistered users; `u.jail_until` threw TypeError outside the try/catch → async `handleMessage` rejected silently → members in snowed server got no reply at all. Fixed with null guard. Added `/debug` HTTP endpoint (debuglog.js ring buffer, traces every command step), try/catch around the TOS prompt, and rejection catches in index.js — now diagnosable.
+- [x] **Local double-instance killed + RENDER hard guard:** a local bot (`node -e require('./index.js')`, stale local DB) was running since 14:59 and overwriting real data perceived as resets. Killed; no systemd auto-restart. index.js now exits on boot unless `process.env.RENDER` is set (committed cc81c76, live). Rule reaffirmed: never run Gambot locally; only Render production.
 
 ## Errors & trials (2026-08-09)
 - [x] **Balance corruption (76T exploit):** Fake accounts had 76 trillion balances. Two fake alts (`alt-1786033753939`, `alt-1786033710016`) created with 0 gambled but millions won. Real users were drained over time (@极极 lost ~52M, @meimei lost ~28M). Fix: deleted fakes, manually corrected balances via SQL. Prevention: `detectCorruption` guard in backup.js, monitor for absurd balances.

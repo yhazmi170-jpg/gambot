@@ -23,10 +23,35 @@ function battleMods(pet) {
   else if (pet.trait === 'Eager') { atkMod += 0.05; defMod += 0.05; }
   else if (pet.trait === 'Lucky') atkMod += 0.15;
   else if (pet.trait === 'Calm') atkMod += 0.03;
+
+  // Equipped weapon: flat attack/defense added after the % modifiers.
+  const weapon = pet._weapon || null;
+  let atkBonus = 0;
+  let defBonus = 0;
+  if (weapon) {
+    atkBonus = weapon.atk || 0;
+    defBonus = weapon.def || 0;
+    if (weapon.type === 'aegis') defBonus += Math.floor((weapon.atk || 0) * 0.9); // aegis leans into defense
+  }
   return {
-    effAtk: Math.floor((pet.attack || 0) * atkMod),
-    effDef: Math.floor((pet.defense || 0) * defMod),
+    effAtk: Math.floor((pet.attack || 0) * atkMod) + atkBonus,
+    effDef: Math.floor((pet.defense || 0) * defMod) + defBonus,
   };
+}
+
+// Attach each pet's equipped weapon for the battle.
+function attachWeapons(pet) {
+  const w = db.getAnimalWeapon(pet.id);
+  const copy = { ...pet };
+  if (w) copy._weapon = w;
+  return copy;
+}
+
+// Holds per-pet status effect state for a battle: { poison: turns, flame: turns, taunt: bool }
+function makeStatuses(pets) {
+  const s = {};
+  for (const p of pets) s[p.id] = { poison: 0, flame: 0, taunt: false };
+  return s;
 }
 
 async function runBattle(message, target) {
@@ -39,8 +64,49 @@ async function runBattle(message, target) {
   const theirPets = [theirTeam.slot1, theirTeam.slot2, theirTeam.slot3].filter(Boolean).map(id => db.getAnimal(id)).filter(Boolean);
   if (!myPets.length || !theirPets.length) return message.channel.send({ embeds: [error('one of the teams has no valid animals')] });
 
-  const myCopy = myPets.map(p => ({ ...p, ...battleMods(p) }));
-  const theirCopy = theirPets.map(p => ({ ...p, ...battleMods(p) }));
+  const myCopy = myPets.map(p => { const wp = attachWeapons(p); return { ...wp, ...battleMods(wp) }; });
+  const theirCopy = theirPets.map(p => { const wp = attachWeapons(p); return { ...wp, ...battleMods(wp) }; });
+  const myStatus = makeStatuses(myCopy);
+  const theirStatus = makeStatuses(theirCopy);
+
+  // damage helper with weapon effect hooks
+  function doDamage(attacker, target, side, myPetsArr, theirPetsArr, log, statuses) {
+    const weapon = attacker._weapon;
+    const power = weapon ? 0.6 + (weapon.quality / 100) * 0.8 : 0;
+    const dmg = Math.max(0, attacker.effAtk - Math.floor(target.effDef / 2) + Math.floor(Math.random() * 10));
+
+    let dealt = dmg;
+    let note = '';
+    if (weapon && weapon.type === 'poison_dagger') { statuses[target.id].poison = 3; note = ' ☠️ **poisoned!**'; }
+    if (weapon && weapon.type === 'flame_staff') { statuses[target.id].flame = 3; note = ' 🔥 **burned!**'; }
+    if (weapon && weapon.type === 'vamp_staff') {
+      const heal = Math.floor(dmg * (0.2 + power * 0.2));
+      attacker.hp = Math.min(attacker.max_hp, attacker.hp + heal);
+      note = ` 🩸 **lifesteal +${heal}**`;
+    }
+    if (weapon && weapon.type === 'aegis') { statuses[attacker.id].taunt = true; note = ' 🛡️ **now taunting!**'; }
+    target.hp = Math.max(0, target.hp - dealt);
+    log.push(`**${attacker.species}**${weapon ? ' ' + weapon.emoji : ''} deals ${dealt} damage to **${target.species}** (${target.hp} HP left)${note}`);
+    if (target.hp <= 0) log.push(`💀 **${target.species}** fainted!`);
+    return dealt;
+  }
+
+  // apply DoT (poison/flame) at the start of a side's turn
+  function applyDot(pets, statuses, log) {
+    for (const p of pets) {
+      if (p.hp <= 0) continue;
+      const s = statuses[p.id];
+      let dotLabel = '';
+      let dot = 0;
+      if (s.poison > 0) { dot += Math.floor(p.max_hp * 0.05) + 3; s.poison--; dotLabel = '☠️ poison'; }
+      if (s.flame > 0) { dot += Math.floor(p.max_hp * 0.04) + 3; s.flame--; dotLabel = (dotLabel ? dotLabel + ' + ' : '') + '🔥 burn'; }
+      if (dot > 0) {
+        p.hp = Math.max(0, p.hp - dot);
+        log.push(`**${p.species}** takes ${dot} from ${dotLabel} (${p.hp} HP left)`);
+        if (p.hp <= 0) log.push(`💀 **${p.species}** fainted!`);
+      }
+    }
+  }
 
   let log = [];
   let round = 0;
@@ -49,23 +115,68 @@ async function runBattle(message, target) {
     const myAlive = myCopy.filter(p => p.hp > 0);
     const theirAlive = theirCopy.filter(p => p.hp > 0);
 
-    for (const pet of myAlive) {
-      if (!theirAlive.length) break;
-const t = theirAlive.reduce((a, b) => a.hp < b.hp ? a : b);
-      const dmg = Math.max(0, pet.effAtk - Math.floor(t.effDef / 2) + Math.floor(Math.random() * 10));
-      t.hp = Math.max(0, t.hp - dmg);
-      log.push(`**${pet.species}** deals ${dmg} damage to **${t.species}** (${t.hp} HP left)`);
-      if (t.hp <= 0) log.push(`💀 **${t.species}** fainted!`);
+    // my turn: apply my DoT, taunt check, heal-staff heal, then attack
+    applyDot(myAlive, myStatus, log);
+    // heal staff: heal weakest of own side before attacking
+    const myHealer = myAlive.find(p => p._weapon && p._weapon.type === 'heal_staff');
+    if (myHealer && myAlive.length > 1) {
+      const weakest = myAlive.filter(x => x.id !== myHealer.id).sort((a, b) => a.hp - b.hp)[0];
+      const powerH = 0.6 + (myHealer._weapon.quality / 100) * 0.8;
+      const healAmt = Math.floor(myHealer.effAtk * (0.3 + powerH * 0.3)) + 5;
+      if (weakest.hp > 0) { weakest.hp = Math.min(weakest.max_hp, weakest.hp + healAmt); log.push(`💚 **${myHealer.species}** heals **${weakest.species}** +${healAmt}`); }
+    }
+    const myAliveAfterDot = myCopy.filter(p => p.hp > 0);
+    const theirAliveForAtk = theirCopy.filter(p => p.hp > 0);
+    for (const pet of myAliveAfterDot) {
+      if (!theirAliveForAtk.length) break;
+      if (pet._weapon && pet._weapon.type === 'great_sword') {
+        // splash: hit every alive enemy (each with slightly reduced damage)
+        for (const en of [...theirAliveForAtk]) {
+          if (en.hp <= 0) continue;
+          const dmg = Math.max(0, pet.effAtk - Math.floor(en.effDef / 2) + Math.floor(Math.random() * 10));
+          const splashed = Math.floor(dmg * 0.7);
+          en.hp = Math.max(0, en.hp - splashed);
+          log.push(`⚔️ **${pet.species}** sweeps **${en.species}** for ${splashed} (${en.hp} HP left)`);
+          if (en.hp <= 0) log.push(`💀 **${en.species}** fainted!`);
+        }
+        continue;
+      }
+      // taunt (aegis) redirects attacks to the taunter
+      const taunter = theirAliveForAtk.find(t => theirStatus[t.id] && theirStatus[t.id].taunt);
+      const t = taunter || theirAliveForAtk.reduce((a, b) => a.hp < b.hp ? a : b);
+      if (taunter) { theirStatus[taunter.id].taunt = false; }
+      doDamage(pet, t, 'my', myAliveAfterDot, theirAliveForAtk, log, theirStatus);
     }
 
-    for (const pet of theirCopy.filter(p => p.hp > 0)) {
-      const myAliveNow = myCopy.filter(p => p.hp > 0);
-      if (!myAliveNow.length) break;
-      const t = myAliveNow.reduce((a, b) => a.hp < b.hp ? a : b);
-      const dmg = Math.max(0, pet.effAtk - Math.floor(t.effDef / 2) + Math.floor(Math.random() * 10));
-      t.hp = Math.max(0, t.hp - dmg);
-      log.push(`**${pet.species}** deals ${dmg} damage to **${t.species}** (${t.hp} HP left)`);
-      if (t.hp <= 0) log.push(`💀 **${t.species}** fainted!`);
+    // their turn
+    const theirAliveNow = theirCopy.filter(p => p.hp > 0);
+    applyDot(theirAliveNow, theirStatus, log);
+    const theirHealer = theirAliveNow.find(p => p._weapon && p._weapon.type === 'heal_staff');
+    if (theirHealer && theirAliveNow.length > 1) {
+      const weakest = theirAliveNow.filter(x => x.id !== theirHealer.id).sort((a, b) => a.hp - b.hp)[0];
+      const powerH = 0.6 + (theirHealer._weapon.quality / 100) * 0.8;
+      const healAmt = Math.floor(theirHealer.effAtk * (0.3 + powerH * 0.3)) + 5;
+      if (weakest.hp > 0) { weakest.hp = Math.min(weakest.max_hp, weakest.hp + healAmt); log.push(`💚 **${theirHealer.species}** heals **${weakest.species}** +${healAmt}`); }
+    }
+    const theirAliveAfterDot = theirCopy.filter(p => p.hp > 0);
+    const myAliveForAtk = myCopy.filter(p => p.hp > 0);
+    for (const pet of theirAliveAfterDot) {
+      if (!myAliveForAtk.length) break;
+      if (pet._weapon && pet._weapon.type === 'great_sword') {
+        for (const en of [...myAliveForAtk]) {
+          if (en.hp <= 0) continue;
+          const dmg = Math.max(0, pet.effAtk - Math.floor(en.effDef / 2) + Math.floor(Math.random() * 10));
+          const splashed = Math.floor(dmg * 0.7);
+          en.hp = Math.max(0, en.hp - splashed);
+          log.push(`⚔️ **${pet.species}** sweeps **${en.species}** for ${splashed} (${en.hp} HP left)`);
+          if (en.hp <= 0) log.push(`💀 **${en.species}** fainted!`);
+        }
+        continue;
+      }
+      const taunter = myAliveForAtk.find(t => myStatus[t.id] && myStatus[t.id].taunt);
+      const t = taunter || myAliveForAtk.reduce((a, b) => a.hp < b.hp ? a : b);
+      if (taunter) { myStatus[taunter.id].taunt = false; }
+      doDamage(pet, t, 'their', theirAliveAfterDot, myAliveForAtk, log, myStatus);
     }
   }
 
@@ -91,6 +202,10 @@ const t = theirAlive.reduce((a, b) => a.hp < b.hp ? a : b);
     for (const pet of winnerPets) {
       db.awardPetAchievement(pet.id, 'battle_first');
       if (wins >= 10) db.awardPetAchievement(pet.id, 'battle_10');
+    }
+    if (Math.random() < db.WEAPON_BATTLE_DROP_CHANCE) {
+      db.addWeaponCrate(winner.id, 1);
+      result += ' 🏴‍☠️ **WEAPON CRATE DROP!**';
     }
     for (const pet of myPets) {
       const survived = myCopy.find(p => p.id === pet.id);

@@ -44,6 +44,7 @@ module.exports = {
     let gemsEarned = 0;
     let coinsEarned = 0;
     let eggsFound = 0;
+    let weaponCratesFound = 0;
     const xpMult = db.eventMult('xpMult');
     const xpEarned = Math.floor(yieldInfo.xp * count * xpMult);
     for (let i = 0; i < count; i++) {
@@ -57,6 +58,10 @@ module.exports = {
       if (db.rollEggDrop(userId)) {
         db.addEgg(userId, 1);
         eggsFound++;
+      }
+      if (Math.random() < db.WEAPON_BATTLE_DROP_CHANCE) {
+        db.addWeaponCrate(userId, 1);
+        weaponCratesFound++;
       }
       results.push(animal);
     }
@@ -83,6 +88,7 @@ module.exports = {
     if (coinsEarned > 0) summary.push(`gain trait: **+${coinsEarned}** coins`);
     if (gemsEarned > 0) summary.push(`💎 found **${gemsEarned} gem${gemsEarned > 1 ? 's' : ''}**!`);
     if (eggsFound > 0) summary.push(`🥚 found **${eggsFound} egg${eggsFound > 1 ? 's' : ''}**! (\`v hatch\` to open)`);
+    if (weaponCratesFound > 0) summary.push(`🏴‍☠️ found **${weaponCratesFound} weapon crate${weaponCratesFound > 1 ? 's' : ''}**! (\`v weaponcrate open\`)`);
     summary.push(`💎 gems: **${db.getGems(userId)}**`);
     if (xpResult) summary.push(`**+${xpEarned}** xp${xpMult > 1 ? ` (event x${xpMult})` : ''}`);
     if (xpResult && xpResult.leveledUp) summary.push(`leveled up to **${xpResult.newLevel}**!`);

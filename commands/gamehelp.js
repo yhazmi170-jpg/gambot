@@ -180,6 +180,20 @@ heist: {
         play: `\`${prefix} crate [common|premium|mythic]\`\nExample: \`${prefix} crate premium\``,
         tips: 'Pity is per-user and never resets unless you hit the guarantee. Mythic crates can drop mythic pets.',
       },
+      weapon: {
+        name: 'Pet Weapons',
+        aliases: 'weps, armory',
+        desc: 'Equip a weapon on a battle-team pet for flat ATK/DEF boosts plus a special battle effect. Weapons come from weapon crates.',
+        play: `\`${prefix} weapon\` — see your armory\n\`${prefix} weapon list\` — same\n\`${prefix} weapon equip #<weapId> #<animalId>\` — equip on a team pet\n\`${prefix} weapon upgrade #<weapId>\` — level it up (coins)`,
+        tips: 'Only team pets can use weapons (`v team add` first). Effects: Great Sword (splash all), Poison Dagger (DoT), Flame Staff (burn), Vampiric Staff (lifesteal), Healing Staff (heal teammate), Defender Aegis (DEF + taunt), Bow (strong targeting), Rune of Power (balanced). Rarity quality % boosts the numbers.',
+      },
+      weaponcrate: {
+        name: 'Weapon Crates',
+        aliases: 'wcrate, wepcrate',
+        desc: 'Buy or open a crate that gives a random weapon for your battle team.',
+        play: `\`${prefix} weaponcrate\` — status\n\`${prefix} weaponcrate buy\` — buy one\n\`${prefix} weaponcrate open\` — open one`,
+        tips: 'Crates also drop from `v battle` wins and `v hunt` (about 8%). Rarity: common → uncommon → rare → epic → mythical → legendary → fabled.',
+      },
       freebet: {
         name: 'Free Bets',
         aliases: 'fb',

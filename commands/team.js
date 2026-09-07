@@ -23,7 +23,9 @@ module.exports = {
           const a = db.getAnimal(id);
           if (a) {
             const emoji = rarityEmojis[(a.rarity || 'common').toLowerCase()] || '⚪';
-            lines.push(`**Slot ${i}:** ${emoji} **${a.species}** Lv.${a.level} ❤️${a.hp} ⚔️${a.attack} 🛡️${a.defense}`);
+            const weapon = db.getAnimalWeapon(id);
+            const wepStr = weapon ? ` · ${weapon.emoji} **${weapon.name}** Lv.${weapon.level}` : '';
+            lines.push(`**Slot ${i}:** ${emoji} **${a.species}** Lv.${a.level} ❤️${a.hp} ⚔️${a.attack} 🛡️${a.defense}${wepStr}`);
           }
           else lines.push(`**Slot ${i}:** empty`);
         } else {

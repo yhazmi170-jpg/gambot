@@ -155,6 +155,23 @@ async function init() {
   try { db.run(`ALTER TABLE animals ADD COLUMN shiny INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   try { db.run(`ALTER TABLE animals ADD COLUMN trait TEXT NOT NULL DEFAULT ''`); } catch (e) {}
   try { db.run(`ALTER TABLE animals ADD COLUMN fed_until INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  db.run(`CREATE TABLE IF NOT EXISTS animals_weapon (
+    animal_id INTEGER PRIMARY KEY,
+    weapon_id INTEGER NOT NULL
+  )`);
+  db.run(`CREATE TABLE IF NOT EXISTS weapons_inv (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    rarity TEXT NOT NULL,
+    quality INTEGER NOT NULL DEFAULT 0,
+    level INTEGER NOT NULL DEFAULT 1,
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+  )`);
+  db.run(`CREATE TABLE IF NOT EXISTS weapon_crates (
+    user_id TEXT PRIMARY KEY,
+    qty INTEGER NOT NULL DEFAULT 0
+  )`);
   db.run(`CREATE TABLE IF NOT EXISTS teams (
     user_id TEXT PRIMARY KEY,
     slot1 INTEGER DEFAULT NULL,
@@ -3400,6 +3417,199 @@ function openCrate(userId, crateId) {
   return { ok: true, id, species, rarity, shiny: shiny === 1, trait, pity, crate: crate.name, gems, essence };
 }
 
+// ── Pet weapons (OwO-style, adapted to Gambot) ─────────────────────────────
+const WEAPON_RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'mythical', 'legendary', 'fabled'];
+// OwO-style drop rates + quality ranges per rarity.
+const WEAPON_CRATE_WEIGHTS = { common: 42.7, uncommon: 26.0, rare: 17.3, epic: 10.5, mythical: 2.5, legendary: 0.9, fabled: 0.05 };
+const WEAPON_RARITY_DATA = {
+  common:    { quality: [0, 20],   tag: '⬜' },
+  uncommon:  { quality: [21, 40],  tag: '🟩' },
+  rare:      { quality: [41, 60],  tag: '🟦' },
+  epic:      { quality: [61, 80],  tag: '🟪' },
+  mythical:  { quality: [81, 94],  tag: '👑' },
+  legendary: { quality: [95, 99],  tag: '🟨' },
+  fabled:    { quality: [100, 100], tag: '🔮' },
+};
+// Weapon type → display name + a flavor line + upsell text.
+const WEAPON_TYPES = {
+  great_sword:  { name: 'Great Sword',     emoji: '⚔️', desc: 'deals your ATK to the lowest-HP enemy, boosted by quality' },
+  poison_dagger:{ name: 'Poison Dagger',   emoji: '🗡️', desc: 'stab and poison the enemy for damage over time' },
+  flame_staff:  { name: 'Flame Staff',     emoji: '🔥', desc: 'burn the enemy — bonus damage every round' },
+  vamp_staff:   { name: 'Vampiric Staff',  emoji: '🧛', desc: 'heal for a share of the damage you deal' },
+  heal_staff:   { name: 'Healing Staff',   emoji: '💚', desc: 'heal your weakest alive pet each round' },
+  aegis:        { name: 'Defender Aegis',  emoji: '🛡️', desc: 'big DEF boost and draws enemy attacks' },
+  bow:          { name: 'Bow',             emoji: '🏹', desc: 'piercing shot that can hit a stronger enemy' },
+  rune:         { name: 'Rune of Power',   emoji: '🔮', desc: 'balanced ATK + DEF boost' },
+};
+// Attack/defense bonus scale per rarity (multiplied by pet level a bit).
+const WEAPON_STAT_BASE = {
+  common:    { atk: 8,   def: 5,   mult: 1 },
+  uncommon:  { atk: 14,  def: 9,   mult: 1 },
+  rare:      { atk: 24,  def: 15,  mult: 1 },
+  epic:      { atk: 42,  def: 26,  mult: 1 },
+  mythical:  { atk: 68,  def: 42,  mult: 1 },
+  legendary: { atk: 100, def: 62,  mult: 1 },
+  fabled:    { atk: 150, def: 95,  mult: 1 },
+};
+const WEAPON_CRATE_PRICE = 15000;
+const WEAPON_BATTLE_DROP_CHANCE = 0.08;
+
+function rollWeaponRarity() {
+  const total = Object.values(WEAPON_CRATE_WEIGHTS).reduce((a, b) => a + b, 0);
+  let roll = Math.random() * total;
+  for (const r of WEAPON_RARITY_ORDER) {
+    roll -= WEAPON_CRATE_WEIGHTS[r];
+    if (roll <= 0) return r;
+  }
+  return 'common';
+}
+
+function rollWeaponType() {
+  const keys = Object.keys(WEAPON_TYPES);
+  return keys[Math.floor(Math.random() * keys.length)];
+}
+
+// Weighted roll weighted toward the common/stronger types so variety feels good.
+function rollWeaponTypeWeighted() {
+  const weights = { great_sword: 16, poison_dagger: 15, flame_staff: 15, vamp_staff: 12, heal_staff: 12, aegis: 12, bow: 9, rune: 9 };
+  const total = Object.values(weights).reduce((a, b) => a + b, 0);
+  let roll = Math.random() * total;
+  for (const [t, w] of Object.entries(weights)) { roll -= w; if (roll <= 0) return t; }
+  return 'great_sword';
+}
+
+function makeWeapon(type, rarity) {
+  const [lo, hi] = WEAPON_RARITY_DATA[rarity].quality;
+  const quality = lo === hi ? lo : lo + Math.floor(Math.random() * (hi - lo + 1));
+  const base = WEAPON_STAT_BASE[rarity];
+  const q = quality / 100;
+  return {
+    type, rarity, quality,
+    atk: Math.max(1, Math.floor(base.atk * (0.7 + q * 0.6))),
+    def: Math.max(1, Math.floor(base.def * (0.7 + q * 0.6))),
+  };
+}
+
+function addWeaponCrate(userId, qty) {
+  db.run(`INSERT INTO weapon_crates (user_id, qty) VALUES ('${userId}', ${qty || 1})
+    ON CONFLICT(user_id) DO UPDATE SET qty = qty + ${qty || 1}`);
+  save();
+}
+
+function getWeaponCrates(userId) {
+  const r = db.exec(`SELECT qty FROM weapon_crates WHERE user_id = '${userId}'`);
+  return (r.length && r[0].values.length) ? r[0].values[0][0] : 0;
+}
+
+function openWeaponCrate(userId) {
+  const crates = getWeaponCrates(userId);
+  if (crates <= 0) return { ok: false, reason: 'nocrates' };
+  db.run(`UPDATE weapon_crates SET qty = qty - 1 WHERE user_id = '${userId}'`);
+  const rarity = rollWeaponRarity();
+  const type = rollWeaponTypeWeighted();
+  const w = makeWeapon(type, rarity);
+  db.run(`INSERT INTO weapons_inv (user_id, type, rarity, quality) VALUES ('${userId}', '${type}', '${rarity}', ${w.quality})`);
+  const rows = db.exec('SELECT last_insert_rowid() AS id');
+  w.id = rows[0].values[0][0];
+  save();
+  return { ok: true, ...w, name: WEAPON_TYPES[type].name, emoji: WEAPON_TYPES[type].emoji, desc: WEAPON_TYPES[type].desc };
+}
+
+function buyWeaponCrate(userId) {
+  const u = ensureUser(userId);
+  if (!u || (u.balance || 0) < WEAPON_CRATE_PRICE) return { ok: false, reason: 'coins' };
+  db.run(`UPDATE users SET balance = balance - ${WEAPON_CRATE_PRICE} WHERE user_id = '${userId}'`);
+  addWeaponCrate(userId, 1);
+  save();
+  return { ok: true };
+}
+
+function getWeaponInv(userId) {
+  const r = db.exec(`SELECT * FROM weapons_inv WHERE user_id = '${userId}' ORDER BY id`);
+  if (!r.length) return [];
+  return r[0].values.map(v => {
+    const w = { id: v[0], user_id: v[1], type: v[2], rarity: v[3], quality: v[4], level: v[5], created_at: v[6] };
+    const meta = WEAPON_TYPES[w.type] || {};
+    return { ...w, name: meta.name, emoji: meta.emoji, desc: meta.desc, atk: weaponAtk(w), def: weaponDef(w) };
+  });
+}
+
+function getWeapon(id) {
+  const r = db.exec(`SELECT * FROM weapons_inv WHERE id = ${id}`);
+  if (!r.length || !r[0].values.length) return null;
+  const v = r[0].values[0];
+  const w = { id: v[0], user_id: v[1], type: v[2], rarity: v[3], quality: v[4], level: v[5], created_at: v[6] };
+  const meta = WEAPON_TYPES[w.type] || {};
+  return { ...w, name: meta.name, emoji: meta.emoji, desc: meta.desc, atk: weaponAtk(w), def: weaponDef(w) };
+}
+
+// Quality scales the weapon's number; level adds a bit more.
+function weaponAtk(w) {
+  const base = WEAPON_STAT_BASE[w.rarity].atk;
+  return Math.floor(base * (0.7 + (w.quality / 100) * 0.6) * (1 + (w.level - 1) * 0.12));
+}
+function weaponDef(w) {
+  const base = WEAPON_STAT_BASE[w.rarity].def;
+  return Math.floor(base * (0.7 + (w.quality / 100) * 0.6) * (1 + (w.level - 1) * 0.12));
+}
+
+function equipWeapon(animalId, weaponId, userId) {
+  const animal = getAnimal(animalId);
+  const weapon = getWeapon(weaponId);
+  if (!animal || !weapon) return { ok: false, reason: 'notfound' };
+  if (String(animal.user_id) !== String(userId)) return { ok: false, reason: 'notyours_animal' };
+  if (String(weapon.user_id) !== String(userId)) return { ok: false, reason: 'notyours_weapon' };
+  const team = getTeam(userId);
+  const teamIds = team ? new Set([team.slot1, team.slot2, team.slot3].filter(Boolean)) : new Set();
+  if (!teamIds.has(animalId)) return { ok: false, reason: 'notonteam' };
+  db.run(`INSERT INTO animals_weapon (animal_id, weapon_id) VALUES (${animalId}, ${weaponId})
+    ON CONFLICT(animal_id) DO UPDATE SET weapon_id = ${weaponId}`);
+  save();
+  return { ok: true, animal, weapon };
+}
+
+function getAnimalWeapon(animalId) {
+  const r = db.exec(`SELECT weapon_id FROM animals_weapon WHERE animal_id = ${animalId}`);
+  if (!r.length || !r[0].values.length) return null;
+  return getWeapon(r[0].values[0][0]);
+}
+
+function upgradeWeapon(weaponId, userId) {
+  const w = getWeapon(weaponId);
+  if (!w) return { ok: false, reason: 'notfound' };
+  if (String(w.user_id) !== String(userId)) return { ok: false, reason: 'notyours' };
+  const cost = weaponUpgradeCost(w.rarity, w.level);
+  const u = ensureUser(userId);
+  if (!u || (u.balance || 0) < cost) return { ok: false, reason: 'coins', cost };
+  db.run(`UPDATE users SET balance = balance - ${cost} WHERE user_id = '${userId}'`);
+  db.run(`UPDATE weapons_inv SET level = level + 1 WHERE id = ${weaponId}`);
+  save();
+  return { ok: true, cost, level: w.level + 1, atk: weaponAtk({ ...w, level: w.level + 1 }), def: weaponDef({ ...w, level: w.level + 1 }) };
+}
+
+function weaponUpgradeCost(rarity, level) {
+  const base = { common: 20000, uncommon: 50000, rare: 120000, epic: 350000, mythical: 900000, legendary: 2000000, fabled: 5000000 };
+  return Math.floor((base[rarity] || 100000) * (1 + 0.1 * (level - 1)));
+}
+
+// A weapon a pet attacks with: adds its effects into the battle log.
+// Returns {atkBoost, defBoost, effect} where effect names a battle behavior.
+function weaponBattleMods(weapon) {
+  if (!weapon) return { atkBoost: 0, defBoost: 0, effect: null, power: 0 };
+  const power = 0.6 + (weapon.quality / 100) * 0.8;
+  return {
+    atkBoost: weapon.atk,
+    defBoost: weapon.def,
+    power,
+    effect: weapon.type,
+    emoji: WEAPON_TYPES[weapon.type] && WEAPON_TYPES[weapon.type].emoji,
+    name: WEAPON_TYPES[weapon.type] && WEAPON_TYPES[weapon.type].name,
+  };
+}
+
+// Expose weapon metadata for commands/UI.
+const WEAPON_RARITY_TAG = Object.fromEntries(Object.entries(WEAPON_RARITY_DATA).map(([k, v]) => [k, v.tag]));
+
 const BOSS_POT_TAX = 0.05;
 const BOSS_LIFE = 30 * 60; // 30 min
 
@@ -3597,6 +3807,11 @@ module.exports = {
   createAuction, getAuction, listAuctions, placeBid, endAuction, cancelAuction, cleanupExpiredAuctions,
   BOSS_BASE_HP, BOSS_LIFE, getBoss, spawnBoss, attackBoss, addBossPot, getBossContrib, resolveBoss,
   CRATES, getCratePity, setCratePity, rollCrateRarity, openCrate,
+  WEAPON_TYPES, WEAPON_RARITY_DATA, WEAPON_RARITY_ORDER, WEAPON_RARITY_TAG,
+  WEAPON_CRATE_PRICE, WEAPON_BATTLE_DROP_CHANCE,
+  addWeaponCrate, getWeaponCrates, openWeaponCrate, buyWeaponCrate,
+  getWeaponInv, getWeapon, equipWeapon, getAnimalWeapon, upgradeWeapon, weaponUpgradeCost,
+  weaponBattleMods, makeWeapon, rollWeaponType, rollWeaponRarity,
    isMarried, marriedMult,
    SHINY_CHANCE, PERSONALITIES, rollShiny, rollTrait,
    exec: (sql) => db ? db.exec(sql) : null,

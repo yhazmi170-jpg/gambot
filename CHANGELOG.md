@@ -4,6 +4,14 @@ Complete list of every update shipped, newest first. Source: git history (`maste
 
 ---
 
+## v1.8.0 — Pet Weapons
+
+- **NEW weapon system (OwO-style, adapted to Gambot's battle loop)**: `v weaponcrate` (buy 15k / open), `v weapon` (list/equip/upgrade). 8 weapon types — Great Sword (splash all), Poison Dagger (3-turn DoT), Flame Staff (burn DoT), Vampiric Staff (lifesteal), Healing Staff (heal weakest teammate), Defender Aegis (DEF lean + taunt draw), Bow, Rune of Power (balanced ATK/DEF). 7 rarities (common→fabled) with quality % scaling; weapons add flat ATK/DEF on top of trait/fed % modifiers.
+- **Drops**: weapon crates drop ~8% (`WEAPON_BATTLE_DROP_CHANCE`) per animal from `v hunt` and on `v battle` wins. Shop has a `Weapon Crate` item.
+- **DB**: new tables `weapons_inv`, `animals_weapon` (animal→weapon), `weapon_crates`; helpers `openWeaponCrate`, `getWeaponInv`, `getWeapon`, `equipWeapon`, `getAnimalWeapon`, `upgradeWeapon`, `weaponUpgradeCost`, `weaponBattleMods`. Weapons only equip on battle-team pets.
+- **Team display**: equipped weapons show in `v team` (`· ⚔️ Great Sword Lv.1`).
+- **Help/docs**: `v help` auto-lists both commands (helpCategory Pets); `v gamehelp weapon` + `v gamehelp weaponcrate` added.
+
 ## v1.7.9 — Lucky perk toggle + UI polish
 
 - **NEW `v lucky` (player-facing)**: self-service toggle for the lucky perk — 90% coinflip win rate with 3× payouts while on (see `commands/lucky.js`). Powered by the existing `users.lucky` column + `db.toggleLucky` (was previously owner-set only). `v help` auto-lists it; coinflip tips in `gamehelp.js` now mention the toggle.

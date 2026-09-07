@@ -17,3 +17,6 @@ Format: one line per change, terse, no AI fluff.
 - Fix silent unregistered-user responses: TOS prompt now wrapped in try/catch so failures can't silently swallow commands (debug the new-server zero-response).
 - Debug: log every parsed command (guild/chan/user/cmd) + capture async handleMessage rejections; diagnosing members getting no reply in snowed #cmds.
 - HARD GUARD: bot now refuses to boot anywhere except Render (prevents local double-instance that wiped definity's data).
+
+(flushed into v1.8.0)
+- Pet weapons shipped (weaponcrate + weapon list/equip/upgrade + battle effects + hunt/battle drops + shop item). Full detail in CHANGELOG / update_msg.

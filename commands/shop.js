@@ -17,6 +17,7 @@ const SHOP = [
       { id: 'gems5', name: 'Gem Pack (x5)', price: 9000000, gems: 5, desc: '5 gems = +1 extra animal per hunt', use: 'v hunt — more gems = more animals per hunt' },
       { id: 'egg_luck', name: 'Egg Luck (2x egg drops)', price: 3500000, desc: 'double your chance of finding eggs while hunting', use: 'Eggs drop 2x as often from v hunt / autohunt — v hatch to open' },
       { id: 'double_quest', name: 'Double Quest Rewards', price: 4000000, desc: 'daily quests and weekly bounties pay 2x', use: 'v quest claim / v bounty claim pay double' },
+      { id: 'weapon_crate', name: 'Weapon Crate', price: 15000, weaponCrates: 1, desc: 'open it for a random weapon: Great Sword, Poison Dagger, Flame Staff, Vampiric Staff, Healing Staff, Defender Aegis, Bow, Rune of Power', use: 'v weaponcrate open — equip with v weapon equip #<wepId> #<animalId>' },
     ],
   },
   {
@@ -175,6 +176,8 @@ async function handleInteraction(i) {
 
     if (item.gems) {
       // gem items are currency, not perks — skip the perk-owned check
+    } else if (item.weaponCrates) {
+      // consumable — everyone can buy more
     } else if (db.hasPerk(i.user.id, itemId)) {
       await i.followUp({ embeds: [errEmbed('You already own this perk.')], ephemeral: true });
       return;
@@ -233,6 +236,8 @@ async function handleConfirm(j) {
     db.addBalance(j.user.id, -price);
     if (pending.item.gems) {
       db.addGems(j.user.id, pending.item.gems);
+    } else if (pending.item.weaponCrates) {
+      db.addWeaponCrate(j.user.id, pending.item.weaponCrates);
     } else if (pending.item.monthly) { db.addPerk(j.user.id, pending.itemId, Math.floor(Date.now() / 1000) + 30 * 86400); }
     else { db.addPerk(j.user.id, pending.itemId, 0); }
     if (pending.itemId === 'sponsored_footer') setSponsored(j.user.username);
