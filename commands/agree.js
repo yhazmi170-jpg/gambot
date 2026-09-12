@@ -31,13 +31,24 @@ module.exports = {
     const col = msg.createMessageComponentCollector({ filter, time: 60000, max: 1 });
 
     col.on('collect', async (interaction) => {
-      db.acceptTerms(message.author.id);
-      await interaction.update({
+      // Ack the click immediately so Discord never marks it failed, even if the
+      // synchronous sql.js save() in acceptTerms stalls the event loop past the
+      // 3s window (the global fallback in index.js may also have deferred it).
+      await interaction.deferUpdate().catch(() => {});
+
+      try {
+        db.acceptTerms(message.author.id);
+      } catch (err) {
+        console.error(`[TOS] acceptTerms failed for ${message.author.id}:`, (err && err.message) || err);
+        return message.channel.send({ embeds: [error('could not accept terms right now — try again in a second')] }).catch(() => {});
+      }
+
+      await msg.edit({
         embeds: [embed('✅ Terms Accepted', [
           ['', `you got **${db.START_BALANCE}** money to start! try \`v help\``],
         ], 0x57f287)],
         components: [],
-      });
+      }).catch(() => {});
     });
 
     col.on('end', async (collected) => {

@@ -23,3 +23,4 @@ Format: one line per change, terse, no AI fluff.
 
 (small, unannounced)
 - Short aliases for under-alias'd commands: weaponcrate `wc`, weapon `wep`, zoo `z`, bid `bd`, heist `hst`, lucky `lck`, rename `rn`, setbadge `sb`, reward `rwd`, givepets `gp`.
+- TOS fix: 'I Agree' now acks the click instantly and confirms via plain message edit (no fragile interaction.update race), acceptTerms wrapped in try/catch + idempotent, and 'tos_accepted'/'tos_accept_failed' traced to /debug. Stops the "can't even agree / same TOS over and over" loop when the sql.js save/backup stalls the event loop past Discord's 3s window.

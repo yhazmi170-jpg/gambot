@@ -216,10 +216,20 @@ async function sendTosPrompt(message, onAccept) {
   const filter = i => i.user.id === message.author.id && i.customId === 'tos_accept';
   const col = msg.createMessageComponentCollector({ filter, time: 60000, max: 1 });
 
+  const dlog = require('../debuglog');
   col.on('collect', async (interaction) => {
+    // Ack immediately so a slow event loop (sql.js save / backup) can never make
+    // the click look like it timed out before we accept the terms.
     await interaction.deferUpdate().catch(() => {});
-    db.acceptTerms(message.author.id);
-    msg.edit({
+    try {
+      db.acceptTerms(message.author.id);
+    } catch (err) {
+      dlog.log({ kind: 'step', guild: message.guild && message.guild.id, user: message.author.id, cmd: 'agree', step: 'tos_accept_failed', err: err && err.message });
+      console.error(`[TOS] acceptTerms failed for ${message.author.id}:`, (err && err.message) || err);
+      return msg.channel.send({ embeds: [error('could not accept terms right now — try again in a second')] }).catch(() => {});
+    }
+    dlog.log({ kind: 'step', guild: message.guild && message.guild.id, user: message.author.id, cmd: 'agree', step: 'tos_accepted' });
+    await msg.edit({
       embeds: [embed('✅ Terms Accepted', [
         ['', `you got **${db.START_BALANCE}** money to start!`],
       ], 0x57f287)],
