@@ -21,7 +21,7 @@
 - Same repo is shared by Cursor and OpenCode � git is the source of truth
 
 ## Two-agent workflow (Claude chai ? Claude Code CLI) � READ THIS FIRST
-- **Roles:** The **chat agent** (this Claude, in the user's claude.ai/sidebar session) is the *orchestrator + ops*: the user talks to it about updates, it assigns/approves coding tasks, and it owns deploys (push ? Render auto-deploy ? poll `https://gambot-o2o4.onrender.com` until the new SHA is live), version bumps, `update_msg.txt`, `pending_updates.txt`, and this doc. The **CLI agent** (Claude Code, run via `claude -p "..."` with the repo's `AGENTS.md`/`HANDOFF.md` as context) is the *coder*: it writes the actual code changes.
+- **Roles:** The **chat agent** (this Claude, in the user's claude.ai/sidebar session) is the *orchestrator + ops*: the user talks to it about updates, it assigns/approves coding tasks, and it owns deploys (push ? Render auto-deploy ? poll `https://gambot-c3f5.onrender.com` until the new SHA is live), version bumps, `update_msg.txt`, `pending_updates.txt`, and this doc. The **CLI agent** (Claude Code, run via `claude -p "..."` with the repo's `AGENTS.md`/`HANDOFF.md` as context) is the *coder*: it writes the actual code changes.
 - **How they talk:** git is the ONLY message bus. The orchestrator may invoke the CLI agent on demand with `claude -p "<task>"` (headless, `--dangerously-skip-permissions` in temp/sim scenarios). The CLI agent commits + pushes its work; the orchestrator reads `git log`/diff to review, then deploys. The user can also run Claude Code interactively in the repo � either way, everything lands in commits.
 - **Shared memory files (both agents MUST keep fresh):**
   - `HANDOFF.md` = live session state + "Done recently" (+ current todos). Rewrite top "Status" after a push; append bullet to "Done recently".
@@ -84,13 +84,13 @@
 ## Host / single instance
 - **Host: Render** (free web service, `plan: free` in `render.yaml`) � deploys from this repo via Blueprint. Auto-deploys on `git push` to `master`.
 - **Do NOT run on Replit anymore** � stop the Replit repl (press Stop / `Aovo shutdown`) so there's no double instance. The `.gambot.lock` is per-machine, so two hosts = two bots = double responses.
-- Free tier spins down after **15 min idle** ? keepalive pinger must keep hitting the Render URL (`https://gambot-o2o4.onrender.com`) every 4 min. It wakes on request (~30-50s).
+- Free tier spins down after **15 min idle** ? keepalive pinger must keep hitting the Render URL (`https://gambot-c3f5.onrender.com`) every 4 min. It wakes on request (~30-50s).
 - Data persistence: free tier has **no persistent disk** � `./data` is ephemeral. `GITHUB_TOKEN` env enables hourly backup + boot restore to `yhazmi170-jpg/gambot-data`. Without it, a fresh instance starts an empty DB (max ~1h of player data lost).
-- `update.sh` is Replit-only legacy � **ignore it**. Deploy = `git push`.
+- `update.sh` is Replit-only legacy � **ignore it**. Deploy = `/home/yxx1/bin/deploy-gambot.sh "<message>"` (identity-verified push → Render auto-deploy).
 
 ## Restart / deploy
 ```bash
-git add -A; git commit -m "..."; git push origin master   # Render auto-redeploys
+/home/yxx1/bin/deploy-gambot.sh "commit message"   # identity-verified push -> Render auto-deploys
 # or in Discord: Arestart (if bot already online)
 ```
 

@@ -8,7 +8,7 @@
 - **Version**: `1.8.1` — Coinflip clarity fix (reply now shows `picked` vs `landed`, real win amount; RNG/settlement were always correct). Integration test `scripts/test-coinflip.js` added. Docs synced. Ready to deploy.
 - **Roles (v two-agent workflow):** chat agent (orchestrator, is the user's main driver) delegates coding to Claude Code CLI; git is the message bus.
 - **Change log**: complete history of every update lives in `CHANGELOG.md` (newest first) — keep it in sync with the version bump + `update_msg.txt`
-- **Host migration**: Replit → Render (free, Blueprint from `render.yaml`). Replit repl was stopped by user. **Render URL: `https://gambot-o2o4.onrender.com`** — keepalive pinger repointed to it.
+- **Host migration**: Replit → Render (free, Blueprint from `render.yaml`). Replit repl was stopped by user. **Render URL: `https://gambot-c3f5.onrender.com`** — keepalive pinger repointed to it.
 - **Keepalive**: `keepalive.ps1` pings every 240s; registered as Windows scheduled task `GambotKeepalive` (runs at logon). Pinger must be running on yazan's PC for this to work (now pinging the Render URL).
 
 ## Done recently (2026-09-07)
