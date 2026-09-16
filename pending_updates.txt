@@ -30,4 +30,4 @@ Format: one line per change, terse, no AI fluff.
 - v profile stat card expanded: level/xp, pets+team, bank, eggs & seals, battle wins, daily streak, lucky status, insurance tier, free bet, credit score, loan/clan/plot/jail (when active), member since.
 - FIX: credit score on profiles read the wrong DB column (showed a raw timestamp). ensureUser now maps columns by name -> jail state + rob cooldown reads also fixed.
 - New fun command: v 8ball / v 8b <question> - 45 silly magic answers, compact embed quoting your question (long questions auto-truncate).
-- 8ball final format: replies to your message with ONLY one random answer (no 🎱/question/embed/mention ping); Gambot self-reacts its own reply with a reaction chosen PER ANSWER (😭/☠️ by vibe, never random), one reaction max, reaction failure safe; decorative emojis stripped from answers; 'gang' → 'gng'.
+- 8ball: reply-only format with a per-answer self-reaction (😭/☠️ by vibe, plus sparing 💔/🙏/🤞/⁉️ — never random) on Gambot's own reply; answer pool expanded 45 → 120 diabolical/casual lines (roasts, dry dismissals, loaded no's), 'gang' → 'gng', no mystical filler.

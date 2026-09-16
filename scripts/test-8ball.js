@@ -54,6 +54,9 @@ const db = require('../db');
 const handler = require('../utils/commandHandler');
 const { ANSWERS } = require('../commands/8ball');
 
+const cookedIdx = ANSWERS.findIndex(a => a.text === 'yeah ur cooked');
+const cookedText = ANSWERS[cookedIdx].text;
+
 let seq = 0;
 const uid = () => '8b_it_' + (++seq);
 
@@ -128,13 +131,15 @@ async function run(input, randoms, opts) {
     console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}${detail ? '  — ' + detail : ''}`);
   };
 
-  console.log('== ANSWER POOL: structured, 45 unique, one reaction each, clean ==');
-  check('45 entries with text + reaction', ANSWERS.length === 45 && ANSWERS.every(a => a && a.text && a.reaction), `len=${ANSWERS.length}`);
-  check('  all texts unique + non-empty', new Set(ANSWERS.map(a => a.text)).size === 45 && ANSWERS.every(a => a.text.trim().length > 0), `uniq=${new Set(ANSWERS.map(a => a.text)).size}`);
+  console.log('== ANSWER POOL: >=100 structured, unique, one reaction each, clean ==');
+  check('100-120 entries with text + reaction', ANSWERS.length >= 100 && ANSWERS.length <= 120 && ANSWERS.every(a => a && a.text && a.reaction), `len=${ANSWERS.length}`);
+  check('  all texts unique + non-empty', new Set(ANSWERS.map(a => a.text)).size === ANSWERS.length && ANSWERS.every(a => a.text.trim().length > 0), `uniq=${new Set(ANSWERS.map(a => a.text)).size}`);
   check('  all reactions defined', ANSWERS.every(a => a.reaction !== undefined && a.reaction !== null && a.reaction !== ''), ANSWERS.filter(a => !a.reaction).map(a => a.text).join('|'));
-  check('  reactions limited to 😭/☠️ personality', ANSWERS.every(a => ['😭', '☠️'].includes(a.reaction)), [...new Set(ANSWERS.map(a => a.reaction))].join(' '));
-  check('  no decorative emoji duplicates in answer text', ANSWERS.every(a => !/😭☠️💀🙏💔/.test(a.text)), ANSWERS.map(a => a.text).filter(t => /[😭☠️💀🙏💔]/.test(t)).join('|'));
-  check('  no "gang" left, "not looking good gng" present', ANSWERS.every(a => !/\bgang\b/.test(a.text)) && ANSWERS.some(a => a.text === 'not looking good gng'), ANSWERS.map(a => a.text).filter(t => /\bgang\b/.test(t)).join('|'));
+  check('  reactions within personality set', ANSWERS.every(a => ['😭', '☠️', '💔', '🙏', '🤞', '⁉️'].includes(a.reaction)), [...new Set(ANSWERS.map(a => a.reaction))].join(' '));
+  check('  no decorative emoji duplicates in answer text', ANSWERS.every(a => !/[😭☠️💀🙏💔🤞⁉️]/.test(a.text)), ANSWERS.map(a => a.text).filter(t => /[😭☠️💀🙏💔🤞⁉️]/.test(t)).join('|'));
+  check('  no "gang" left, gng answers present', ANSWERS.every(a => !/\bgang\b/.test(a.text)) && ANSWERS.filter(a => a.text.includes('gng')).length >= 2, ANSWERS.map(a => a.text).filter(t => /\bgang\b/.test(t)).join('|'));
+  check('  no @everyone/@here/mention patterns', ANSWERS.every(a => !a.text.includes('@')), ANSWERS.map(a => a.text).filter(t => t.includes('@')).join('|'));
+  check('  no mystical filler (universe has spoken/destiny/stars align/fate/cosmic)', ANSWERS.every(a => !/(the universe has spoken|destiny|the stars align|fate smiles|cosmic|mystical ball predicts)/i.test(a.text)), ANSWERS.map(a => a.text).filter(t => /(the universe has spoken|destiny|the stars align|fate smiles|cosmic|mystical ball predicts)/i.test(t)).join('|'));
 
   console.log('\n== ANSWER->REACTION MAPPING (deterministic, one per answer) ==');
   const mappingBads = [];
@@ -144,7 +149,7 @@ async function run(input, randoms, opts) {
       mappingBads.push(`${i}:"${ANSWERS[i].text}" -> got ${JSON.stringify(r.content)} / ${JSON.stringify(r.reactions)}, want ${ANSWERS[i].reaction}`);
     }
   }
-  check('  all 45 answers return their exact assigned reaction', mappingBads.length === 0, mappingBads.join(' | '));
+  check('  all answers return their exact assigned reaction', mappingBads.length === 0, mappingBads.join(' | '));
 
   console.log('\n== REPLY FORMAT: only the answer, real reply, no extras ==');
   let r = await run('v 8b do we do mines all', [0.0]);
@@ -152,13 +157,13 @@ async function run(input, randoms, opts) {
   check('  reply content is ONLY the selected answer', r.content === ANSWERS[0].text, `content="${r.content}"`);
   check('  question NOT repeated', r.content && !r.content.includes('do we do mines all'), r.content);
   check('  no 🎱 / no embed / no manual mention ping', !r.content.includes('🎱') && !r.payload.embeds && r.payload.allowedMentions.repliedUser === false, JSON.stringify(r.payload));
-  r = await run('v 8ball am i cooked', [36 / 45]);
-  check('v 8ball am i cooked -> answer + its own ☠️ reaction', r.content === ANSWERS[36].text && r.reactions.length === 1 && r.reactions[0] === '☠️', JSON.stringify({ content: r.content, reactions: r.reactions }));
+  r = await run('v 8ball am i cooked', [(cookedIdx + 0.5) / ANSWERS.length]);
+  check('v 8ball am i cooked -> answer + its own ☠️ reaction', r.content === cookedText && r.reactions.length === 1 && r.reactions[0] === '☠️', JSON.stringify({ content: r.content, reactions: r.reactions }));
 
   console.log('\n== ANSWER SELECTION STILL RANDOM (via Math.random index) ==');
   const seen = new Set();
-  for (let i = 0; i < 45; i++) seen.add((await run('v 8b r?', [(i + 0.37) / 45])).content);
-  check('all 45 answers reachable across forced rolls', seen.size === 45, `distinct=${seen.size}`);
+  for (let i = 0; i < ANSWERS.length; i++) seen.add((await run('v 8b r?', [(i + 0.37) / ANSWERS.length])).content);
+  check('all answers reachable across forced rolls', seen.size === ANSWERS.length, `distinct=${seen.size}`);
 
   console.log('\n== NO QUESTION: tiny usage reply ==');
   r = await run('v 8b');
@@ -166,9 +171,9 @@ async function run(input, randoms, opts) {
   check('  usage text says ask something', r.content && r.content.includes('ask something'), r.content);
 
   console.log('\n== SELF-REACTION: own sent message, exactly one, failure-safe ==');
-  r = await run('v 8b should i?', [9 / 45]);
+  r = await run('v 8b should i?', [(9 + 0.5) / ANSWERS.length]);
   check('reaction lands on Gambot OWN reply (sent stub)', r.replyCount === 1 && r.reactions.length === 1 && r.reactions[0] === ANSWERS[9].reaction, JSON.stringify(r.reactions));
-  r = await run('v 8b should i?', [9 / 45], { failReact: true });
+  r = await run('v 8b should i?', [(9 + 0.5) / ANSWERS.length], { failReact: true });
   check('  reaction failure does NOT break the answer', r.content === ANSWERS[9].text && r.reactions.length === 0, `content="${r.content}"`);
   check('  reaction failure sends no error message', r.sendCount === 0, `sends=${r.sendCount}`);
 
