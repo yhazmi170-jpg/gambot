@@ -1,11 +1,7 @@
 const MAX_QUESTION_LEN = 100;
 
-function sanitizeQuestion(q) {
-  return q.replace(/[\\*_~`>|#@<&]/g, m => '\\' + m);
-}
-
 const ANSWERS = [
-  'absolutely 😭',
+  'absolutely',
   'yes yes yes',
   '100% trust',
   'the vibes are yes',
@@ -15,11 +11,11 @@ const ANSWERS = [
   'signs point to yes',
   'hell nah',
   'do NOT do that',
-  'absolutely not 😭',
+  'absolutely not',
   'the universe said no',
   'pls dont',
   'signs point to no',
-  'lowkey... yeah 😭',
+  'lowkey... yeah',
   'lowkey...',
   'maybe if u lock in',
   'give it 5 business days',
@@ -29,14 +25,14 @@ const ANSWERS = [
   'fortunately no',
   'we might be cooked',
   'source: trust me',
-  'probably 💀',
+  'probably',
   '50/50 bestie',
   'depends on ur sleep schedule',
-  'bro i dont know 😭',
+  'bro i dont know',
   'i forgot the question already',
   'im pretending i didnt hear that',
   'ask again when im awake',
-  'the magic ball glitched 💀',
+  'the magic ball glitched',
   'somehow yes',
   'u got this',
   'lucky aura detected',
@@ -62,7 +58,7 @@ module.exports = {
     let question = args.join(' ').trim();
 
     if (!question.replace(/[?\s]+$/g, '').trim()) {
-      return message.channel.send({ content: '🎱 ask something 😭\n`v 8b am i cooked`' });
+      return message.reply({ content: 'ask something 😭', allowedMentions: { repliedUser: false } });
     }
 
     if (question.length > MAX_QUESTION_LEN) {
@@ -70,6 +66,13 @@ module.exports = {
     }
 
     const answer = ANSWERS[Math.floor(Math.random() * ANSWERS.length)];
-    message.channel.send({ content: `🎱 **${sanitizeQuestion(question)}**\n${answer}` });
+    const roll = Math.random();
+
+    message.reply({ content: answer, allowedMentions: { repliedUser: false } })
+      .then(sent => {
+        const reaction = roll < 0.35 ? '😭' : roll < 0.55 ? '☠️' : null;
+        if (reaction) sent.react(reaction).catch(() => {});
+      })
+      .catch(() => {});
   },
 };

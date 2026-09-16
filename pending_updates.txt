@@ -30,4 +30,4 @@ Format: one line per change, terse, no AI fluff.
 - v profile stat card expanded: level/xp, pets+team, bank, eggs & seals, battle wins, daily streak, lucky status, insurance tier, free bet, credit score, loan/clan/plot/jail (when active), member since.
 - FIX: credit score on profiles read the wrong DB column (showed a raw timestamp). ensureUser now maps columns by name -> jail state + rob cooldown reads also fixed.
 - New fun command: v 8ball / v 8b <question> - 45 silly magic answers, compact embed quoting your question (long questions auto-truncate).
-- 8ball final look: no embed at all — plain message `🎱 **<question>**` with the answer right below (sanitizes mentions/markdown); bare command gets `🎱 ask something 😭` + example.
+- 8ball final format: replies to your message with ONLY one random answer (no 🎱/question/embed/mention ping, 45-answer pool). Sometimes self-reacts 😭 (35%) or ☠️ (20%) on its own reply; decorative emojis removed from answers.
