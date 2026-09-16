@@ -13,8 +13,8 @@ const Module = require('module');
 const origLoad = Module._load;
 
 class StubEmbed {
-  constructor() { this._title = ''; this._fields = []; this._description = ''; }
-  setColor() { return this; }
+  constructor() { this._title = ''; this._fields = []; this._description = ''; this._color = 0; }
+  setColor(c) { this._color = c; return this; }
   setTitle(t) { this._title = t; return this; }
   setDescription(d) { this._description = d; return this; }
   addFields(...args) { for (const a of args) this._fields.push(a); return this; }
@@ -92,15 +92,15 @@ async function run(input) {
   db.acceptTerms(id);
   const msg = makeMessage(input, id);
   await handler.handleMessage(msg);
-  const result = msg._sends.filter(s => s && s.embeds && s.embeds[0] && s.embeds[0]._title === '🔮 8 Ball');
-  const usage = msg._sends.filter(s => s && s.embeds && s.embeds[0] && s.embeds[0]._title.includes('ask me something first'));
+  const result = msg._sends.filter(s => s && s.embeds && s.embeds[0] && String(s.embeds[0]._description || '').startsWith('`8ball`'));
+  const usage = msg._sends.filter(s => s && typeof s.content === 'string' && s.content.includes('ask something 😭'));
   const e = result.length ? result[0].embeds[0] : null;
   let q = null, a = null;
   if (e) {
-    const m = String(e._description || '').match(/^> (.+)\n\n\*\*(.+)\*\*$/);
-    if (m) { q = m[1]; a = m[2]; }
+    const m = String(e._description || '').match(/^`([^`]+)`\n> (.+)\n\n\*\*(.+)\*\*$/);
+    if (m) { q = m[2]; a = m[3]; }
   }
-  return { id, msg, resultCount: result.length, usageCount: usage.length, e, q, a, usageEmbed: usage[0] && usage[0].embeds[0] };
+  return { id, msg, resultCount: result.length, usageCount: usage.length, usageContent: usage[0] && usage[0].content, e, q, a };
 }
 
 (async () => {
@@ -116,13 +116,13 @@ async function run(input) {
     console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}${detail ? '  — ' + detail : ''}`);
   };
 
-  console.log('== NO QUESTION: short usage response, NOT a result ==');
+  console.log('== NO QUESTION: short usage message, NOT a result ==');
   let r = await run('v 8ball');
-  check('v 8ball -> usage response', r.resultCount === 0 && r.usageCount === 1, `results=${r.resultCount} usage=${r.usageCount}`);
-  check('  usage shows the example syntax', r.usageEmbed && r.usageEmbed._fields.some(f => f.value.includes('v 8b am i cooked')), JSON.stringify(r.usageEmbed && r.usageEmbed._fields));
+  check('v 8ball -> usage message', r.resultCount === 0 && r.usageCount === 1, `results=${r.resultCount} usage=${r.usageCount}`);
+  check('  usage is a plain compact message with the example', r.usageContent === 'ask something 😭  ·  v 8b am i cooked', `content="${r.usageContent}"`);
 
   r = await run('v 8b');
-  check('v 8b -> usage response', r.resultCount === 0 && r.usageCount === 1, `results=${r.resultCount} usage=${r.usageCount}`);
+  check('v 8b -> usage message', r.resultCount === 0 && r.usageCount === 1, `results=${r.resultCount} usage=${r.usageCount}`);
 
   console.log('\n== VALID QUESTION: immediate silly answer, question preserved ==');
   r = await run('v 8ball am i cooked');
@@ -150,6 +150,13 @@ async function run(input) {
   r = await run('v 8ball ' + huge);
   check('600-char question -> one result, truncated, no crash', r.resultCount === 1 && r.q && r.q.length <= MAX_Q + 1 && r.q.endsWith('…'), `qlen=${r.q && r.q.length}`);
   check('  truncated answer still from pool', ANSWERS.includes(r.a), `a="${r.a}"`);
+
+  console.log('\n== PRESENTATION: compact layout, dark-red accent ==');
+  r = await run('v 8ball whats ur gender');
+  check('short question render: `8ball` label, quote, bold answer, no title', r.resultCount === 1 && r.q === 'whats ur gender' && !r.e._title, `q="${r.q}" desc="${r.e && r.e._description}"`);
+  check('  embed uses the #6f0000 dark-red accent', r.e && r.e._color === 0x6f0000, `color=${r.e && r.e._color.toString(16)}`);
+  r = await run('v 8b am i getting a good grade this week');
+  check('long question render keeps the same tight layout', r.q === 'am i getting a good grade this week' && r.resultCount === 1, `q="${r.q}"`);
 
   console.log('\n== ANSWER POOL + RNG ==');
   check('pool has 45 unique, non-empty answers', ANSWERS.length === 45 && new Set(ANSWERS).size === 45 && ANSWERS.every(Boolean), `len=${ANSWERS.length} uniq=${new Set(ANSWERS).size}`);
