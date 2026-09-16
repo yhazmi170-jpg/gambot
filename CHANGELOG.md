@@ -4,6 +4,12 @@ Complete list of every update shipped, newest first. Source: git history (`maste
 
 ---
 
+## v1.8.1 — Coinflip clarity fix
+
+- **Coinflip reply now shows the player's pick AND the landed side** (`🪙 picked **heads** — landed **tails** — lost **100**`). Root cause of the "tails always loses / it ignored my heads pick" reports: the old reply only printed the **landed** side (`🪙 **heads** — ...`), so every loss looked like the bot had switched the player's selection. The RNG and settlement were always correct (`result === side`); only the display omitted the choice. Fixed in `commands/coinflip.js`; help text in `commands/gamehelp.js` now states the amount-first syntax and picked/landed display.
+- **Coinflip win amount corrected**: old reply printed `won amount+paid` (double-counting the stake, e.g. "won 200 (+100)" for a 100 bet whose real credit is 100); now prints the real credited amount, matching dice/roulette.
+- Added integration/regression test `scripts/test-coinflip.js` — drives the real command handler (prefix → alias → args → wager parse → side parse → forced RNG → settlement → reply) through all four logical outcomes plus lucky mode, against a throwaway `/tmp` DB.
+
 ## v1.8.0 — Pet Weapons
 
 - **NEW weapon system (OwO-style, adapted to Gambot's battle loop)**: `v weaponcrate` (buy 15k / open), `v weapon` (list/equip/upgrade). 8 weapon types — Great Sword (splash all), Poison Dagger (3-turn DoT), Flame Staff (burn DoT), Vampiric Staff (lifesteal), Healing Staff (heal weakest teammate), Defender Aegis (DEF lean + taunt draw), Bow, Rune of Power (balanced ATK/DEF). 7 rarities (common→fabled) with quality % scaling; weapons add flat ATK/DEF on top of trait/fed % modifiers.

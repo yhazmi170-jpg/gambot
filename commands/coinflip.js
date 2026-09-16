@@ -29,13 +29,13 @@ module.exports = {
     if (win) {
       const profit = amount * mult;
       const paid = db.payWin(message.author.id, profit);
-      message.channel.send(`🪙 **${result}** — won **${amount + paid}** (+**${paid}**)`);
+      message.channel.send(`🪙 picked **${side}** — landed **${result}** — won **${paid}**`);
     } else {
       db.addBalance(message.author.id, -amount);
       db.addGambled(message.author.id, amount);
       const refund = db.getInsuranceRefund(message.author.id, amount);
-      if (refund > 0) { db.addBalance(message.author.id, refund); message.channel.send(`🪙 **${result}** — lost **${amount}** (🛡️ **${refund}** refunded)`); }
-      else message.channel.send(`🪙 **${result}** — lost **${amount}**`);
+      if (refund > 0) { db.addBalance(message.author.id, refund); message.channel.send(`🪙 picked **${side}** — landed **${result}** — lost **${amount}** (🛡️ **${refund}** refunded)`); }
+      else message.channel.send(`🪙 picked **${side}** — landed **${result}** — lost **${amount}**`);
     }
   },
 };

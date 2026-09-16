@@ -1,11 +1,11 @@
-v1.8.0 — What's New
+v1.8.1 — What's New
 
-- ⚔️ NEW: Pet Weapons! Teams can now equip weapons that boost ATK/DEF and add special battle effects
-  - `v weaponcrate buy` (15k coins) → `v weaponcrate open` for a random weapon
-  - `v weapon list` / `v weapon equip #<weaponId> #<animalId>` / `v weapon upgrade #<weaponId>`
-  - 8 weapon types: Great Sword (splash), Poison Dagger (DoT), Flame Staff (burn), Vampiric Staff (lifesteal), Healing Staff (team heal), Defender Aegis (DEF + taunt), Bow, Rune of Power
-  - 7 rarities, common → fabled, each with a quality % that scales your stats
-  - Weapon crates also drop from `v battle` wins and `v hunt` (~8% per animal)
-  - Equipped weapons show up in `v team`
+- 🪙 Coinflip is now crystal clear! The reply shows exactly what you chose:
+  - `🪙 picked **heads** — landed **tails** — lost **100**`
+  - Format: `v cf <amount> <heads/tails>` (amount first, then your side)
+  - You can now always see your pick vs. the landed side — no more "it ignored my choice" confusion
+  - Win messages now show the exact amount you received
+- ✅ TOS "I Agree" button is reliable now (no more repeated prompts)
+- 📛 Short aliases added: `wc`, `wep`, `z`, `bd`, `hst`, `lck`, `rn`, `sb`, `rwd`, `gp`
 
 Enjoy!
