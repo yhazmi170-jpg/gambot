@@ -1,6 +1,8 @@
-const { EmbedBuilder } = require('discord.js');
-
 const MAX_QUESTION_LEN = 100;
+
+function sanitizeQuestion(q) {
+  return q.replace(/[\\*_~`>|#@<&]/g, m => '\\' + m);
+}
 
 const ANSWERS = [
   'absolutely 😭',
@@ -60,7 +62,7 @@ module.exports = {
     let question = args.join(' ').trim();
 
     if (!question.replace(/[?\s]+$/g, '').trim()) {
-      return message.channel.send({ content: 'ask something 😭  ·  v 8b am i cooked' });
+      return message.channel.send({ content: '🎱 ask something 😭\n`v 8b am i cooked`' });
     }
 
     if (question.length > MAX_QUESTION_LEN) {
@@ -68,10 +70,6 @@ module.exports = {
     }
 
     const answer = ANSWERS[Math.floor(Math.random() * ANSWERS.length)];
-    const e = new EmbedBuilder()
-      .setColor(0x6f0000)
-      .setDescription(`\`8ball\`\n> ${question}\n\n**${answer}**`);
-
-    message.channel.send({ embeds: [e] });
+    message.channel.send({ content: `🎱 **${sanitizeQuestion(question)}**\n${answer}` });
   },
 };

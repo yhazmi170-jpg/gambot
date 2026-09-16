@@ -92,15 +92,18 @@ async function run(input) {
   db.acceptTerms(id);
   const msg = makeMessage(input, id);
   await handler.handleMessage(msg);
-  const result = msg._sends.filter(s => s && s.embeds && s.embeds[0] && String(s.embeds[0]._description || '').startsWith('`8ball`'));
-  const usage = msg._sends.filter(s => s && typeof s.content === 'string' && s.content.includes('ask something 😭'));
-  const e = result.length ? result[0].embeds[0] : null;
+  const contentSends = msg._sends.filter(s => typeof s.content === 'string');
+  const result = contentSends.filter(s => s.content.startsWith('🎱 **'));
+  const usage = contentSends.filter(s => s.content.startsWith('🎱 ask something'));
+  const noEmbeds = msg._sends.every(s => !s.embeds);
   let q = null, a = null;
-  if (e) {
-    const m = String(e._description || '').match(/^`([^`]+)`\n> (.+)\n\n\*\*(.+)\*\*$/);
-    if (m) { q = m[2]; a = m[3]; }
+  if (result.length) {
+    const lines = result[0].content.split('\n');
+    const qm = lines[0].match(/^🎱 \*\*(.+)\*\*$/);
+    if (qm) q = qm[1];
+    a = lines.slice(1).join('\n') || null;
   }
-  return { id, msg, resultCount: result.length, usageCount: usage.length, usageContent: usage[0] && usage[0].content, e, q, a };
+  return { id, msg, resultCount: result.length, usageCount: usage.length, usageContent: usage[0] && usage[0].content, noEmbeds, q, a };
 }
 
 (async () => {
@@ -116,19 +119,18 @@ async function run(input) {
     console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}${detail ? '  — ' + detail : ''}`);
   };
 
-  console.log('== NO QUESTION: short usage message, NOT a result ==');
+  console.log('== NO QUESTION: short plain message, NO embed ==');
   let r = await run('v 8ball');
-  check('v 8ball -> usage message', r.resultCount === 0 && r.usageCount === 1, `results=${r.resultCount} usage=${r.usageCount}`);
-  check('  usage is a plain compact message with the example', r.usageContent === 'ask something 😭  ·  v 8b am i cooked', `content="${r.usageContent}"`);
+  check('v 8ball -> usage message, no result', r.resultCount === 0 && r.usageCount === 1, `results=${r.resultCount} usage=${r.usageCount}`);
+  check('  usage is a plain message with the example, no embeds', r.usageContent === '🎱 ask something 😭\n`v 8b am i cooked`' && r.noEmbeds, `content="${r.usageContent}" embeds=${!r.noEmbeds}`);
 
   r = await run('v 8b');
-  check('v 8b -> usage message', r.resultCount === 0 && r.usageCount === 1, `results=${r.resultCount} usage=${r.usageCount}`);
+  check('v 8b -> usage message, no embed', r.resultCount === 0 && r.usageCount === 1 && r.noEmbeds, `results=${r.resultCount} usage=${r.usageCount}`);
 
-  console.log('\n== VALID QUESTION: immediate silly answer, question preserved ==');
+  console.log('\n== VALID QUESTION: plain message, question preserved ==');
   r = await run('v 8ball am i cooked');
-  check('v 8ball am i cooked -> one result embed', r.resultCount === 1, `results=${r.resultCount}`);
-  check('  question "am i cooked" preserved', r.q === 'am i cooked', `q="${r.q}"`);
-  check('  answer is a real pool entry', ANSWERS.includes(r.a), `a="${r.a}"`);
+  check('v 8ball am i cooked -> one plain response, no embeds', r.resultCount === 1 && r.noEmbeds, `results=${r.resultCount} embeds=${!r.noEmbeds}`);
+  check('  question "am i cooked" preserved, answer from pool', r.q === 'am i cooked' && ANSWERS.includes(r.a), `q="${r.q}" a="${r.a}"`);
 
   r = await run('v 8b does she like me');
   check('v 8b does she like me -> one result, question preserved', r.resultCount === 1 && r.q === 'does she like me', `q="${r.q}"`);
@@ -151,12 +153,21 @@ async function run(input) {
   check('600-char question -> one result, truncated, no crash', r.resultCount === 1 && r.q && r.q.length <= MAX_Q + 1 && r.q.endsWith('…'), `qlen=${r.q && r.q.length}`);
   check('  truncated answer still from pool', ANSWERS.includes(r.a), `a="${r.a}"`);
 
-  console.log('\n== PRESENTATION: compact layout, dark-red accent ==');
+  console.log('\n== PRESENTATION: plain Discord message, no embed ==');
   r = await run('v 8ball whats ur gender');
-  check('short question render: `8ball` label, quote, bold answer, no title', r.resultCount === 1 && r.q === 'whats ur gender' && !r.e._title, `q="${r.q}" desc="${r.e && r.e._description}"`);
-  check('  embed uses the #6f0000 dark-red accent', r.e && r.e._color === 0x6f0000, `color=${r.e && r.e._color.toString(16)}`);
+  check('short question: "🎱 **question**\\nanswer", exactly one response', r.resultCount === 1 && r.q === 'whats ur gender' && r.a && r.noEmbeds, `content="${r.msg._sends.find(s => typeof s.content === 'string' && s.content.startsWith('🎱 **')) && r.msg._sends.find(s => typeof s.content === 'string' && s.content.startsWith('🎱 **')).content}"`);
   r = await run('v 8b am i getting a good grade this week');
-  check('long question render keeps the same tight layout', r.q === 'am i getting a good grade this week' && r.resultCount === 1, `q="${r.q}"`);
+  check('long question keeps the same two-line plain layout', r.q === 'am i getting a good grade this week' && r.resultCount === 1 && r.noEmbeds, `q="${r.q}"`);
+
+  console.log('\n== MARKDOWN / MENTION SAFETY ==');
+  const esc = s => s.replace(/[\\*_~`>|#@<&]/g, m => '\\' + m);
+  const nasty = '@everyone <@123456789> **bold** ||sp|| ~x~ `c` > q?';
+  r = await run('v 8ball ' + nasty);
+  const out = r.msg._sends.find(s => typeof s.content === 'string' && s.content.startsWith('🎱 **')).content;
+  check('visible wording preserved, markdown escaped', r.q === esc(nasty), `q="${r.q}"`);
+  check('  no raw user-mention pattern left', !out.includes('<@123456789>'), out);
+  check('  no @everyone ping left (escaped with backslash)', out.includes('\\@everyone') && !out.replace('\\@everyone', '').includes('@everyone'), out);
+  check('  bold/spoiler/strike/code all neutralized', !out.includes('**bold**') && !out.includes('||sp||') && !out.includes('~x~') && !out.includes('`c`'), out);
 
   console.log('\n== ANSWER POOL + RNG ==');
   check('pool has 45 unique, non-empty answers', ANSWERS.length === 45 && new Set(ANSWERS).size === 45 && ANSWERS.every(Boolean), `len=${ANSWERS.length} uniq=${new Set(ANSWERS).size}`);
