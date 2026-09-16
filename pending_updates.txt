@@ -29,4 +29,4 @@ Format: one line per change, terse, no AI fluff.
 (queued after v1.8.1)
 - v profile stat card expanded: level/xp, pets+team, bank, eggs & seals, battle wins, daily streak, lucky status, insurance tier, free bet, credit score, loan/clan/plot/jail (when active), member since.
 - FIX: credit score on profiles read the wrong DB column (showed a raw timestamp). ensureUser now maps columns by name -> jail state + rob cooldown reads also fixed.
-- New fun command: v 8ball (aliases eightball, ball) - shake the magic 8 ball for a yes/no answer.
+- New fun command: v 8ball / v 8b <question> - 45 silly magic answers, compact embed quoting your question (long questions auto-truncate).

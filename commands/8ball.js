@@ -1,43 +1,81 @@
 const { embed } = require('../utils/embed');
+const { EmbedBuilder } = require('discord.js');
+
+const MAX_QUESTION_LEN = 100;
 
 const ANSWERS = [
-  'It is certain.',
-  'Without a doubt.',
-  'You may rely on it.',
-  'Yes, definitely.',
-  'As I see it, yes.',
-  'Most likely.',
-  'Outlook good.',
-  'Signs point to yes.',
-  'Reply hazy, try again.',
-  'Ask again later.',
-  'Better not tell you now.',
-  'Cannot predict now.',
-  'Concentrate and ask again.',
-  "Don't count on it.",
-  'My reply is no.',
-  'My sources say no.',
-  'Outlook not so good.',
-  'Very doubtful.',
+  'absolutely 😭',
+  'yes yes yes',
+  '100% trust',
+  'the vibes are yes',
+  'yessss go for it',
+  'obviously bestie',
+  'the universe said yes',
+  'signs point to yes',
+  'hell nah',
+  'do NOT do that',
+  'absolutely not 😭',
+  'the universe said no',
+  'pls dont',
+  'signs point to no',
+  'lowkey... yeah 😭',
+  'lowkey...',
+  'maybe if u lock in',
+  'give it 5 business days',
+  'ask ur lawyer',
+  'coin says yes, i say no',
+  'unfortunately yes',
+  'fortunately no',
+  'we might be cooked',
+  'source: trust me',
+  'probably 💀',
+  '50/50 bestie',
+  'depends on ur sleep schedule',
+  'bro i dont know 😭',
+  'i forgot the question already',
+  'im pretending i didnt hear that',
+  'ask again when im awake',
+  'the magic ball glitched 💀',
+  'somehow yes',
+  'u got this',
+  'lucky aura detected',
+  'not looking good gang',
+  'yeah ur cooked',
+  'the voices said yes',
+  'ur on ur own with this one',
+  'ask ur rubber duck',
+  'i asked the cat, the cat said yes',
+  'the math says maybe',
+  "it's giving good luck",
+  'the stars said its ur day',
+  'try again after a snack',
 ];
 
 module.exports = {
   name: '8ball',
   helpCategory: 'Fun',
   helpArgs: '<question>',
-  description: 'shake the magic 8 ball and get a yes/no answer',
-  aliases: ['eightball', 'ball'],
+  description: 'silly magic answers — alias `v 8b <question>`',
+  aliases: ['8b', 'eightball', 'ball'],
   execute(message, args) {
-    const question = args.join(' ').trim();
-    if (!question) {
+    let question = args.join(' ').trim();
+
+    if (!question.replace(/[?\s]+$/g, '').trim()) {
       return message.channel.send({
-        embeds: [embed('🔮 8 Ball', [['Question', 'What do you want to ask?', true], ['Answer', 'Ask me something first.', true]], 0x9b59b6)],
+        embeds: [embed('🔮 ask me something first 😭', [['', '`v 8b am i cooked`']], 0x9b59b6)],
       });
     }
 
+    if (question.length > MAX_QUESTION_LEN) {
+      question = question.slice(0, MAX_QUESTION_LEN).trimEnd() + '…';
+    }
+
     const answer = ANSWERS[Math.floor(Math.random() * ANSWERS.length)];
-    message.channel.send({
-      embeds: [embed('🔮 8 Ball', [['Question', question, true], ['Answer', answer, true]], 0x9b59b6)],
-    });
+    const e = new EmbedBuilder()
+      .setColor(0x9b59b6)
+      .setTitle('🔮 8 Ball')
+      .setDescription(`> ${question}\n\n**${answer}**`);
+
+    message.channel.send({ embeds: [e] });
   },
 };
