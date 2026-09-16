@@ -31,3 +31,4 @@ Format: one line per change, terse, no AI fluff.
 - FIX: credit score on profiles read the wrong DB column (showed a raw timestamp). ensureUser now maps columns by name -> jail state + rob cooldown reads also fixed.
 - New fun command: v 8ball / v 8b <question> - 45 silly magic answers, compact embed quoting your question (long questions auto-truncate).
 - 8ball: reply-only format with a per-answer self-reaction (😭/☠️ by vibe, plus sparing 💔/🙏/🤞/⁉️ — never random) on Gambot's own reply; answer pool expanded 45 → 120 diabolical/casual lines (roasts, dry dismissals, loaded no's), 'gang' → 'gng', no mystical filler.
+- v give to the owner: the owner alone gets a DM approval card (Keep / Decline / Mute 30m). Keep closes the card, Decline refunds the sender, Mute blocks that sender from gifting the owner for 30 min ("u cant give this user money"). Money moves on confirm; owner decides after. Owner+internal only.

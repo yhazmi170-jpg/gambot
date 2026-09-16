@@ -527,6 +527,10 @@ client.on('interactionCreate', (i) => {
     require('./commands/help').handleInteraction(i);
     return;
   }
+  if (i.customId.startsWith('ogive_')) {
+    require('./commands/give').handleInteraction(i);
+    return;
+  }
   const fallback = setTimeout(() => i.deferUpdate().catch(() => {}), 2500);
   i._ackFallback = fallback;
 });

@@ -29,6 +29,10 @@ async function init() {
       lucky INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
     );
+    CREATE TABLE IF NOT EXISTS owner_give_mutes (
+      user_id TEXT PRIMARY KEY,
+      mute_until INTEGER NOT NULL DEFAULT 0
+    );
     CREATE TABLE IF NOT EXISTS lottery (
       user_id TEXT PRIMARY KEY,
       tickets INTEGER NOT NULL DEFAULT 0
@@ -2582,6 +2586,37 @@ function markNotified(key) {
   save();
 }
 
+// ---------- Owner-give mute (owner can silence people sending them money) ----------
+const OWNER_GIVE_MUTE_DEFAULT = 30 * 60; // 30 min
+
+function muteOwnerGive(userId, seconds = OWNER_GIVE_MUTE_DEFAULT) {
+  const until = Math.floor(Date.now() / 1000) + seconds;
+  const safe = String(userId).replace(/'/g, "''");
+  db.run(`INSERT INTO owner_give_mutes (user_id, mute_until) VALUES ('${safe}', ${until})
+          ON CONFLICT(user_id) DO UPDATE SET mute_until = excluded.mute_until`);
+  save();
+}
+
+function getOwnerGiveMutedUntil(userId) {
+  const safe = String(userId).replace(/'/g, "''");
+  const rows = db.exec(`SELECT mute_until FROM owner_give_mutes WHERE user_id = '${safe}'`);
+  if (!rows.length || !rows[0].values.length) return 0;
+  return Number(rows[0].values[0][0]) || 0;
+}
+
+function isOwnerGiveMuted(userId) {
+  return getOwnerGiveMutedUntil(userId) > Math.floor(Date.now() / 1000);
+}
+
+function declineOwnerGive(giverId, amount) {
+  const ownerId = '536278876247162882'; // owner — matches ownerCheck() elsewhere
+  const owner = ensureUser(ownerId);
+  if (!owner || owner.balance < amount) return { ok: false, reason: 'funds' };
+  addBalance(ownerId, -amount);
+  addBalance(giverId, amount);
+  return { ok: true };
+}
+
 // ---- v1.7.0: Free bets (house money) ----
 const FREE_BET_DAILY = 500;
 const FREE_BET_MAX = 2500;
@@ -3768,6 +3803,7 @@ module.exports = {
   setAutoReactEmoji, clearAutoReactEmoji,
   getAutoReactEmoji, setBadgeEmoji, getBadgeEmoji, setLbEmoji, getLbEmoji,
   wasNotified, markNotified,
+  muteOwnerGive, getOwnerGiveMutedUntil, isOwnerGiveMuted, declineOwnerGive,
   START_BALANCE,
   addAnimal, getUserAnimals, getAnimal, removeAnimal, addExp, renameAnimal,
   setTeam, removeFromTeam, getTeam, setHuntCooldown, getHuntCooldown, sellPrice, getAnimalCount,
