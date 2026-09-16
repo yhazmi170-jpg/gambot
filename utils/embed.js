@@ -1,16 +1,11 @@
 const { EmbedBuilder } = require('discord.js');
 
-let sponsoredName = null;
-function setSponsored(name) { sponsoredName = name; }
-function getSponsored() { return sponsoredName; }
-
 function embed(title, fields = [], color = 0x2b2d31) {
   const e = new EmbedBuilder().setColor(color);
   if (title) e.setTitle(title);
   for (const [name, value, inline = false] of fields) {
     if (value !== undefined && value !== null) e.addFields({ name, value: String(value), inline });
   }
-  if (sponsoredName) e.setFooter({ text: `Sponsored by @${sponsoredName}` });
   return e;
 }
 
@@ -60,4 +55,4 @@ function parseAmount(str) {
   return Math.floor(num);
 }
 
-module.exports = { embed, error, success, parseAmount, setSponsored, getSponsored, chunkText, updateEmbed };
+module.exports = { embed, error, success, parseAmount, chunkText, updateEmbed };

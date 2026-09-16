@@ -1,5 +1,5 @@
 const db = require('../db');
-const { error, getSponsored } = require('../utils/embed');
+const { error } = require('../utils/embed');
 const config = require('../config');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 
@@ -51,10 +51,7 @@ function cardBack() {
 }
 
 function bjEmbed(description, color = 0x2b2d31) {
-  const e = new EmbedBuilder().setColor(color).setDescription(description);
-  const sponsored = getSponsored();
-  if (sponsored) e.setFooter({ text: `Sponsored by @${sponsored}` });
-  return e;
+  return new EmbedBuilder().setColor(color).setDescription(description);
 }
 
 function board({ name, player, dealer, reveal, bet, result }) {

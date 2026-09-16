@@ -1,5 +1,4 @@
 const db = require('../db');
-const { setSponsored } = require('../utils/embed');
 const config = require('../config');
 const { ContainerBuilder, TextDisplayBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags, EmbedBuilder } = require('discord.js');
 
@@ -35,7 +34,6 @@ const SHOP = [
     category: 'SERVER TOOLS',
     items: [
       { id: 'auto_react', name: 'Auto-react on messages', price: 1500000, desc: 'set an emoji that the bot auto-reacts to your messages with', use: 'Use v autoreact <emoji> to set your reaction emoji' },
-      { id: 'sponsored_footer', name: 'Sponsored footer on bot', price: 2500000, desc: '"Sponsored by @you" on all bot commands', use: 'Your name appears on all bot embeds' },
       { id: 'rain', name: 'v rain <amount>', price: 3000000, desc: 'rain money to everyone online', use: 'Use v rain <amount> to share money with online members' },
       { id: 'duel', name: 'v duel @user <amount>', price: 2000000, desc: '1v1 coinflip challenge another user', use: 'Use v duel @user <amount> to challenge someone' },
     ],
@@ -240,7 +238,6 @@ async function handleConfirm(j) {
       db.addWeaponCrate(j.user.id, pending.item.weaponCrates);
     } else if (pending.item.monthly) { db.addPerk(j.user.id, pending.itemId, Math.floor(Date.now() / 1000) + 30 * 86400); }
     else { db.addPerk(j.user.id, pending.itemId, 0); }
-    if (pending.itemId === 'sponsored_footer') setSponsored(j.user.username);
     if (pending.itemId === 'vip_role_sub' && pending.guild) {
       const vipRoleId = db.getVipRole(pending.guild.id);
       if (vipRoleId) {
