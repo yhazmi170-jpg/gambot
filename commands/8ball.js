@@ -1,51 +1,51 @@
 const MAX_QUESTION_LEN = 100;
 
 const ANSWERS = [
-  'absolutely',
-  'yes yes yes',
-  '100% trust',
-  'the vibes are yes',
-  'yessss go for it',
-  'obviously bestie',
-  'the universe said yes',
-  'signs point to yes',
-  'hell nah',
-  'do NOT do that',
-  'absolutely not',
-  'the universe said no',
-  'pls dont',
-  'signs point to no',
-  'lowkey... yeah',
-  'lowkey...',
-  'maybe if u lock in',
-  'give it 5 business days',
-  'ask ur lawyer',
-  'coin says yes, i say no',
-  'unfortunately yes',
-  'fortunately no',
-  'we might be cooked',
-  'source: trust me',
-  'probably',
-  '50/50 bestie',
-  'depends on ur sleep schedule',
-  'bro i dont know',
-  'i forgot the question already',
-  'im pretending i didnt hear that',
-  'ask again when im awake',
-  'the magic ball glitched',
-  'somehow yes',
-  'u got this',
-  'lucky aura detected',
-  'not looking good gang',
-  'yeah ur cooked',
-  'the voices said yes',
-  'ur on ur own with this one',
-  'ask ur rubber duck',
-  'i asked the cat, the cat said yes',
-  'the math says maybe',
-  "it's giving good luck",
-  'the stars said its ur day',
-  'try again after a snack',
+  { text: 'absolutely', reaction: '😭' },
+  { text: 'yes yes yes', reaction: '😭' },
+  { text: '100% trust', reaction: '😭' },
+  { text: 'the vibes are yes', reaction: '😭' },
+  { text: 'yessss go for it', reaction: '😭' },
+  { text: 'obviously bestie', reaction: '😭' },
+  { text: 'the universe said yes', reaction: '😭' },
+  { text: 'signs point to yes', reaction: '😭' },
+  { text: 'hell nah', reaction: '☠️' },
+  { text: 'do NOT do that', reaction: '☠️' },
+  { text: 'absolutely not', reaction: '☠️' },
+  { text: 'the universe said no', reaction: '☠️' },
+  { text: 'pls dont', reaction: '☠️' },
+  { text: 'signs point to no', reaction: '☠️' },
+  { text: 'lowkey... yeah', reaction: '😭' },
+  { text: 'lowkey...', reaction: '😭' },
+  { text: 'maybe if u lock in', reaction: '😭' },
+  { text: 'give it 5 business days', reaction: '😭' },
+  { text: 'ask ur lawyer', reaction: '😭' },
+  { text: 'coin says yes, i say no', reaction: '☠️' },
+  { text: 'unfortunately yes', reaction: '😭' },
+  { text: 'fortunately no', reaction: '😭' },
+  { text: 'we might be cooked', reaction: '😭' },
+  { text: 'source: trust me', reaction: '😭' },
+  { text: 'probably', reaction: '😭' },
+  { text: '50/50 bestie', reaction: '😭' },
+  { text: 'depends on ur sleep schedule', reaction: '😭' },
+  { text: 'bro i dont know', reaction: '😭' },
+  { text: 'i forgot the question already', reaction: '😭' },
+  { text: 'im pretending i didnt hear that', reaction: '😭' },
+  { text: 'ask again when im awake', reaction: '😭' },
+  { text: 'the magic ball glitched', reaction: '😭' },
+  { text: 'somehow yes', reaction: '😭' },
+  { text: 'u got this', reaction: '😭' },
+  { text: 'lucky aura detected', reaction: '😭' },
+  { text: 'not looking good gng', reaction: '☠️' },
+  { text: 'yeah ur cooked', reaction: '☠️' },
+  { text: 'the voices said yes', reaction: '😭' },
+  { text: 'ur on ur own with this one', reaction: '😭' },
+  { text: 'ask ur rubber duck', reaction: '😭' },
+  { text: 'i asked the cat, the cat said yes', reaction: '😭' },
+  { text: 'the math says maybe', reaction: '😭' },
+  { text: "it's giving good luck", reaction: '😭' },
+  { text: 'the stars said its ur day', reaction: '😭' },
+  { text: 'try again after a snack', reaction: '😭' },
 ];
 
 module.exports = {
@@ -54,6 +54,7 @@ module.exports = {
   helpArgs: '<question>',
   description: 'silly magic answers — alias `v 8b <question>`',
   aliases: ['8b', 'eightball', 'ball'],
+  ANSWERS,
   execute(message, args) {
     let question = args.join(' ').trim();
 
@@ -65,14 +66,10 @@ module.exports = {
       question = question.slice(0, MAX_QUESTION_LEN).trimEnd() + '…';
     }
 
-    const answer = ANSWERS[Math.floor(Math.random() * ANSWERS.length)];
-    const roll = Math.random();
+    const pick = ANSWERS[Math.floor(Math.random() * ANSWERS.length)];
 
-    message.reply({ content: answer, allowedMentions: { repliedUser: false } })
-      .then(sent => {
-        const reaction = roll < 0.35 ? '😭' : roll < 0.55 ? '☠️' : null;
-        if (reaction) sent.react(reaction).catch(() => {});
-      })
+    message.reply({ content: pick.text, allowedMentions: { repliedUser: false } })
+      .then(sent => sent.react(pick.reaction).catch(() => {}))
       .catch(() => {});
   },
 };
