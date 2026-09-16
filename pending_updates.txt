@@ -25,3 +25,8 @@ Format: one line per change, terse, no AI fluff.
 - Coinflip clarity fix: reply shows picked vs landed, correct win amount.
 - TOS 'I Agree' ack-race fix.
 - Short aliases: wc, wep, z, bd, hst, lck, rn, sb, rwd, gp.
+
+(queued after v1.8.1)
+- v profile stat card expanded: level/xp, pets+team, bank, eggs & seals, battle wins, daily streak, lucky status, insurance tier, free bet, credit score, loan/clan/plot/jail (when active), member since.
+- FIX: credit score on profiles read the wrong DB column (showed a raw timestamp). ensureUser now maps columns by name -> jail state + rob cooldown reads also fixed.
+- New fun command: v 8ball (aliases eightball, ball) - shake the magic 8 ball for a yes/no answer.
