@@ -10,7 +10,6 @@ const prefix = config.prefixes[0];
 
 const perkCmdMap = {
   rob: `\`${prefix} rob <@user>\` — 50/50 robbery`,
-  profile: `\`${prefix} profile\` — view stats`,
   rain: `\`${prefix} rain <amount>\` — rain money to online members`,
   duel: `\`${prefix} duel <@user> <amount>\` — 1v1 coinflip`,
   rep: `\`${prefix} rep <@user>\` — give reputation`,

@@ -6,13 +6,9 @@ module.exports = {
   name: 'profile',
   helpCategory: 'Social',
   helpArgs: '[@user]',
-  description: 'detailed stats card (requires profile perk)',
+  description: 'detailed stats card',
   aliases: ['stats', 'me'],
   execute(message, args) {
-    if (!db.hasPerk(message.author.id, 'profile') && message.author.id !== config.ownerId) {
-      return message.channel.send({ embeds: [error('you need the **profile** perk — buy it in `v shop`')] });
-    }
-
     const target = message.mentions.users.first() || message.author;
     const user = db.ensureUser(target.id);
     if (!user) return message.channel.send({ embeds: [error('user not found')] });

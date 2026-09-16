@@ -43,7 +43,6 @@ const SHOP = [
     items: [
       { id: 'colored_lb', name: 'Colored leaderboard name', price: 750000, desc: 'your name shows in color on v lb', use: 'Use v setlb <emoji> then check v lb' },
       { id: 'badge', name: 'Custom badge emoji', price: 500000, desc: 'set a badge emoji shown on your profile and lb', use: 'Use v setbadge <emoji>' },
-      { id: 'profile', name: 'v profile stat card', price: 600000, desc: 'view detailed stats with v profile', use: 'Use v profile to see your stats' },
       { id: 'rep', name: 'v rep @user', price: 300000, desc: 'give reputation points to others', use: 'Use v rep @user to give reputation' },
     ],
   },
