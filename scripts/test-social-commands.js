@@ -53,13 +53,24 @@ const handler = require('../utils/commandHandler');
 const EXPECT = {
   hug:    { cat: 'hug',    react: '🤗' },
   kiss:   { cat: 'kiss',   react: '😘' },
-  kill:   { cat: 'punch',  react: '💀' },
+  kill:   { cat: 'kill',   react: '💀' },
   slap:   { cat: 'slap',   react: '✋' },
   pat:    { cat: 'pat',    react: '🫳' },
   cuddle: { cat: 'cuddle', react: '🧸' },
   bite:   { cat: 'bite',   react: '😬' },
   punch:  { cat: 'punch',  react: '👊' },
   lick:   { cat: 'lick',   react: '👅' },
+  bonk:   { cat: 'bonk',   react: '💨' },
+  facepalm: { cat: 'facepalm', react: '🤦' },
+  tease:  { cat: 'tease',  react: '🤣' },
+  wave:   { cat: 'wave',   react: '👋' },
+  poke:   { cat: 'poke',   react: '👀' },
+  tickle: { cat: 'tickle', react: '🤣' },
+  blush:  { cat: 'blush',  react: '😊' },
+  cry:    { cat: 'cry',    react: '😢' },
+  laugh:  { cat: 'laugh',  react: '😀' },
+  dance:  { cat: 'dance',  react: '🕺' },
+  stare:  { cat: 'stare',  react: '👀' },
 };
 
 const assert = require('assert');

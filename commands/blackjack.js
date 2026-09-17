@@ -182,7 +182,7 @@ module.exports = {
 
     const pv = handValue(player);
     if (pv === 21) {
-        \/\/ lucky removed - no longer affects blackjack - const paid = db.payWin(message.author.id, amount);
+        // lucky removed - no longer affects blackjack - const paid = db.payWin(message.author.id, amount);
       while (handValue(dealer) < 17) dealer.push(deck.pop());
       return message.channel.send({
         embeds: [bjEmbed(board({

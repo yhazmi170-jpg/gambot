@@ -1,4 +1,14 @@
 # Gambot Changelog (full history)
+## v2.0.3 — Social GIF Expansion
+
+- **Dedicated GIF pools** for all social commands: bonk, facepalm, tease, wave, poke, tickle, blush, cry, laugh, dance, stare — hand-curated from verified anime-reaction database
+- **kill** gets standalone pool (4 clips) instead of reusing punch category — resolves “kill reuses punch” complaint
+- **22 dead GIF URLs removed** from production — all HTTP 404 at GitHub; bot will never randomly select a broken link
+- **Preserved** all existing approved GIF pools (hug, kiss, slap, pat, cuddle, bite, punch, lick)
+- **Contact sheets generated** under `~/.agents/reports/socialgifs-review/new/` with numbered manifests for each action
+- **test-social.js** updated to validate 21 social actions (was 9); **test-try.js** passes 13/13
+- **Fixed** duplicate `nowSec` declaration in commandHandler.js (Node.js v26 compatibility)
+
 ## 2.0.2 - Lucky cleanup and summon system (pending deploy)
 
 Complete list of every update shipped, newest first. Source: git history (`master`) + release notes + `HANDOFF.md` session logs.

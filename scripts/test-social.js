@@ -95,14 +95,14 @@ let m;
   check('self actions create no pair', db.getSocialPair('soc_pair', 'soc_pair', 'hug') === null);
 
   // --- every social action produces the same safe shape ---
-  const actions = ['hug', 'kiss', 'kill', 'slap', 'pat', 'cuddle', 'bite', 'punch', 'lick'];
+  const actions = ['hug', 'kiss', 'kill', 'slap', 'pat', 'cuddle', 'bite', 'punch', 'lick', 'bonk', 'facepalm', 'tease', 'wave', 'poke', 'tickle', 'blush', 'cry', 'laugh', 'dance', 'stare'];
   let ok = true;
   for (const a of actions) {
     m = fakeMessage('soc_actor', 'soc_target');
     await execSocial(m, a);
     if (!m.sent || !m.sent.content || !m.sent.embeds[0].image) ok = false;
   }
-  check('all 9 social actions send content + gif', ok);
+  check('all 20 social actions send content + gif', ok);
 
   Module._load = origLoad;
   console.log(`\n${passed} passed, ${failed} failed`);

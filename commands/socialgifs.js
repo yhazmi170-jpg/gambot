@@ -18,8 +18,17 @@ const POOLS = {
   cuddle: { cat: 'cuddle', idx: [4, 24, 23, 12, 5, 10, 20, 11, 15, 6] },
   bite:   { cat: 'bite',   idx: [16, 5, 17, 6, 9, 10, 13, 20, 3, 1] },
   punch:  { cat: 'punch',  idx: [8, 1, 4, 5, 3, 15, 7, 12, 11, 6] },
+  kill:   { cat: 'kill',   idx: [1, 3, 5, 7] },
   lick:   { cat: 'lick',   idx: [1, 8, 2, 3, 11, 13, 5, 10] },
-  kill:   { cat: 'punch',  idx: [2, 10, 13, 14] },
+  facepalm: { cat: 'facepalm', idx: [1, 3, 5, 7, 9] },
+  wave:   { cat: 'wave',   idx: [1, 3, 5, 7, 9] },
+  poke:   { cat: 'poke',   idx: [1, 4, 7, 10, 13, 16, 19] },
+  tickle: { cat: 'tickle', idx: [1, 3, 5, 7, 9, 11, 13, 15, 17] },
+  blush:  { cat: 'blush',  idx: [1, 2, 3, 4, 5, 6, 7, 8] },
+  cry:    { cat: 'cry',    idx: [1, 2, 3, 4, 5, 6] },
+  laugh:  { cat: 'laugh',  idx: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] },
+  dance:  { cat: 'dance',  idx: [1, 2, 3, 4, 5, 6, 7, 8] },
+  stare:  { cat: 'stare',  idx: [1, 2, 3, 4, 5, 6] },
 };
 
 function gifsFor(action) {

@@ -8,10 +8,21 @@ const ACTIONS = {
   kill:   { verb: 'annihilates', react: '💀' },
   slap:   { verb: 'slaps',       react: '✋' },
   pat:    { verb: 'pats',        react: '🫳' },
+  bonk:   { verb: "bonks",       react: "💨" },
+  facepalm: { verb: "facepalms",   react: "🤦" },
+  tease:  { verb: "teases",     react: "🤣" },
   cuddle: { verb: 'cuddles',     react: '🧸' },
   bite:   { verb: 'bites',       react: '😬' },
   punch:  { verb: 'punches',     react: '👊' },
   lick:   { verb: 'licks',       react: '👅' },
+  wave:    { verb: "waves",       react: "👋" },
+  poke:    { verb: "pokes",       react: "👀" },
+  tickle:  { verb: "tickles",     react: "🤣" },
+  blush:   { verb: "blushes",     react: "😊" },
+  cry:     { verb: "cries",       react: "😢" },
+  laugh:   { verb: "laughs",      react: "😀" },
+  dance:   { verb: "dances",      react: "🕺" },
+  stare:   { verb: "stares",      react: "👀" },
 };
 
 const EMOJI = {

@@ -1,3 +1,11 @@
+v2.0.3 — Social GIF Expansion
+
+- Dedicated GIF pools for bonk, facepalm, tease, wave, poke, tickle, blush, cry, laugh, dance, stare
+- kill gets standalone pool (4 clips) instead of reusing punch
+- 22 dead GIF URLs removed from production (all HTTP 404)
+- All existing approved GIF pools preserved
+- Contact sheets generated under ~/.agents/reports/socialgifs-review/new/
+
 v2.0.1 — Multi-Winner Giveaways + Inbox Payouts
 
 ## Lucky cleanup: removed public v lucky/v luckylist; made Alucky owner-only only (ID 536278876247162882); removed Lucky gambling from coinflip/blackjack/slots/mines/profile/gamehelp; removed luckylist command; completed inactivity summon system with 7-day eligibility, 14-day cooldown, opt-out, rate limiting. Pet Lucky trait preserved.

@@ -173,7 +173,7 @@ async function handleMessage(message) {
   
   // Check if >=7 days since last meaningful command
   const lastMeaningful = getLastMeaningfulAt(message.author.id);
-  const nowSec = Math.floor(Date.now() / 1000);
+  nowSec = Math.floor(Date.now() / 1000);
   let eligible = false;
   let summonTriggered = false;
   if (lastMeaningful && nowSec - lastMeaningful >= 7 * 86400) {
