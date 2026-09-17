@@ -125,6 +125,8 @@ async function init() {
     entries TEXT NOT NULL DEFAULT '[]',
     winner_id TEXT DEFAULT NULL
   )`);
+  try { db.run(`ALTER TABLE giveaways ADD COLUMN winner_count INTEGER NOT NULL DEFAULT 1`); } catch (e) {}
+  try { db.run(`ALTER TABLE giveaways ADD COLUMN mode TEXT NOT NULL DEFAULT 'split'`); } catch (e) {}
   db.run(`CREATE TABLE IF NOT EXISTS streaks (user_id TEXT PRIMARY KEY, count INTEGER NOT NULL DEFAULT 0, last_time INTEGER NOT NULL DEFAULT 0, best INTEGER NOT NULL DEFAULT 0)`);
   db.run(`CREATE TABLE IF NOT EXISTS pvp_bounties (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1128,18 +1130,20 @@ function repairNaNBalances() {
 }
 
 // ---- Giveaways: persisted so a restart never kills an "about to end" giveaway ----
-function createGiveaway(messageId, channelId, hostId, prize, endsAt) {
-  db.run(`INSERT OR REPLACE INTO giveaways (message_id, channel_id, host_id, prize, ends_at, entries, winner_id) VALUES ('${messageId}', '${channelId}', '${hostId}', ${prize}, ${endsAt}, '[]', NULL)`);
+function createGiveaway(messageId, channelId, hostId, prize, endsAt, winnerCount = 1, mode = 'split') {
+  const wc = Math.max(1, Math.min(50, Number(winnerCount) || 1));
+  const m = mode === 'full' ? 'full' : 'split';
+  db.run(`INSERT OR REPLACE INTO giveaways (message_id, channel_id, host_id, prize, ends_at, entries, winner_id, winner_count, mode) VALUES ('${messageId}', '${channelId}', '${hostId}', ${prize}, ${endsAt}, '[]', NULL, ${wc}, '${m}')`);
   save();
 }
 
 function getGiveaway(messageId) {
-  const rows = db.exec(`SELECT message_id, channel_id, host_id, prize, ends_at, entries, winner_id FROM giveaways WHERE message_id = '${messageId}'`);
+  const rows = db.exec(`SELECT message_id, channel_id, host_id, prize, ends_at, entries, winner_id, winner_count, mode FROM giveaways WHERE message_id = '${messageId}'`);
   if (!rows.length || !rows[0].values.length) return null;
   const v = rows[0].values[0];
   let entries = [];
   try { entries = JSON.parse(v[5] || '[]'); } catch {}
-  return { message_id: v[0], channel_id: v[1], host_id: v[2], prize: v[3], ends_at: v[4], entries, winner_id: v[6] };
+  return { message_id: v[0], channel_id: v[1], host_id: v[2], prize: v[3], ends_at: v[4], entries, winner_id: v[6], winner_count: v[7] || 1, mode: v[8] || 'split' };
 }
 
 function addGiveawayEntry(messageId, userId) {
@@ -1160,8 +1164,9 @@ function getExpiredGiveaways(now) {
   return rows[0].values.map(r => r[0]);
 }
 
-function finishGiveaway(messageId, winnerId) {
-  db.run(`UPDATE giveaways SET winner_id = '${winnerId}' WHERE message_id = '${messageId}'`);
+function finishGiveaway(messageId, winners) {
+  const raw = Array.isArray(winners) ? JSON.stringify(winners) : winners;
+  db.run(`UPDATE giveaways SET winner_id = '${String(raw).replace(/'/g, "''")}' WHERE message_id = '${messageId}'`);
   save();
 }
 
@@ -3940,7 +3945,7 @@ function distributeBossPot(guildId, contrib, pot) {
 //  2.0 systems — inbox / contracts / titles / incidents / activity / discovery / events
 // =====================================================================================
 
-const INBOX_SOURCES = ['give', 'contract', 'event', 'achievement', 'gift', 'quest_bonus', 'title', 'system'];
+const INBOX_SOURCES = ['give', 'contract', 'event', 'achievement', 'gift', 'quest_bonus', 'title', 'giveaway', 'system'];
 const CONTRACT_TTL_PENDING = 24 * 3600;   // undoable proposal window
 const CONTRACT_TTL_ACTIVE = 72 * 3600;    // window to actually finish
 const INCIDENT_LIMIT_PER_GUILD = 60;

@@ -454,19 +454,53 @@ start().catch(e => console.error('[START] FATAL:', e));
         db.finishGiveaway(gwId, '__none__');
         continue;
       }
-      const winner = g.entries[Math.floor(Math.random() * g.entries.length)];
-      db.addBalance(winner, g.prize);
-      db.finishGiveaway(gwId, winner);
-      console.log(`[gw] giveaway ${gwId} won by ${winner} (${g.prize} coins)`);
+
+      // draw up to winner_count unique winners
+      const pool = [...g.entries];
+      const winners = [];
+      const drawCount = Math.min(Math.max(1, g.winner_count || 1), pool.length);
+      for (let k = 0; k < drawCount; k++) {
+        const idx = Math.floor(Math.random() * pool.length);
+        winners.push(pool.splice(idx, 1)[0]);
+      }
+
+      const mode = g.mode === 'full' ? 'full' : 'split';
+      let perWinner;
+      let refund = 0;
+      if (mode === 'full') {
+        perWinner = g.prize;
+        refund = g.prize * ((g.winner_count || 1) - winners.length);
+      } else {
+        perWinner = Math.floor(g.prize / winners.length);
+        refund = g.prize - perWinner * winners.length;
+      }
+
+      // prizes land in the inbox so winners must claim them
+      for (const w of winners) {
+        db.createDelivery(w, {
+          sender: g.host_id,
+          source: 'giveaway',
+          label: mode === 'full' ? 'giveaway prize (full)' : `giveaway prize (1 of ${winners.length})`,
+          amount: perWinner,
+        });
+      }
+      if (refund > 0) db.addBalance(g.host_id, refund);
+      db.finishGiveaway(gwId, winners);
+      console.log(`[gw] giveaway ${gwId} won by ${winners.join(', ')} (${perWinner} coins each, ${mode})`);
+
+      const winnerList = winners.slice(0, 10).map(w => `<@${w}>`).join(', ') + (winners.length > 10 ? ` +${winners.length - 10} more` : '');
       client.channels.fetch(g.channel_id).then(ch => {
         if (!ch || typeof ch.edit !== 'function') return;
-        try { if (ch.guild) db.addIncident(ch.guild.id, 'giveaway', `<@${winner}> won a **${g.prize.toLocaleString()}** giveaway`); } catch (e) {}
+        try { if (ch.guild) db.addIncident(ch.guild.id, 'giveaway', `${winners.length} winner(s) drew a **${g.prize.toLocaleString()}** giveaway`); } catch (e) {}
         ch.messages.fetch(g.message_id).then(msg => {
           msg.edit({
             embeds: [embed('🎉 Giveaway', [
-              ['Winner', `<@${winner}> 🎉`],
-              ['Prize', `**${g.prize.toLocaleString()}** ${config.currency}`],
+              ['Winner(s)', `${winnerList} 🎉`],
+              ['Prize', mode === 'full'
+                ? `**${g.prize.toLocaleString()}** ${config.currency} each`
+                : `**${g.prize.toLocaleString()}** ${config.currency} split → **${perWinner.toLocaleString()}** each`],
               ['Entries', `${g.entries.length} people entered`],
+              ['', 'prizes are in the winners\' inbox — claim with `v inbox`'],
             ], 0xfee75c)],
             components: [],
           }).catch(() => {});

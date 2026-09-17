@@ -11,6 +11,7 @@ const SOURCE_EMOJI = {
   gift: '🎁',
   quest_bonus: '🗒️',
   title: '🎖️',
+  giveaway: '🎉',
   system: '📦',
 };
 

@@ -1,34 +1,16 @@
-v2.0.0 — What's New
+v2.0.1 — Multi-Winner Giveaways + Inbox Payouts
 
-❤️ Social Commands (animated GIFs!)
-- `v hug` `v kiss` `v pat` `v slap` `v cuddle` `v bite` `v punch` `v lick` — real 2D-anime GIF clips matching each action, plus a one-action react from Gambot
-- Add a friend with `v hug @user` — a self-line plays if you use it alone
-- 😅 `v kill` — 4 comedic, non-graphic stand-ins for now; a real defeat-pool pass is on the list
+🎉 `v giveaway` got a whole lot bigger
+- New syntax: `v giveaway <time> <prize> <winners> <split|full>`
+  - `v giveaway 24h 100m 10 split` → 100m divided across 10 winners = 10m each
+  - `v giveaway 24h 100m 10 full` → each of the 10 winners gets the full 100m
+  - `v giveaway 24h 100m 10` → defaults to split
+  - `v giveaway 24h 100m` → the old 1-winner syntax still works exactly as before
+- Up to 50 winners. Winners are drawn uniquely — nobody wins twice.
+- Host is charged correctly: split = the pot; full = prize × winners.
+- If fewer people enter than winner slots: split distributes the full pot, full refunds the unused slots to the host. Split remainders are refunded too.
 
-🔍 `v try` — your personal "what's next"
-- Recommends only what you HAVEN'T done: unclaimed quests/bounties, unhatched eggs, inbox deliveries, missing dex, marriage, clan, pets without a battle team, and never-tried features
-- `v try list` — full 43-feature tracker (never-tried vs tried)
-- `v try tip` — one verified mechanic tip (real caps from real code, e.g. hunt costs 5/animal, egg drop 8%, weapon crate 15k)
-
-📣 Community Events (rare, non-gambling, announced in-server)
-- The Button (`v button`), Roll Call (`v here`), Creature Sighting (`v creature`), Quest Rush, Double Pet XP — each has a hidden achievement
-- Check status anytime: `v event`
-
-⚖️ Silly Justice + Server Lore
-- `v case @user` — a totally fictional case file about anyone
-- `v judge @user` — a legally non-binding sentence (hidden 🕵️ achievement too)
-- `v compare @user` — real stats vs certified commentary
-- `v lore` — what's been happening in the server (achievements, raids, giveaways, events)
-
-📢 Rare DM summons after long absences
-- If you go quiet for days, Gambot might send one gentle nudge — `v summon off` turns them off forever
-- `v new` — presets of this release
-
-📊 Everything else in 2.0
-- Profile card expanded: streak, lucky, insurance tier, free bet, credit, clan/loan/plot/jail, member since
-- Credit score display fixed (was showing a timestamp)
-- 8ball: 120 answers with vibe-matched reactions
-- Alias cleanup — `v market` is the shop, `v stats` is your profile, `v spin` is the wheel, `v snailgarden` is the garden, `v bm` = black market
-- Rob help text corrected (30% success, 20% steal capped 3M)
-
-Enjoy!
+📭 Prizes now land in the inbox
+- Every winner gets their prize as an inbox delivery (`v inbox` or the Claim All button) instead of instant balance.
+- Inbox shows giveaway prizes with a 🎉 marker.
+- The final giveaway embed now lists the winner(s) and reminds them to claim.

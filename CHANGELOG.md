@@ -4,6 +4,15 @@ Complete list of every update shipped, newest first. Source: git history (`maste
 
 ---
 
+## v2.0.1 — Multi-Winner Giveaways + Inbox Payouts
+
+- **Multi-winner giveaways:** `v giveaway <time> <prize> <winners> <split|full>` (up to 50 winners). `split` divides the pot across winners (`100m 10 split` = 10m each); `full` gives every winner the whole prize (`100m 10 full` = 100m each). Defaults to `split` when a winner count is supplied. The original `v giveaway <time> <prize>` 1-winner syntax is unchanged.
+- **Correct host economics:** split charges the pot; full charges prize × winners. Underfilled giveaways refund unused slots (full) or leftovers (split) to the host.
+- **Unique winner drawing:** winners are drawn without replacement; the final embed lists up to 10 winners (+N more) and points winners to `v inbox`.
+- **Inbox delivery:** giveaway prizes are created as `giveaway` inbox deliveries (`db.createDelivery`) so winners claim via `v inbox` / Claim All instead of being credited instantly. `giveaway` added to `INBOX_SOURCES` and the inbox 🎉 marker.
+- **Schema:** `giveaways` gains `winner_count` + `mode` columns (additive migrations, existing rows default to 1 / `split`).
+- **Tests:** `scripts/test-giveaway.js` — 19/19 passing (migration, persistence, split/full math + refunds, inbox delivery/claim, unique draws).
+
 ## v2.0.0 — Social Commands + `v try` + Community Events + Server Lore (big update)
 
 - **NEW social command family (`v hug/kiss/pat/slap/cuddle/bite/punch/lick`):** each posts a real 2D-anime GIF clip matched to the action from a verified pool (82 clips live-checked at build time), replies charmingly to a mentioned target, and reacts once with an action emoji. A self-line plays when no target is mentioned (`v hug` alone). Reaction permission failures never drop the GIF (`utils/social.js` `safeSelfReact`). Tied into stats/titles: `social_used` feeds `cuddle bug` (1) + `influencer` (5) titles. **Caution flag:** `v kill` uses 4 verified non-graphic comedic stand-ins (punch-category clips) instead of true defeat kills — flagged as unfinished content polish; quality-over-quantity, a real pool is planned later.
