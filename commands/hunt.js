@@ -59,7 +59,8 @@ module.exports = {
     const xpEarned = Math.floor(yieldInfo.xp * count * xpMult);
     for (let i = 0; i < count; i++) {
       const animal = db.addAnimal(userId, traits.efficiency);
-      const g = db.rollGemDrop(animal.rarity, yieldInfo.radarMult);
+      let g = db.rollGemDrop(animal.rarity, yieldInfo.radarMult);
+      if (g > 0 && db.isCommunityEvent('gem_rush')) g *= 2;
       if (g > 0) {
         db.addGems(userId, g);
         gemsEarned += g;
@@ -80,11 +81,16 @@ module.exports = {
       coinsEarned = yieldInfo.coins * count;
     }
     const xpResult = yieldInfo.xp > 0 ? db.addXpRaw(userId, xpEarned) : null;
+    if (gemsEarned > 0) db.trackProgress(userId, 'gem', gemsEarned);
     db.trackProgress(userId, 'hunt', count);
+    if (message.guild && db.isCommunityEvent('great_hunt')) {
+      try { db.addCommunityProgress(message.guild.id, 'great_hunt', count, userId, message.guild.memberCount); } catch (e) {}
+    }
     db.addChecklistProgress(userId, 'daily', 'hunt', count);
     db.addChecklistProgress(userId, 'weekly', 'hunt', count);
     db.addPassXp(userId, db.PASS_XP.hunt * count);
 
+    if (message.guild) { try { db.recordDiscoveries(message.guild.id, userId, results); } catch (e) {} }
     const fields = results.map((a, i) => [
       `#${i + 1}`,
       `${rarityEmojis[(a.rarity || 'common').toLowerCase()] || '⚪'} **${a.species}** — ${a.rarity.toUpperCase()}${a.gemDrop ? ` 💎+${a.gemDrop}` : ''}\n` +

@@ -2,14 +2,7 @@ const db = require('../db');
 const { embed, error, success, parseAmount } = require('../utils/embed');
 const config = require('../config');
 
-const BOUNTY_LABELS = {
-  hunt: 'hunt animals',
-  sacrifice: 'sacrifice animals',
-  win: 'win coins from games',
-  work: 'work shifts',
-  give: 'give coins to other players',
-  battle: 'win battles',
-};
+const BOUNTY_LABELS = db.QUEST_OBJECTIVES;
 
 module.exports = {
   name: 'bounty',
@@ -75,18 +68,21 @@ module.exports = {
         const cur = db.getBounty(userId);
         return message.channel.send({ embeds: [error(cur.claimed ? 'you already claimed this week\'s bounty!' : `bounty not done yet — **${cur.progress}/${cur.target}** ${BOUNTY_LABELS[cur.key]}`)] });
       }
-      return message.channel.send({ embeds: [success(`bounty complete! claimed **${b.reward.toLocaleString()}** ${config.currency} 💰`) ] });
+      const bonus = b.sealReward > 0 ? ` + **${b.sealReward}** 🦭` : '';
+      return message.channel.send({ embeds: [success(`bounty complete! claimed **${b.reward.toLocaleString()}** ${config.currency}${bonus} 💰`) ] });
     }
 
     const pvp = db.listActiveBounties().find(x => x.poster_id === userId || x.target_id === userId);
     const b = db.getBounty(userId);
     const pct = Math.min(100, Math.floor((b.progress / b.target) * 100));
     const bar = '█'.repeat(Math.floor(pct / 10)) + '░'.repeat(10 - Math.floor(pct / 10));
+    const rewardLine = `**${b.reward.toLocaleString()}** ${config.currency}${b.sealReward > 0 ? ` + **${b.sealReward}** 🦭 seal` : ''}`;
+    const label = BOUNTY_LABELS[b.key] || b.key;
     const extra = pvp ? `\n\n🏅 You have a **PvP bounty** — \`v bounty info ${pvp.id}\`` : '';
     return message.channel.send({ embeds: [embed('🎯 Weekly Bounty', [
-      ['Task', `**${b.progress.toLocaleString()}/${b.target.toLocaleString()}** ${BOUNTY_LABELS[b.key]}`],
+      ['Task', `**${b.progress.toLocaleString()}/${b.target.toLocaleString()}** ${label}`],
       ['Progress', `${bar} **${pct}%**`],
-      ['Reward', `**${b.reward.toLocaleString()}** ${config.currency}`],
+      ['Reward', rewardLine],
       ['', (b.claimed ? 'claimed for this week — resets next week!' : '`v bounty claim` when done') + extra],
     ], 0xf1c40f)] });
   },

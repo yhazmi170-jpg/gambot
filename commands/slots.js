@@ -45,12 +45,8 @@ module.exports = {
     const user = db.ensureUser(message.author.id);
     if (user.balance < amount) return message.channel.send({ embeds: [error('not enough money')] });
 
-    const lucky = db.ensureUser(message.author.id).lucky;
+    
     let reels = spin();
-    if (lucky) {
-      const jackpot = Math.random() < 0.5 ? 6 : Math.floor(Math.random() * 6);
-      reels = [jackpot, jackpot, jackpot];
-    }
 
     const msg = await message.channel.send({
       embeds: [embed('🎰 Slots', [

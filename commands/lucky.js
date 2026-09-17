@@ -1,14 +1,27 @@
 const db = require('../db');
 
+// Owner ID for Gambot
+const OWNER_ID = '536278876247162882';
+
 module.exports = {
-  name: 'lucky',
-  aliases: ['lck'],
-  helpCategory: 'Games',
+  name: 'Alucky',
+  helpCategory: 'Admin',
   helpArgs: '',
-  description: 'toggle your personal lucky streak (90% win rate on coinflip / 50% otherwise)',
+  description: 'owner-only: toggle personal lucky streak',
+  aliases: ['Alucky'],
   execute(message) {
-    const enabled = db.toggleLucky(message.author.id);
-    const emoji = enabled ? '🍀' : '⚪';
-    message.channel.send(`🪙 Your lucky ${enabled ? 'enabled' : 'disabled'} ${emoji} — coinflip now gives **90%** win rate if enabled, **50%** otherwise. Use \`v lucky\` again to toggle back.`);
+    const authorId = message.author.id;
+    
+    // Only owner can toggle lucky
+    if (authorId !== OWNER_ID) {
+      return message.channel.send({
+        embeds: [{ title: '🚫 Owner Only', description: 'This command is reserved for the bot owner.' }]
+      });
+    }
+    
+    const on = db.toggleLucky(authorId);
+    message.channel.send({
+      embeds: [{ title: '🍀 Lucky Streak', description: `<@${authorId}> is now ${on ? 'lucky' : 'unlucky'} 🌟` }]
+    });
   },
 };

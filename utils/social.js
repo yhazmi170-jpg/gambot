@@ -52,13 +52,29 @@ async function execSocial(message, action) {
   db.recordActivity(selfId, 'any');
   db.bumpSocial(selfId);
 
-  const line = target
-    ? `<@${selfId}> ${act.verb} <@${target.id}>`
-    : `<@${selfId}> ${SELF_LINE[action]}`;
+  // Real mention chips only render from message content — Discord does NOT parse
+  // <@id> inside embed titles, which is why the old version showed literal IDs.
+  // The action line goes in content; the GIF sits in an image-only embed below it.
+  let line;
+  if (target) {
+    // Rare pair milestones only: 1st, then 10/25/50/100/250/500/1000. Otherwise silent.
+    let pair = null;
+    try { pair = db.bumpSocialPair(selfId, target.id, action); } catch {}
+    const suffix = pair && pair.first ? ' for the 1st time!'
+      : (pair && pair.milestone ? ` for the ${pair.milestone}th time!` : '');
+    line = `${EMOJI[action]} <@${selfId}> ${act.verb} <@${target.id}>${suffix}`;
+  } else {
+    line = `${EMOJI[action]} <@${selfId}> ${SELF_LINE[action]}`;
+  }
+  const content = line;
+  // Ping ONLY the target. The actor still renders as a mention chip but is never notified.
+  const allowedMentions = target
+    ? { parse: [], users: [target.id] }
+    : { parse: [] };
 
-  const e = embed(`${EMOJI[action]} ${line}`, [], 0x2b2d31);
+  const e = embed(null, [], 0x2b2d31);
   e.setImage(gif);
-  await message.channel.send({ embeds: [e] });
+  await message.channel.send({ content, embeds: [e], allowedMentions });
   await safeSelfReact(message, act.react);
 }
 

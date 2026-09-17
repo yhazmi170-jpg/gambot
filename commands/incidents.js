@@ -10,6 +10,8 @@ const TYPE_ICON = {
   summon: '📢',
   creature: '🦄',
   milestone: '⭐',
+  discovery: '✨',
+  return: '👋',
 };
 
 module.exports = {

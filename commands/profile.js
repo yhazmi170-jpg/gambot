@@ -54,7 +54,6 @@ module.exports = {
       ['Eggs & Seals', `**${eggs}** eggs · **${seals}** seals`],
       ['Battle Wins', `**${battleWins}**`],
       ['Daily Streak', `**${user.daily_streak || 0}** day${user.daily_streak === 1 ? '' : 's'}`],
-      ['Lucky', user.lucky ? '🍀 **on** — 90% coinflip wins (3x payout)' : 'off'],
       ['Insurance', ins ? `**${insPct[ins]}%** loss refund` : 'none'],
       ['Free Bet', `**${freeBet.toLocaleString()}** free coins`],
       ['Credit Score', `**${user.credit_score}**`],

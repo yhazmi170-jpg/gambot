@@ -39,7 +39,8 @@ async function init() {
     );
     CREATE TABLE IF NOT EXISTS guilds (
       guild_id TEXT PRIMARY KEY,
-      disabled_commands TEXT NOT NULL DEFAULT '[]'
+      disabled_commands TEXT NOT NULL DEFAULT '[]',
+      summon_last INTEGER NOT NULL DEFAULT 0
     );
     CREATE TABLE IF NOT EXISTS channel_disabled (
       guild_id TEXT NOT NULL,
@@ -98,6 +99,7 @@ async function init() {
   try { db.run(`ALTER TABLE bids ADD COLUMN guild_id TEXT NOT NULL DEFAULT ''`); } catch (e) {}
   db.run(`CREATE TABLE IF NOT EXISTS world_boss (boss_id TEXT PRIMARY KEY, species TEXT NOT NULL, rarity TEXT NOT NULL, hp INTEGER NOT NULL, max_hp INTEGER NOT NULL, pot INTEGER NOT NULL DEFAULT 0, ends_at INTEGER NOT NULL)`);
   try { db.run(`ALTER TABLE world_boss ADD COLUMN level INTEGER NOT NULL DEFAULT 1`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN event_wins INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   db.run(`CREATE TABLE IF NOT EXISTS boss_contrib (boss_id TEXT NOT NULL, user_id TEXT NOT NULL, damage INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (boss_id, user_id))`);
   db.run(`CREATE TABLE IF NOT EXISTS events (key TEXT PRIMARY KEY, type TEXT NOT NULL, ends_at INTEGER NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS plots (user_id TEXT PRIMARY KEY, level INTEGER NOT NULL DEFAULT 1, planted_at INTEGER NOT NULL DEFAULT 0, last_claim INTEGER NOT NULL DEFAULT 0)`);
@@ -161,6 +163,7 @@ async function init() {
   try { db.run(`ALTER TABLE animals ADD COLUMN shiny INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   try { db.run(`ALTER TABLE animals ADD COLUMN trait TEXT NOT NULL DEFAULT ''`); } catch (e) {}
   try { db.run(`ALTER TABLE animals ADD COLUMN fed_until INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE animals ADD COLUMN bond INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   db.run(`CREATE TABLE IF NOT EXISTS animals_weapon (
     animal_id INTEGER PRIMARY KEY,
     weapon_id INTEGER NOT NULL
@@ -248,7 +251,8 @@ async function init() {
     progress INTEGER NOT NULL DEFAULT 0,
     target INTEGER NOT NULL DEFAULT 1,
     reward INTEGER NOT NULL DEFAULT 0,
-    claimed INTEGER NOT NULL DEFAULT 0
+    claimed INTEGER NOT NULL DEFAULT 0,
+    seal_reward INTEGER NOT NULL DEFAULT 0
   )`);
   db.run(`CREATE TABLE IF NOT EXISTS bounties (
     user_id TEXT PRIMARY KEY,
@@ -257,8 +261,11 @@ async function init() {
     progress INTEGER NOT NULL DEFAULT 0,
     target INTEGER NOT NULL DEFAULT 1,
     reward INTEGER NOT NULL DEFAULT 0,
-    claimed INTEGER NOT NULL DEFAULT 0
+    claimed INTEGER NOT NULL DEFAULT 0,
+    seal_reward INTEGER NOT NULL DEFAULT 0
   )`);
+  try { db.run(`ALTER TABLE quests ADD COLUMN seal_reward INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE bounties ADD COLUMN seal_reward INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   db.run(`CREATE TABLE IF NOT EXISTS checklist_daily (
     user_id TEXT PRIMARY KEY,
     day INTEGER NOT NULL DEFAULT 0,
@@ -394,6 +401,17 @@ async function init() {
     PRIMARY KEY (user_id, feature)
   )`);
 
+  // Social interaction pairs: ids + action + count only. Never message content.
+  db.run(`CREATE TABLE IF NOT EXISTS social_pairs (
+    actor_id TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    count INTEGER NOT NULL DEFAULT 0,
+    first_at INTEGER NOT NULL DEFAULT 0,
+    last_at INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (actor_id, target_id, action)
+  )`);
+
   db.run(`CREATE TABLE IF NOT EXISTS user_activity (
     user_id TEXT PRIMARY KEY,
     first_seen INTEGER NOT NULL DEFAULT 0,
@@ -408,6 +426,16 @@ async function init() {
   db.run(`CREATE TABLE IF NOT EXISTS community_events (
     key TEXT PRIMARY KEY,
     ends_at INTEGER NOT NULL
+  )`);
+  db.run(`CREATE TABLE IF NOT EXISTS community_event_progress (
+    guild_id TEXT NOT NULL,
+    key TEXT NOT NULL,
+    progress INTEGER NOT NULL DEFAULT 0,
+    goal INTEGER NOT NULL DEFAULT 0,
+    contributors TEXT NOT NULL DEFAULT '',
+    rewarded INTEGER NOT NULL DEFAULT 0,
+    updated_at INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (guild_id, key)
   )`);
 
   db.run(`CREATE TABLE IF NOT EXISTS update_dm_delivery (
@@ -499,6 +527,7 @@ function ensureUser(userId) {
       judged: get('judged', 0) || 0,
       bm_buys: get('bm_buys', 0) || 0,
       merchant_buys: get('merchant_buys', 0) || 0,
+      event_wins: get('event_wins', 0) || 0,
       worked: get('worked', 0) || 0,
       avatar_url: get('avatar_url', null) || null,
       banner_url: get('banner_url', null) || null,
@@ -771,6 +800,7 @@ function claimStreak(userId) {
   const best = Math.max(s.best, count);
   db.run(`INSERT OR REPLACE INTO streaks (user_id, count, last_time, best) VALUES ('${userId}', ${count}, ${now}, ${best})`);
   db.run(`UPDATE users SET balance = balance + ${reward} WHERE user_id = '${userId}'`);
+  trackProgress(userId, 'streak', 1);
   save();
   return { count, reward, best, cooldown: 0, maxDay: STREAK_MAX_DAY };
 }
@@ -1464,6 +1494,97 @@ function getOwnedSpecies(userId) {
   return owned;
 }
 
+// ---- 2.0: Dex / collection progression (source of truth = the real catalog) ----
+// Event/special-exclusive species are excluded from NORMAL completion so the
+// normal dex (and any "full dex" milestone) always stays achievable.
+const EVENT_SPECIES = [];
+
+/** The normal (non-event) species catalog, flat + grouped by rarity. */
+function dexCatalog() {
+  const all = [];
+  const byRarity = {};
+  for (const r of RARITY_ORDER) {
+    const list = (SPECIES[r] || []).filter(s => !EVENT_SPECIES.includes(s));
+    byRarity[r] = list;
+    all.push(...list);
+  }
+  return { all, byRarity };
+}
+
+/**
+ * Live dex progress for a user against the ACTUAL catalog.
+ * Returns normal species only (event species never block completion).
+ */
+function dexProgress(userId) {
+  const owned = getOwnedSpecies(userId);
+  const { all, byRarity } = dexCatalog();
+  const shinyRows = db.exec(`SELECT DISTINCT species FROM animals WHERE user_id = '${safeStr(userId)}' AND shiny = 1`);
+  const shinySet = new Set(shinyRows.length ? shinyRows[0].values.map(v => v[0]) : []);
+
+  const byRarityOut = {};
+  let ownedCount = 0;
+  for (const r of RARITY_ORDER) {
+    const have = new Set((owned[r] || []).filter(s => !EVENT_SPECIES.includes(s)));
+    const list = byRarity[r];
+    const haveCount = list.filter(s => have.has(s)).length;
+    ownedCount += haveCount;
+    byRarityOut[r] = {
+      owned: haveCount,
+      total: list.length,
+      missing: Math.max(0, list.length - haveCount),
+      done: list.length > 0 && haveCount === list.length,
+    };
+  }
+
+  const total = all.length;
+  return {
+    total,
+    owned: ownedCount,
+    missing: Math.max(0, total - ownedCount),
+    percent: total ? Math.round((ownedCount / total) * 100) : 0,
+    complete: total > 0 && ownedCount === total,
+    byRarity: byRarityOut,
+    shinySpecies: [...shinySet].filter(s => !EVENT_SPECIES.includes(s)).length,
+  };
+}
+
+// Ordered, catalog-derived dex milestones. `type: species` = N distinct species,
+// `type: rarity` = every normal species of that rarity.
+const DEX_MILESTONES = [
+  { key: 'dex_10',   type: 'species', need: 10,  name: '10 species' },
+  { key: 'dex_25',   type: 'species', need: 25,  name: '25 species' },
+  { key: 'dex_50',   type: 'species', need: 50,  name: '50 species' },
+  { key: 'dex_75',   type: 'species', need: 75,  name: '75 species' },
+  { key: 'dex_90',   type: 'species', need: 90,  name: '90 species' },
+  { key: 'dex_full', type: 'species', need: 92,  name: 'full dex' },
+  { key: 'dex_all_common',    type: 'rarity', rarity: 'common',    name: 'all Commons' },
+  { key: 'dex_all_uncommon',  type: 'rarity', rarity: 'uncommon',  name: 'all Uncommons' },
+  { key: 'dex_all_rare',      type: 'rarity', rarity: 'rare',      name: 'all Rares' },
+  { key: 'dex_all_epic',      type: 'rarity', rarity: 'epic',      name: 'all Epics' },
+  { key: 'dex_all_legendary', type: 'rarity', rarity: 'legendary', name: 'all Legendaries' },
+  { key: 'dex_all_mythic',    type: 'rarity', rarity: 'mythic',    name: 'all Mythics' },
+];
+
+/** Which dex milestones the given progress satisfies. */
+function dexMilestonesHit(progress) {
+  const hit = [];
+  for (const m of DEX_MILESTONES) {
+    if (m.type === 'species') { if (progress.owned >= m.need) hit.push(m.key); }
+    else if (progress.byRarity[m.rarity] && progress.byRarity[m.rarity].done) hit.push(m.key);
+  }
+  return hit;
+}
+
+/** Next unmet species-count milestone (for UI/quests/recommendations). */
+function nextDexMilestone(progress) {
+  const p = progress || {};
+  for (const m of DEX_MILESTONES) {
+    if (m.type !== 'species') continue;
+    if ((p.owned || 0) < m.need) return m;
+  }
+  return null;
+}
+
 function randomStats(rarity) {
   const base = { common: [100, 10, 5], uncommon: [130, 18, 12], rare: [180, 30, 22], epic: [270, 50, 38], legendary: [400, 75, 60], mythic: [650, 130, 100] };
   const [hp, atk, def] = base[rarity];
@@ -1519,6 +1640,7 @@ function grantXp(userId, amount) {
     reward += Math.floor(LEVEL_REWARD * level * getBalanceFactor(userId));
   }
   db.run(`UPDATE users SET xp = ${xp}, xp_time = ${now}, level = ${level} WHERE user_id = '${userId}'`);
+  trackProgress(userId, 'xp', amount);
   save();
   if (reward > 0) addBalance(userId, reward);
   return leveledUp ? { leveledUp, newLevel: level, reward, xp, needed: xpForLevel(level) } : { leveledUp: false, newLevel: level, reward: 0, xp, needed: xpForLevel(level) };
@@ -1531,13 +1653,31 @@ function addAnimal(userId, effLevel) {
   const shiny = rollShiny() ? 1 : 0;
   if (shiny) db.run(`UPDATE users SET shiny_found = shiny_found + 1 WHERE user_id = '${safeStr(userId)}'`);
   const trait = rollTrait();
+  const newSpecies = !speciesOwned(userId, species);
   db.run(`INSERT INTO animals (user_id, species, rarity, hp, max_hp, attack, defense, shiny, trait) VALUES ('${userId}', '${species}', '${rarity}', ${stats.hp}, ${stats.hp}, ${stats.attack}, ${stats.defense}, ${shiny}, '${trait}')`);
   const rows = db.exec('SELECT last_insert_rowid() AS id');
   const id = rows[0].values[0][0];
   save();
   if (shiny) awardPetAchievement(id, 'shiny');
   if (rarity === 'mythic') awardPetAchievement(id, 'mythic');
+  if (newSpecies) awardDexDiscovery(userId);
   return { id, species, rarity, ...stats, level: 1, exp: 0, name: 'Unnamed', shiny: shiny === 1, trait };
+}
+
+function speciesOwned(userId, species) {
+  const rows = db.exec(`SELECT 1 FROM animals WHERE user_id = '${safeStr(userId)}' AND species = '${safeStr(species)}' LIMIT 1`);
+  return !!(rows.length && rows[0].values.length);
+}
+
+// New species discovery: quest/bounty progress plus the Dex Challenge event bonus.
+// The travelling merchant's stock pets are internal and never generate player progress.
+function awardDexDiscovery(userId) {
+  if (!userId || userId === '__merchant__') return;
+  trackProgress(userId, 'dex', 1);
+  if (isCommunityEvent('dex_challenge')) {
+    addGems(userId, 2);
+    addBalance(userId, 10000);
+  }
 }
 
 function getUserAnimals(userId) {
@@ -1546,7 +1686,7 @@ function getUserAnimals(userId) {
   return rows[0].values.map(v => ({
     id: v[0], user_id: v[1], species: v[2], rarity: v[3], name: v[4],
     level: v[5], exp: v[6], hp: v[7], max_hp: v[8], attack: v[9], defense: v[10], created_at: v[11],
-    shiny: v[12] === 1, trait: v[13] || '', fed_until: v[14] || 0,
+    shiny: v[12] === 1, trait: v[13] || '', fed_until: v[14] || 0, bond: v[15] || 0,
   }));
 }
 
@@ -1554,7 +1694,7 @@ function getAnimal(id) {
   const rows = db.exec(`SELECT * FROM animals WHERE id = ${id}`);
   if (!rows.length || !rows[0].values.length) return null;
   const v = rows[0].values[0];
-  return { id: v[0], user_id: v[1], species: v[2], rarity: v[3], name: v[4], level: v[5], exp: v[6], hp: v[7], max_hp: v[8], attack: v[9], defense: v[10], created_at: v[11], shiny: v[12] === 1, trait: v[13] || '', fed_until: v[14] || 0 };
+  return { id: v[0], user_id: v[1], species: v[2], rarity: v[3], name: v[4], level: v[5], exp: v[6], hp: v[7], max_hp: v[8], attack: v[9], defense: v[10], created_at: v[11], shiny: v[12] === 1, trait: v[13] || '', fed_until: v[14] || 0, bond: v[15] || 0 };
 }
 
 function removeAnimal(id) {
@@ -1579,6 +1719,8 @@ function addExp(id, amount) {
     if (a.level < 10 && level >= 10) awardPetAchievement(id, 'level_10');
     if (a.level < 25 && level >= 25) awardPetAchievement(id, 'level_25');
     if (a.level < 50 && level >= 50) awardPetAchievement(id, 'level_50');
+    trackProgress(a.user_id, 'petlevel', level - a.level);
+    addBond(id, (level - a.level) * 2);
   }
   db.run(`UPDATE animals SET exp = ${exp} WHERE id = ${id}`);
   save();
@@ -1586,6 +1728,7 @@ function addExp(id, amount) {
 
 function renameAnimal(id, name) {
   db.run(`UPDATE animals SET name = '${name.replace(/'/g, "''")}' WHERE id = ${id}`);
+  addBond(id, 2);
   save();
 }
 
@@ -1659,7 +1802,7 @@ function addEgg(userId, n = 1) {
 function hatchEgg(userId) {
   if (getEggs(userId) <= 0) return null;
   db.run(`UPDATE users SET eggs = eggs - 1, hatched = hatched + 1 WHERE user_id = '${userId}'`);
-  addContractProgress(userId, 'hatch', 1);
+  trackProgress(userId, 'hatch', 1);
   const r = Math.random();
   let rarity = 'common';
   let acc = 0;
@@ -1669,12 +1812,14 @@ function hatchEgg(userId) {
   const shiny = rollShiny() ? 1 : 0;
   if (shiny) db.run(`UPDATE users SET shiny_found = shiny_found + 1 WHERE user_id = '${safeStr(userId)}'`);
   const trait = rollTrait();
+  const newSpecies = !speciesOwned(userId, species);
   db.run(`INSERT INTO animals (user_id, species, rarity, hp, max_hp, attack, defense, shiny, trait) VALUES ('${userId}', '${species}', '${rarity}', ${stats.hp}, ${stats.hp}, ${stats.attack}, ${stats.defense}, ${shiny}, '${trait}')`);
   const rows = db.exec('SELECT last_insert_rowid() AS id');
   const id = rows[0].values[0][0];
   save();
   if (shiny) awardPetAchievement(id, 'shiny');
   if (rarity === 'mythic') awardPetAchievement(id, 'mythic');
+  if (newSpecies) awardDexDiscovery(userId);
   return { id, species, rarity, ...stats, level: 1, exp: 0, name: 'Unnamed', shiny: shiny === 1, trait };
 }
 
@@ -2038,6 +2183,7 @@ function addXpRaw(userId, amount) {
     reward += Math.floor(LEVEL_REWARD * level * getBalanceFactor(userId));
   }
   db.run(`UPDATE users SET xp = ${xp}, level = ${level} WHERE user_id = '${userId}'`);
+  trackProgress(userId, 'xp', amount);
   save();
   if (reward > 0) addBalance(userId, reward);
   return leveledUp ? { leveledUp, newLevel: level, reward, xp, needed: xpForLevel(level) } : { leveledUp: false, newLevel: level, reward: 0, xp, needed: xpForLevel(level) };
@@ -2205,25 +2351,115 @@ function sellSnails(userId, count) {
 
 // ---------- Quests (daily) + Bounties (weekly) ----------
 
+// Human-readable labels for every objective a quest/bounty can ask for.
+const QUEST_OBJECTIVES = {
+  hunt:      'hunt animals',
+  sacrifice: 'sacrifice animals',
+  work:      'work shifts',
+  give:      'give coins to other players',
+  battle:    'win battles',
+  hatch:     'hatch eggs',
+  gem:       'find gems while hunting',
+  social:    'use social commands',
+  dex:       'discover a new species',
+  petlevel:  'level up your pets',
+  bond:      'raise a pet\'s bond tier',
+  merchant:  'buy from the travelling merchant',
+  inbox:     'claim inbox deliveries',
+  streak:    'keep your daily streak alive',
+  xp:        'earn XP',
+  event:     'take part in an active server event',
+  contract:  'complete a contract',
+};
+
+// Some objectives only make sense for players who actually have the feature
+// (pets/team, undiscovered species, a live server event), so the generator
+// filters them out instead of handing out an impossible task.
+const QUEST_REQUIRES = {
+  pets: ctx => ctx.animals >= 1,
+  dex: (ctx, entry) => ctx.dexMissing >= entry.target,
+  event: ctx => ctx.eventActive,
+};
+
+function questEligible(entry, ctx) {
+  if (!entry.require) return true;
+  const fn = QUEST_REQUIRES[entry.require];
+  return fn ? fn(ctx, entry) : true;
+}
+
+function questContext(userId) {
+  let animals = 0;
+  try {
+    const rows = db.exec(`SELECT COUNT(*) FROM animals WHERE user_id = '${safeStr(userId)}'`);
+    if (rows.length && rows[0].values.length) animals = Number(rows[0].values[0][0]) || 0;
+  } catch (e) {}
+  let dexMissing = 0;
+  try {
+    const p = dexProgress(userId);
+    if (p) dexMissing = p.missing || 0;
+  } catch (e) {}
+  let eventActive = false;
+  try {
+    if (typeof getActiveCommunityEvent === 'function') eventActive = !!getActiveCommunityEvent();
+  } catch (e) {}
+  return { animals, dexMissing, eventActive };
+}
+
+// Pick a random objective the user can actually complete; if nothing is
+// eligible (rare), fall back to the unconditional entries only.
+function pickFromPool(pool, ctx) {
+  const eligible = pool.filter(e => questEligible(e, ctx));
+  const list = eligible.length ? eligible : pool.filter(e => !e.require);
+  const from = list.length ? list : pool;
+  return from[Math.floor(Math.random() * from.length)];
+}
+
 const QUEST_POOL = [
-  { key: 'hunt', target: 10, reward: 20000 },
-  { key: 'hunt', target: 20, reward: 50000 },
-  { key: 'sacrifice', target: 3, reward: 30000 },
-  { key: 'sacrifice', target: 5, reward: 60000 },
-  { key: 'win', target: 50000, reward: 25000 },
-  { key: 'work', target: 3, reward: 30000 },
-  { key: 'give', target: 50000, reward: 35000 },
-  { key: 'battle', target: 3, reward: 45000 },
+  // easy — a few quick actions
+  { key: 'hunt', target: 8, reward: 20000, tier: 'easy' },
+  { key: 'hunt', target: 15, reward: 30000, tier: 'easy' },
+  { key: 'work', target: 2, reward: 22000, tier: 'easy' },
+  { key: 'social', target: 3, reward: 18000, tier: 'easy' },
+  { key: 'hatch', target: 2, reward: 26000, tier: 'easy' },
+  { key: 'gem', target: 2, reward: 30000, tier: 'easy' },
+  { key: 'streak', target: 1, reward: 20000, tier: 'easy' },
+  { key: 'xp', target: 120, reward: 22000, tier: 'easy' },
+  { key: 'inbox', target: 1, reward: 18000, tier: 'easy' },
+  // medium — a bit of a grind
+  { key: 'sacrifice', target: 4, reward: 45000, tier: 'medium' },
+  { key: 'battle', target: 3, reward: 50000, tier: 'medium', require: 'pets' },
+  { key: 'give', target: 50000, reward: 42000, tier: 'medium' },
+  { key: 'dex', target: 1, reward: 70000, tier: 'medium', require: 'dex' },
+  { key: 'petlevel', target: 2, reward: 60000, tier: 'medium', require: 'pets' },
+  { key: 'bond', target: 1, reward: 60000, tier: 'medium', require: 'pets' },
+  { key: 'merchant', target: 1, reward: 55000, tier: 'medium' },
+  { key: 'contract', target: 1, reward: 65000, tier: 'medium' },
+  // rare — big grind, pays a seal on top
+  { key: 'hunt', target: 40, reward: 120000, seal: 1, tier: 'rare' },
+  { key: 'battle', target: 8, reward: 140000, seal: 1, tier: 'rare', require: 'pets' },
+  { key: 'event', target: 1, reward: 100000, seal: 1, tier: 'rare', require: 'event' },
 ];
 
 const BOUNTY_POOL = [
-  { key: 'hunt', target: 60, reward: 200000 },
-  { key: 'hunt', target: 100, reward: 400000 },
-  { key: 'sacrifice', target: 10, reward: 250000 },
-  { key: 'win', target: 300000, reward: 200000 },
-  { key: 'work', target: 10, reward: 200000 },
-  { key: 'give', target: 250000, reward: 350000 },
-  { key: 'battle', target: 10, reward: 300000 },
+  { key: 'hunt', target: 60, reward: 200000, tier: 'easy' },
+  { key: 'hunt', target: 100, reward: 400000, tier: 'medium' },
+  { key: 'sacrifice', target: 10, reward: 250000, tier: 'easy' },
+  { key: 'work', target: 10, reward: 200000, tier: 'easy' },
+  { key: 'give', target: 250000, reward: 350000, tier: 'medium' },
+  { key: 'battle', target: 10, reward: 300000, tier: 'medium', require: 'pets' },
+  { key: 'battle', target: 25, reward: 500000, seal: 1, tier: 'rare', require: 'pets' },
+  { key: 'hatch', target: 15, reward: 260000, tier: 'easy' },
+  { key: 'gem', target: 20, reward: 320000, tier: 'medium' },
+  { key: 'social', target: 15, reward: 220000, tier: 'easy' },
+  { key: 'dex', target: 3, reward: 500000, seal: 1, tier: 'rare', require: 'dex' },
+  { key: 'petlevel', target: 8, reward: 380000, tier: 'medium', require: 'pets' },
+  { key: 'bond', target: 3, reward: 400000, seal: 1, tier: 'hard', require: 'pets' },
+  { key: 'merchant', target: 3, reward: 300000, tier: 'medium' },
+  { key: 'inbox', target: 5, reward: 240000, tier: 'easy' },
+  { key: 'streak', target: 5, reward: 260000, tier: 'easy' },
+  { key: 'xp', target: 800, reward: 300000, tier: 'medium' },
+  { key: 'contract', target: 3, reward: 420000, seal: 1, tier: 'hard' },
+  { key: 'event', target: 2, reward: 350000, seal: 1, tier: 'rare', require: 'event' },
 ];
 
 function getQuest(userId) {
@@ -2231,12 +2467,12 @@ function getQuest(userId) {
   const today = dayNumber();
   let q = rows.length && rows[0].values.length ? rows[0].values[0] : null;
   if (!q || q[1] !== today) {
-    const roll = QUEST_POOL[Math.floor(Math.random() * QUEST_POOL.length)];
-    db.run(`INSERT OR REPLACE INTO quests (user_id, day, quest_key, progress, target, reward, claimed) VALUES ('${userId}', ${today}, '${roll.key}', 0, ${roll.target}, ${roll.reward}, 0)`);
+    const roll = pickFromPool(QUEST_POOL, questContext(userId));
+    db.run(`INSERT OR REPLACE INTO quests (user_id, day, quest_key, progress, target, reward, claimed, seal_reward) VALUES ('${userId}', ${today}, '${roll.key}', 0, ${roll.target}, ${roll.reward}, 0, ${roll.seal || 0})`);
     save();
     q = db.exec(`SELECT * FROM quests WHERE user_id = '${userId}'`)[0].values[0];
   }
-  return { day: q[1], key: q[2], progress: q[3], target: q[4], reward: q[5], claimed: q[6] === 1 };
+  return { day: q[1], key: q[2], progress: q[3], target: q[4], reward: q[5], claimed: q[6] === 1, sealReward: q[7] || 0 };
 }
 
 function addQuestProgress(userId, key, amount) {
@@ -2252,6 +2488,7 @@ function claimQuest(userId) {
   db.run(`UPDATE quests SET claimed = 1 WHERE user_id = '${userId}'`);
   const reward = hasPerk(userId, 'double_quest') ? q.reward * 2 : q.reward;
   addBalance(userId, reward);
+  if (q.sealReward > 0) addSeals(userId, q.sealReward);
   addPassXp(userId, PASS_XP.quest);
   db.run(`UPDATE users SET quests_done = quests_done + 1 WHERE user_id = '${userId}'`);
   addContractProgress(userId, 'quest', 1);
@@ -2264,12 +2501,12 @@ function getBounty(userId) {
   const week = Math.floor(dayNumber() / 7);
   let b = rows.length && rows[0].values.length ? rows[0].values[0] : null;
   if (!b || b[1] !== week) {
-    const roll = BOUNTY_POOL[Math.floor(Math.random() * BOUNTY_POOL.length)];
-    db.run(`INSERT OR REPLACE INTO bounties (user_id, week, quest_key, progress, target, reward, claimed) VALUES ('${userId}', ${week}, '${roll.key}', 0, ${roll.target}, ${roll.reward}, 0)`);
+    const roll = pickFromPool(BOUNTY_POOL, questContext(userId));
+    db.run(`INSERT OR REPLACE INTO bounties (user_id, week, quest_key, progress, target, reward, claimed, seal_reward) VALUES ('${userId}', ${week}, '${roll.key}', 0, ${roll.target}, ${roll.reward}, 0, ${roll.seal || 0})`);
     save();
     b = db.exec(`SELECT * FROM bounties WHERE user_id = '${userId}'`)[0].values[0];
   }
-  return { week: b[1], key: b[2], progress: b[3], target: b[4], reward: b[5], claimed: b[6] === 1 };
+  return { week: b[1], key: b[2], progress: b[3], target: b[4], reward: b[5], claimed: b[6] === 1, sealReward: b[7] || 0 };
 }
 
 function addBountyProgress(userId, key, amount) {
@@ -2285,6 +2522,7 @@ function claimBounty(userId) {
   db.run(`UPDATE bounties SET claimed = 1 WHERE user_id = '${userId}'`);
   const reward = hasPerk(userId, 'double_quest') ? b.reward * 2 : b.reward;
   addBalance(userId, reward);
+  if (b.sealReward > 0) addSeals(userId, b.sealReward);
   addPassXp(userId, PASS_XP.bounty);
   db.run(`UPDATE users SET quests_done = quests_done + 1 WHERE user_id = '${userId}'`);
   addContractProgress(userId, 'quest', 1);
@@ -2643,6 +2881,16 @@ const ACHIEVEMENTS = [
   { key: 'shiny_3', name: '💫 Prismatic', desc: 'catch 3 shinies', reward: 500000, test: u => (u.shiny_found || 0) >= 3 },
   { key: 'dex_10', name: '🗂️ Wildlife Watcher', desc: 'discover 10 different species', reward: 50000, test: u => u.dex_species >= 10 },
   { key: 'dex_25', name: '🧭 Beast Master', desc: 'discover 25 different species', reward: 200000, test: u => u.dex_species >= 25 },
+  { key: 'dex_50', name: '🧬 Dex Devotee', desc: 'discover 50 different species', reward: 600000, test: u => (u.dex_owned || 0) >= 50 },
+  { key: 'dex_75', name: '📚 Living Encyclopedia', desc: 'discover 75 different species', reward: 1500000, test: u => (u.dex_owned || 0) >= 75 },
+  { key: 'dex_full', name: '🏆 Complete Dex', desc: 'discover every species in the dex', reward: 5000000, test: u => (u.dex_owned || 0) >= 92 },
+  { key: 'shiny_dex_10', name: '🌈 Prismatic Dex', desc: 'own 10 different shiny species', reward: 750000, test: u => (u.dex_shiny_species || 0) >= 10 },
+  { key: 'dex_complete_common', name: '⚪ Common Completionist', desc: 'own every common species', reward: 200000, test: u => u.dex_done_common === true },
+  { key: 'dex_complete_uncommon', name: '🟢 Uncommon Completionist', desc: 'own every uncommon species', reward: 400000, test: u => u.dex_done_uncommon === true },
+  { key: 'dex_complete_rare', name: '🔵 Rare Completionist', desc: 'own every rare species', reward: 1000000, test: u => u.dex_done_rare === true },
+  { key: 'dex_complete_epic', name: '🟣 Epic Completionist', desc: 'own every epic species', reward: 2500000, test: u => u.dex_done_epic === true },
+  { key: 'dex_complete_legendary', name: '🟡 Legendary Completionist', desc: 'own every legendary species', reward: 5000000, test: u => u.dex_done_legendary === true },
+  { key: 'dex_complete_mythic', name: '👑 Mythic Completionist', desc: 'own every mythic species', reward: 10000000, test: u => u.dex_done_mythic === true },
   { key: 'quests_10', name: '🗒️ Quest Regular', desc: 'complete 10 daily quests', reward: 100000, test: u => (u.quests_done || 0) >= 10 },
   { key: 'seals_10', name: '🎟️ Seal Collector', desc: 'hold 10 seals', reward: 50000, test: u => (u.seals || 0) >= 10 },
   { key: 'streak_7', name: '🔥 Week Streak', desc: 'hit a 7-day streak', reward: 100000, test: u => (u.daily_streak || 0) >= 7 },
@@ -2657,6 +2905,9 @@ const ACHIEVEMENTS = [
   { key: 'conspiracy', name: '🕵️ Alright What Is Going On', desc: 'judged someone in a case. certified conspiracy theorist.', reward: 0, rewardType: 'none', hidden: true, test: u => (u.judged || 0) >= 1 },
   { key: 'veteran', name: '🫡 Roll Call Veteran', desc: 'showed up for roll call once. once.', reward: 0, rewardType: 'none', hidden: true, test: u => (u.rollcalls || 0) >= 1 },
   { key: 'wanted', name: '🚨 Wanted', desc: 'was seen in a wanted notice. try to stay calm.', reward: 0, rewardType: 'none', hidden: true, test: u => (u.wanted_marked || 0) >= 1 },
+  { key: 'bonded', name: '🤝 Bonded', desc: 'reach 150 bond with a pet', reward: 75000, test: u => (u.best_bond || 0) >= 150 },
+  { key: 'soulbound', name: '🪢 Soulbound', desc: 'reach 2500 bond with a single pet', reward: 750000, test: u => (u.best_bond || 0) >= 2500 },
+  { key: 'event_hero', name: '🏹 Event Hero', desc: 'complete a server community event', reward: 150000, test: u => (u.event_wins || 0) >= 1 },
 ];
 
 function getAchievements(userId) {
@@ -2671,6 +2922,7 @@ function checkAchievements(userId) {
   if (!u) return [];
   const animals = getUserAnimals(userId);
   const ownedSpecies = getOwnedSpecies(userId);
+  const dexP = dexProgress(userId);
   let contractsDone = 0;
   try {
     const r = db.exec(`SELECT COUNT(*) FROM contracts WHERE target_id = '${safeStr(userId)}' AND status = 'completed'`);
@@ -2681,6 +2933,14 @@ function checkAchievements(userId) {
     has_legendary: animals.some(a => a.rarity === 'legendary'),
     has_mythic: animals.some(a => a.rarity === 'mythic'),
     dex_species: Object.values(ownedSpecies).reduce((s, arr) => s + arr.length, 0),
+    dex_owned: dexP.owned,
+    dex_shiny_species: dexP.shinySpecies,
+    dex_done_common: dexP.byRarity.common.done,
+    dex_done_uncommon: dexP.byRarity.uncommon.done,
+    dex_done_rare: dexP.byRarity.rare.done,
+    dex_done_epic: dexP.byRarity.epic.done,
+    dex_done_legendary: dexP.byRarity.legendary.done,
+    dex_done_mythic: dexP.byRarity.mythic.done,
     shiny_found: u.shiny_found || 0,
     hatched: u.hatched,
     battles_won: u.battles_won,
@@ -2701,6 +2961,8 @@ function checkAchievements(userId) {
     judged: u.judged || 0,
     rollcalls: u.rollcalls || 0,
     wanted_marked: u.wanted_marked || 0,
+    best_bond: animals.reduce((m, a) => Math.max(m, a.bond || 0), 0),
+    event_wins: u.event_wins || 0,
   };
   const owned = new Set(getAchievements(userId));
   const unlocked = [];
@@ -2917,6 +3179,11 @@ const PET_ACHIEVEMENTS = {
   shiny: { name: '✨ Shiny Collector', desc: 'own a shiny pet', reward: 250000 },
   mythic: { name: '👑 Mythic', desc: 'own a mythic pet', reward: 1000000 },
   fed: { name: '🍖 Well Fed', desc: 'feed any pet', reward: 10000 },
+  bond_50: { name: '🤝 Acquaintance', desc: 'reach 50 bond with a pet', reward: 20000 },
+  bond_150: { name: '🧡 Companion', desc: 'reach 150 bond with a pet', reward: 60000 },
+  bond_400: { name: '💞 Loyal', desc: 'reach 400 bond with a pet', reward: 150000 },
+  bond_1000: { name: '🔗 Devoted', desc: 'reach 1000 bond with a pet', reward: 400000 },
+  bond_2500: { name: '🪢 Soulbound', desc: 'reach 2500 bond with a pet', reward: 1000000 },
 };
 
 function petAchievementsFor(animalId) {
@@ -2936,6 +3203,58 @@ function getPetAchievementReward(animalId) {
   if (!rows.length || !rows[0].values.length) return null;
   const k = rows[0].values[0][0];
   return PET_ACHIEVEMENTS[k] || null;
+}
+
+// ---- 2.0: Pet bond / affinity ----
+// Bond grows from real interaction (leveling, feeding, evolving, naming, battles).
+// Shiny pets bond twice as fast. Tiers give a small passive battle bonus so a
+// long-term pet actually feels more valuable without overshadowing rarity.
+const BOND_TIERS = [
+  { key: 'stranger',     name: 'Stranger',     min: 0,    mult: 0 },
+  { key: 'acquaintance', name: 'Acquaintance', min: 50,   mult: 0.02, ach: 'bond_50' },
+  { key: 'companion',    name: 'Companion',    min: 150,  mult: 0.04, ach: 'bond_150' },
+  { key: 'loyal',        name: 'Loyal',        min: 400,  mult: 0.06, ach: 'bond_400' },
+  { key: 'devoted',      name: 'Devoted',      min: 1000, mult: 0.08, ach: 'bond_1000' },
+  { key: 'soulbound',    name: 'Soulbound',    min: 2500, mult: 0.10, ach: 'bond_2500' },
+];
+
+function bondTier(bond) {
+  const b = Math.max(0, bond | 0);
+  let idx = 0;
+  for (let i = 0; i < BOND_TIERS.length; i++) if (b >= BOND_TIERS[i].min) idx = i;
+  const next = BOND_TIERS[idx + 1] || null;
+  return { ...BOND_TIERS[idx], index: idx, next, toNext: next ? next.min - b : 0 };
+}
+
+/** Passive battle multiplier from bond: 0 -> 1.0, soulbound -> 1.10. */
+function bondMultiplier(bond) {
+  return 1 + bondTier(bond || 0).mult;
+}
+
+/** Add bond to a pet. Shiny pets gain 2x. Awards tier achievements on the way up. */
+function addBond(animalId, amount) {
+  const a = getAnimal(animalId);
+  if (!a || !(amount > 0)) return a ? { pet: a, gained: 0, tier: bondTier(a.bond || 0) } : null;
+  const before = bondTier(a.bond || 0).index;
+  const festival = isCommunityEvent('pet_festival') ? 2 : 1;
+  const gained = Math.floor(amount * (a.shiny ? 2 : 1) * festival);
+  const bond = (a.bond || 0) + gained;
+  db.run(`UPDATE animals SET bond = ${bond} WHERE id = ${animalId}`);
+  const tier = bondTier(bond);
+  for (let i = before + 1; i <= tier.index; i++) {
+    const t = BOND_TIERS[i];
+    if (t && t.ach) awardPetAchievement(animalId, t.ach);
+  }
+  if (tier.index > before) trackProgress(a.user_id, 'bond', tier.index - before);
+  save();
+  return { petId: animalId, bond, gained, tier };
+}
+
+/** Highest bond value across all of a user's pets (used for milestones/titles). */
+function bestBond(userId) {
+  const rows = db.exec(`SELECT IFNULL(MAX(bond), 0) FROM animals WHERE user_id = '${safeStr(userId)}'`);
+  if (!rows.length || !rows[0].values.length) return 0;
+  return rows[0].values[0][0] || 0;
 }
 
 // ---- v1.7.0: Evolution ----
@@ -2963,6 +3282,7 @@ function evolveAnimal(animalId, userEssence) {
   db.run(`UPDATE animals SET species = '${newSpecies}', rarity = '${can.next}', attack = attack + ${Math.floor(a.attack * 0.15)}, defense = defense + ${Math.floor(a.defense * 0.15)}, max_hp = max_hp + ${Math.floor(a.max_hp * 0.15)} WHERE id = ${animalId}`);
   db.run(`UPDATE users SET essence = essence - ${can.cost} WHERE user_id = '${a.user_id}'`);
   awardPetAchievement(animalId, 'evolved');
+  addBond(animalId, 15);
   save();
   return { ok: true, species: newSpecies, rarity: can.next, cost: can.cost };
 }
@@ -2982,6 +3302,7 @@ function feedAnimal(animalId) {
   const nowF = Math.max(a.fed_until || 0, net);
   db.run(`UPDATE animals SET fed_until = ${nowF + FEED_DURATION} WHERE id = ${animalId}`);
   awardPetAchievement(animalId, 'fed');
+  addBond(animalId, 5);
   save();
   return { ok: true, fedUntil: nowF + FEED_DURATION };
 }
@@ -3233,13 +3554,16 @@ function buyMerchantItem(userId, slot) {
   if (item.sold_to) return { ok: false, reason: 'sold' };
   const u = ensureUser(userId);
   if (!u || (u.balance || 0) < item.price) return { ok: false, reason: 'coins' };
+  let merchantNewSpecies = false;
   if (item.kind === 'pet') {
     const a = getAnimal(Number(item.extra));
     if (!a || a.user_id !== MERCHANT_OWNER_ID) return { ok: false, reason: 'gone' };
+    merchantNewSpecies = !speciesOwned(userId, a.species);
   }
   db.run(`UPDATE users SET balance = balance - ${item.price} WHERE user_id = '${userId}'`);
   if (item.kind === 'pet') {
     db.run(`UPDATE animals SET user_id = '${userId}' WHERE id = ${item.extra} AND user_id = '${MERCHANT_OWNER_ID}'`);
+    if (merchantNewSpecies) awardDexDiscovery(userId);
   } else if (item.kind === 'gems') {
     addGems(userId, parseInt(item.extra || '10', 10));
   } else if (item.kind === 'essence') {
@@ -3247,6 +3571,7 @@ function buyMerchantItem(userId, slot) {
   }
   db.run(`UPDATE merchant_stock SET sold_to = '${userId}' WHERE slot = ${item.slot}`);
   db.run(`UPDATE users SET merchant_buys = merchant_buys + 1 WHERE user_id = '${safeStr(userId)}'`);
+  trackProgress(userId, 'merchant', 1);
   save();
   return { ok: true, item };
 }
@@ -4026,6 +4351,7 @@ function safeClaim(deliveryId, recipientId) {
   if (changed !== 1) return { ok: false, reason: 'already' };
   if (d.amount > 0) addBalance(recipientId, d.amount);
   creditPayload(recipientId, d.payload);
+  trackProgress(recipientId, 'inbox', 1);
   save();
   return { ok: true, delivery: d };
 }
@@ -4162,6 +4488,7 @@ function settleCompletedContract(contractId) {
   const changed = db.exec('SELECT changes() AS c')[0].values[0][0];
   if (changed !== 1) return { ok: false, reason: 'already' };
   const deliveryId = createDelivery(c.target_id, { sender: c.creator_id, source: 'contract', label: `${CONTRACT_OBJECTIVES[c.objective].label} — contract with <@${c.creator_id}>`.slice(0, 90), amount: c.reward });
+  trackProgress(c.target_id, 'contract', 1);
   save();
   return { ok: true, deliveryId };
 }
@@ -4217,6 +4544,9 @@ const TITLES = {
   safarilegend:     { name: 'safari legend',    rarity: 'rare',    desc: 'owned 50 animals', award: u => u.animals >= 50 },
   crypto_dex:       { name: 'specialist',       rarity: 'common',  desc: 'caught 10 different species', award: u => u.dex_species >= 10 },
   collector_xl:     { name: 'completionist',    rarity: 'rare',    desc: 'caught 20 different species', award: u => u.dex_species >= 20 },
+  dex_master:       { name: 'dex master',       rarity: 'rare',    desc: 'discovered 50 different species', award: u => (u.dex_owned || 0) >= 50 },
+  living_dex:       { name: 'living dex',       rarity: 'legendary', desc: 'completed the entire species dex', award: u => (u.dex_owned || 0) >= 92 },
+  prismatic:        { name: 'prismatic',        rarity: 'rare',    desc: 'own 10 different shiny species', award: u => (u.dex_shiny_species || 0) >= 10 },
   hatcher:          { name: 'egg opener',       rarity: 'common',  desc: 'hatched ur first egg', award: u => u.hatched >= 1 },
   egg_enthusiast:   { name: 'hatchery',         rarity: 'common',  desc: 'hatched 10 eggs', award: u => u.hatched >= 10 },
   shiny_finder:     { name: 'shiny hunter',     rarity: 'rare',    desc: 'caught a shiny', award: u => u.shiny_found >= 1 },
@@ -4240,6 +4570,9 @@ const TITLES = {
   family_man:       { name: 'family oriented',  rarity: 'common',  desc: 'married somebody', award: u => u.is_married },
   adoption_arch:    { name: 'adoption agency',  rarity: 'rare',    desc: 'adopted somebody', award: u => u.children > 0 },
   decorated:        { name: 'decorated',        rarity: 'common',  desc: 'unlocked 5 achievements', award: u => u.achievements >= 5 },
+  bonded:           { name: 'bonded',           rarity: 'rare',    desc: 'reached 400 bond with a pet', award: u => (u.best_bond || 0) >= 400 },
+  soulbound:        { name: 'soulbound',        rarity: 'legendary', desc: 'reached 2500 bond with a pet', award: u => (u.best_bond || 0) >= 2500 },
+  event_champion:   { name: 'event champion',   rarity: 'rare',    desc: 'completed 5 server community events', award: u => (u.event_wins || 0) >= 5 },
   // funny / hidden
   gift_giver:       { name: 'generous',         rarity: 'common',  desc: 'sent somebody money', award: u => u.money_sent >= 100000 },
   animal_hoarder:   { name: 'animal hoarder',   rarity: 'rare',    desc: 'owned 30 eggs somehow', award: u => u.egg_hopper >= 30 },
@@ -4292,6 +4625,7 @@ function titleStateFor(userId) {
   if (!u) return null;
   const animals = getUserAnimals(userId);
   const ownedSpecies = getOwnedSpecies(userId);
+  const dexP = dexProgress(userId);
   const ach = getAchievements(userId);
   let contractsDone = 0, contractsGiven = 0;
   try { const r = db.exec(`SELECT COUNT(*) FROM contracts WHERE target_id = '${safeStr(userId)}' AND status = 'completed'`); contractsDone = r[0] ? r[0].values[0][0] : 0; } catch {}
@@ -4302,6 +4636,8 @@ function titleStateFor(userId) {
   return {
     animals: animals.length,
     dex_species: Object.values(ownedSpecies).reduce((s, a) => s + a.length, 0),
+    dex_owned: dexP.owned,
+    dex_shiny_species: dexP.shinySpecies,
     has_legendary: animals.some(a => a.rarity === 'legendary'),
     has_mythic: animals.some(a => a.rarity === 'mythic'),
     shiny_found: u.shiny_found || 0,
@@ -4329,7 +4665,9 @@ function titleStateFor(userId) {
     button_pressed: u.button_pressed || 0,
     rollcalls: u.rollcalls || 0,
     judged: u.judged || 0,
+    event_wins: u.event_wins || 0,
     account_days: days,
+    best_bond: animals.reduce((m, a) => Math.max(m, a.bond || 0), 0),
   };
 }
 
@@ -4369,6 +4707,24 @@ function getIncidents(guildId, limit = 15) {
   return rows[0].values.map(v => ({ id: v[0], type: v[1], text: v[2], created_at: v[3] }));
 }
 
+// Only genuinely notable finds make the lore: shiny pets and mythic/legendary
+// captures. At most one entry per batch so a big hunt can't flood the log.
+const DISCOVERY_SCORE = { shiny: 100, mythic: 4, legendary: 3, epic: 2, rare: 1 };
+function recordDiscoveries(guildId, userId, animals) {
+  if (!guildId || !animals || !animals.length) return false;
+  const score = a => (a.shiny ? DISCOVERY_SCORE.shiny : 0) + (DISCOVERY_SCORE[String(a.rarity || '').toLowerCase()] || 0);
+  const best = animals.slice().sort((a, b) => score(b) - score(a))[0];
+  if (!best) return false;
+  const rarity = String(best.rarity || '').toLowerCase();
+  let text = '';
+  if (best.shiny) text = `<@${userId}> found a ✨ **shiny ${best.species}**!`;
+  else if (rarity === 'mythic') text = `<@${userId}> discovered a **mythic ${best.species}**!`;
+  else if (rarity === 'legendary') text = `<@${userId}> caught a **legendary ${best.species}**!`;
+  else return false;
+  addIncident(guildId, 'discovery', text);
+  return true;
+}
+
 // ---------------- ACTIVITY / DISCOVERY ----------------
 
 function getActivity(userId) {
@@ -4401,7 +4757,41 @@ function recordActivity(userId, kind = 'any') {
 
 function bumpSocial(userId) {
   db.run(`UPDATE users SET social_used = social_used + 1 WHERE user_id = '${safeStr(userId)}'`);
+  trackProgress(userId, 'social', 1);
   save();
+}
+
+// Rare interaction-pair milestones. Everything else stays silent.
+const SOCIAL_PAIR_MILESTONES = [10, 25, 50, 100, 250, 500, 1000];
+
+/**
+ * Record one social interaction between an actor and a target for a given action.
+ * Stores ids/action/count only (no content). Returns { count, first, milestone }
+ * where `first` is true on the very first interaction and `milestone` is the
+ * milestone number when the count lands exactly on one, else null.
+ */
+function bumpSocialPair(actorId, targetId, action) {
+  if (!actorId || !targetId || !action || actorId === targetId) return null;
+  const now = Math.floor(Date.now() / 1000);
+  const rows = db.exec(`SELECT count FROM social_pairs WHERE actor_id = '${safeStr(actorId)}' AND target_id = '${safeStr(targetId)}' AND action = '${safeStr(action)}'`);
+  const prev = (rows.length && rows[0].values.length) ? (rows[0].values[0][0] || 0) : 0;
+  const count = prev + 1;
+  if (prev === 0) {
+    db.run(`INSERT INTO social_pairs (actor_id, target_id, action, count, first_at, last_at)
+            VALUES ('${safeStr(actorId)}', '${safeStr(targetId)}', '${safeStr(action)}', 1, ${now}, ${now})`);
+  } else {
+    db.run(`UPDATE social_pairs SET count = ${count}, last_at = ${now}
+            WHERE actor_id = '${safeStr(actorId)}' AND target_id = '${safeStr(targetId)}' AND action = '${safeStr(action)}'`);
+  }
+  save();
+  return { count, first: prev === 0, milestone: SOCIAL_PAIR_MILESTONES.includes(count) ? count : null };
+}
+
+function getSocialPair(actorId, targetId, action) {
+  const rows = db.exec(`SELECT count, first_at, last_at FROM social_pairs WHERE actor_id = '${safeStr(actorId)}' AND target_id = '${safeStr(targetId)}' AND action = '${safeStr(action)}'`);
+  if (!rows.length || !rows[0].values.length) return null;
+  const [count, firstAt, lastAt] = rows[0].values[0];
+  return { actorId, targetId, action, count, firstAt, lastAt };
 }
 
 // Whitelisted per-command counters (event/wanted/social achievements read these).
@@ -4409,6 +4799,9 @@ const COUNTER_COLS = ['judged', 'button_pressed', 'rollcalls', 'summoned', 'want
 function bumpCounter(userId, col) {
   if (!COUNTER_COLS.includes(col)) return false;
   db.run(`UPDATE users SET ${col} = ${col} + 1 WHERE user_id = '${safeStr(userId)}'`);
+  if ((col === 'button_pressed' || col === 'rollcalls') && getActiveCommunityEvent()) {
+    trackProgress(userId, 'event', 1);
+  }
   save();
   return true;
 }
@@ -4494,7 +4887,16 @@ const COMMUNITY_EVENTS = {
   creature:     { name: 'Creature Sighting', emoji: '🦄', duration: 1800, desc: 'the local creature is around — sightings confirmed' },
   quest_rush:   { name: 'Quest Rush',   emoji: '🗒️', duration: 1800, desc: 'daily quests are juicier this hour' },
   double_petxp: { name: 'Double Pet XP', emoji: '📚', duration: 1800, desc: 'pet exp is doubled while this is up' },
+  great_hunt:   { name: 'Great Hunt',   emoji: '🏹', duration: 1800, desc: 'the whole server hunts toward a shared goal', coop: true, entry: '`v hunt` — every animal you catch counts toward the server goal' },
+  gem_rush:     { name: 'Gem Rush',     emoji: '💎', duration: 1200, desc: 'gem drops are doubled', entry: '`v hunt` — every dig can strike double gems' },
+  pet_festival: { name: 'Pet Festival', emoji: '🎀', duration: 1800, desc: 'your pets bond twice as fast', entry: '`v animal` / `v feed` — bond grows at 2x while this is live' },
+  dex_challenge: { name: 'Dex Challenge', emoji: '📖', duration: 1800, desc: 'new species discoveries pay bonus coins + gems', entry: '`v hunt` or `v hatch` — discover a new species for the bonus' },
 };
+
+// Cooperative events track a shared per-guild goal. Progress only counts while
+// the event is live; rewards are delivered to every contributor's inbox once.
+const COMMUNITY_COOP_GOALS = { great_hunt: 80 };
+const COMMUNITY_COOP_REWARD = { coins: 60000, seals: 1 };
 const COMMUNITY_COOLDOWN_S = 4 * 3600;
 const COMMUNITY_TYPES_BY_KEY = Object.keys(COMMUNITY_EVENTS);
 
@@ -4523,13 +4925,16 @@ function canStartCommunityEvent() {
   return now - last >= COMMUNITY_COOLDOWN_S;
 }
 
-function startCommunityEvent() {
+function startCommunityEvent(preferredKey) {
   if (!canStartCommunityEvent()) return null;
-  const key = COMMUNITY_TYPES_BY_KEY[Math.floor(Math.random() * COMMUNITY_TYPES_BY_KEY.length)];
+  const key = (preferredKey && COMMUNITY_EVENTS[preferredKey])
+    ? preferredKey
+    : COMMUNITY_TYPES_BY_KEY[Math.floor(Math.random() * COMMUNITY_TYPES_BY_KEY.length)];
   const ev = COMMUNITY_EVENTS[key];
   const now = Math.floor(Date.now() / 1000);
   db.run(`INSERT INTO community_events (key, ends_at) VALUES ('${key}', ${now + ev.duration})`);
   db.run(`INSERT OR REPLACE INTO lb_state (key, value) VALUES ('last_community_event', ${now})`);
+  if (COMMUNITY_COOP_GOALS[key]) db.run(`DELETE FROM community_event_progress WHERE key = '${safeStr(key)}'`);
   save();
   return { key, ...ev, endsAt: now + ev.duration };
 }
@@ -4541,9 +4946,73 @@ function endCommunityEvent(key) {
   return changed === 1;
 }
 
-function recordIncidentFromEvent(prefix) {
-  return prefix;
+// Cooperative events scale their goal with server size (fallback = base goal).
+function communityCoopGoal(key, memberCount) {
+  const base = COMMUNITY_COOP_GOALS[key];
+  if (!base) return 0;
+  const n = Number(memberCount) || 0;
+  if (n > 0) return Math.max(base, Math.min(base * 5, n * 5));
+  return base;
 }
+
+function communityProgressRow(guildId, key) {
+  const rows = db.exec(`SELECT progress, goal, contributors, rewarded FROM community_event_progress WHERE guild_id = '${safeStr(guildId)}' AND key = '${safeStr(key)}'`);
+  if (!rows.length || !rows[0].values.length) return null;
+  const v = rows[0].values[0];
+  return {
+    progress: v[0] || 0,
+    goal: v[1] || 0,
+    contributors: v[2] ? String(v[2]).split(',').filter(Boolean) : [],
+    rewarded: v[3] === 1,
+  };
+}
+
+function getCommunityProgress(guildId, key, memberCount) {
+  const row = communityProgressRow(guildId, key);
+  const goal = (row && row.goal) || communityCoopGoal(key, memberCount);
+  return {
+    guildId, key,
+    progress: row ? row.progress : 0,
+    goal,
+    contributors: row ? row.contributors.length : 0,
+    rewarded: row ? row.rewarded : false,
+  };
+}
+
+// Add to a live cooperative event's shared goal. Rewards every contributor's
+// inbox exactly once when the goal completes. No-op when the event isn't live.
+function addCommunityProgress(guildId, key, amount, userId, memberCount) {
+  if (!guildId || !key || !(amount > 0)) return null;
+  if (!isCommunityEvent(key) || !COMMUNITY_COOP_GOALS[key]) return null;
+  let row = communityProgressRow(guildId, key);
+  if (!row) row = { progress: 0, goal: communityCoopGoal(key, memberCount), contributors: [], rewarded: false };
+  if (row.rewarded) return { guildId, key, progress: row.progress, goal: row.goal, contributors: row.contributors.length, rewarded: true, done: true };
+  const goal = row.goal || communityCoopGoal(key);
+  const contributors = row.contributors.slice();
+  if (userId && !contributors.includes(String(userId))) contributors.push(String(userId));
+  const progress = Math.min(row.progress + Math.floor(amount), goal);
+  const done = progress >= goal;
+  db.run(`INSERT OR REPLACE INTO community_event_progress (guild_id, key, progress, goal, contributors, rewarded, updated_at)
+          VALUES ('${safeStr(guildId)}', '${safeStr(key)}', ${progress}, ${goal}, '${contributors.map(safeStr).join(',')}', ${done ? 1 : 0}, ${Math.floor(Date.now() / 1000)})`);
+  save();
+  if (done) {
+    try { addIncident(guildId, 'event', `${COMMUNITY_EVENTS[key].name} completed — ${contributors.length} hunter(s) filled the server goal`); } catch (e) {}
+    for (const uid of contributors) {
+      try { db.run(`UPDATE users SET event_wins = event_wins + 1 WHERE user_id = '${safeStr(uid)}'`); } catch (e) {}
+      try {
+        createDelivery(uid, {
+          source: 'event',
+          amount: COMMUNITY_COOP_REWARD.coins,
+          payload: { seals: COMMUNITY_COOP_REWARD.seals },
+          label: `${COMMUNITY_EVENTS[key].name} reward`,
+        });
+      } catch (e) {}
+    }
+  }
+  return { guildId, key, progress, goal, contributors: contributors.length, rewarded: done, done };
+}
+
+
 
 // =====================================================================================
 //  END 2.0 systems
@@ -4576,6 +5045,7 @@ module.exports = {
   getBalanceFactor,
   effectiveMult,
   getOwnedSpecies,
+  dexCatalog, dexProgress, DEX_MILESTONES, dexMilestonesHit, nextDexMilestone, EVENT_SPECIES,
   getInsuranceLevel,
   addTicket,
   resetLottery,
@@ -4637,7 +5107,7 @@ module.exports = {
   sharkLoan, SHARK_INTEREST, SHARK_MAX, getLoan, hasOutstandingLoan,
   stockPrice, getStockPrices, buyStock, sellStock, getStockShares, getPortfolio, STOCKS,
   rollEggDrop, getEggs, addEgg, hatchEgg, transferAnimal, EGG_DROP_CHANCE, EGG_HATCH_RARITY,
-  getQuest, addQuestProgress, claimQuest, getBounty, addBountyProgress, claimBounty,
+  getQuest, addQuestProgress, claimQuest, getBounty, addBountyProgress, claimBounty, QUEST_OBJECTIVES,
   getChecklist, addChecklistProgress, claimChecklist, getSeals, addSeals,
   setAvatarUrl, clearAvatarUrl, setBannerUrl, clearBannerUrl,
   currentSeason, addPassXp, passProgress, buyPassPremium, claimPassLevel, claimAllPass, passTop, passReward,
@@ -4659,6 +5129,7 @@ module.exports = {
   registerLoss, resetLossStreak, lossStreakBonus, LOSS_STREAK_WINDOW,
   VAULT_HOURLY_RATE, accrueVaultInterest,
   PET_ACHIEVEMENTS, petAchievementsFor, awardPetAchievement, getPetAchievementReward,
+  BOND_TIERS, bondTier, bondMultiplier, addBond, bestBond,
   EVOLUTION_COSTS, EVOLUTION_MIN_LEVEL, canEvolve, evolveAnimal,
   FEED_COST, FEED_DURATION, isFed, feedAnimal,
   FUSION_COST, fuseAnimals,
@@ -4680,12 +5151,16 @@ module.exports = {
    SHINY_CHANCE, PERSONALITIES, rollShiny, rollTrait,
    // 2.0 systems
    INBOX_SOURCES, createDelivery, getPendingDeliveries, getPendingDeliveryCount, hasPendingSource, getDelivery, creditPayload, safeClaim, claimAllDeliveries,
+   INCIDENT_LIMIT_PER_GUILD,
    CONTRACT_OBJECTIVES, createContract, getContract, listContractsFor, refundContractEscrow,
    acceptContract, declineContract, cancelContract, addContractProgress, settleCompletedContract, claimCompletedContract, expireContracts, trackProgress,
    TITLES, TITLES_BY_KEY, TITLE_RARITY_COLOR, getTitles, getEquippedTitle, unlockTitle, equipTitle, clearTitle, checkTitles,
    addIncident, getIncidents,
    getActivity, recordActivity, bumpSocial, bumpCounter, setSummonTime, setSummonOptOut, getSummonOptOut, setLastDmOk, recordFeatureUse, getFeatureUse, unseenFeatures, CLAIM_ONLY_COMMANDS,
+  SOCIAL_PAIR_MILESTONES, bumpSocialPair, getSocialPair,
+   recordDiscoveries,
    queueUpdateDm, getUpdateDmBatch, updateDmStatus, countUpdateDm,
    COMMUNITY_EVENTS, getActiveCommunityEvent, isCommunityEvent, canStartCommunityEvent, startCommunityEvent, endCommunityEvent,
+   getCommunityProgress, addCommunityProgress, COMMUNITY_COOP_GOALS,
    exec: (sql) => db ? db.exec(sql) : null,
 };

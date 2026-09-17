@@ -29,6 +29,7 @@ module.exports = {
     }
     if (!results.length) return message.channel.send({ embeds: [error('nothing hatched — you ran out of eggs')] });
 
+    if (message.guild) { try { db.recordDiscoveries(message.guild.id, userId, results); } catch (e) {} }
     const remaining = db.getEggs(userId);
     if (all) {
       const lines = results.map(a => `${RARITY_EMOJIS[(a.rarity||'').toLowerCase()] || '⚪'} **${a.species}** (${a.rarity}) Lv.${a.level}`);

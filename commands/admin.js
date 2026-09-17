@@ -104,11 +104,6 @@ module.exports = {
       } else {
         message.channel.send({ embeds: [error('usage: Aovo gems add/remove/bal @user <amount>')] });
       }
-    } else if (sub === 'lucky') {
-      if (!target) return message.channel.send({ embeds: [error('usage: Alucky @user')] });
-      if (!db.ensureUser(target.id)) return message.channel.send({ embeds: [error('user not found')] });
-      const on = db.toggleLucky(target.id);
-      message.channel.send({ embeds: [success(`<@${target.id}> is ${on ? 'now **lucky** 🍀' : 'no longer lucky'}`)] });
     } else if (sub === 'logs' || sub === 'log') {
       if (!message.guild) return message.channel.send({ embeds: [error('must be in a server')] });
       const channel = message.mentions.channels.first();

@@ -36,6 +36,8 @@ const FEATURES = [
   { id: 'dex', label: 'Dex', how: 'v dex', weight: 2, desc: 'the full species checklist — completion feeds titles and bragging rights' },
   { id: 'zoo', label: 'Zoo', how: 'v zoo', weight: 1, desc: 'your whole collection at a glance' },
   { id: 'team', label: 'Team', how: 'v team', weight: 1, desc: 'battle team management' },
+  { id: 'animal', label: 'Pet card', how: 'v animal <id>', weight: 2, desc: 'one pet in detail — bond tier, level, traits and stats' },
+  { id: 'evolve', label: 'Evolution', how: 'v evolve <id>', weight: 2, desc: 'push a level 10+ pet into the next rarity with essence' },
   { id: 'sell', label: 'Sell', how: 'v sell <id|species|all>', weight: 2, desc: 'clear zoo clutter by id, species, rarity or everything at once' },
   { id: 'trade', label: 'Trade', how: 'v trade @user <id>', weight: 2, desc: 'trade pets player-to-player with a price' },
   { id: 'rep', label: 'Reputation', how: 'v rep @user', weight: 1, desc: 'hand out +rep — reputation is badge of honour, not currency' },
@@ -82,6 +84,25 @@ function buildContext(userId) {
   try { const b = db.getBounty(userId); if (!b.claimed) bounty = b; } catch {}
   try { deliveries = db.getPendingDeliveryCount(userId); } catch {}
 
+  // Pet progression: the pet closest to its next bond tier, plus anything ready to evolve.
+  let animalsList = [];
+  try { animalsList = db.getUserAnimals(userId); } catch {}
+  let bondClosest = null;
+  for (const a of animalsList) {
+    const t = db.bondTier(a.bond || 0);
+    if (t.next && (!bondClosest || t.toNext < bondClosest.toNext)) bondClosest = { pet: a, tier: t, toNext: t.toNext };
+  }
+  let evolvable = 0;
+  for (const a of animalsList) { try { if (db.canEvolve(a).ok) evolvable++; } catch {} }
+
+  // Dex milestone + merchant/summon opportunities.
+  let dexP = null, dexMilestone = null;
+  try { dexP = db.dexProgress(userId); dexMilestone = db.nextDexMilestone(dexP); } catch {}
+  let merchantUnsold = 0;
+  try { merchantUnsold = db.getMerchantItems().filter(i => !i.sold_to).length; } catch {}
+  let summonOptOut = false;
+  try { summonOptOut = !!db.getSummonOptOut(userId); } catch {}
+
   return {
     u, used, usedCount, unseen, owned, speciesCount, speciesTotal,
     quest, bounty, deliveries,
@@ -90,6 +111,13 @@ function buildContext(userId) {
     married: !!db.getMarriage(userId),
     clanName: (() => { try { const id = db.getClanOf(userId); return id ? (db.getClan(id) || {}).name : ''; } catch { return ''; } })(),
     event: db.getActiveCommunityEvent(),
+    dexOwned: dexP ? dexP.owned : speciesCount,
+    dexMilestone,
+    bondClosest,
+    evolvable,
+    merchantUnsold,
+    summonOptOut,
+    summoned: u.summoned || 0,
   };
 }
 
@@ -105,7 +133,17 @@ function buildRecommendations(ctx) {
 
   // GAP context (next sensible step).
   if (ctx.speciesCount < ctx.speciesTotal) out.push({ f: FEATURES.find(f => f.id === 'dex'), line: `dex ${ctx.speciesCount}/${ctx.speciesTotal} — species still missing` });
+  if (ctx.dexMilestone && ctx.dexMilestone.need - ctx.dexOwned > 0 && ctx.dexMilestone.need - ctx.dexOwned <= 5) {
+    out.push({ f: FEATURES.find(f => f.id === 'dex'), line: `${ctx.dexMilestone.need - ctx.dexOwned} species from your next dex milestone (${ctx.dexMilestone.name})` });
+  }
   if (ctx.animals > 0 && !used.has('battle')) out.push({ f: FEATURES.find(f => f.id === 'team'), line: 'you own pets but have not sent a battle team out yet' });
+  if (ctx.bondClosest && ctx.bondClosest.toNext <= 60) {
+    const pn = ctx.bondClosest.pet.name || ctx.bondClosest.pet.species;
+    out.push({ f: FEATURES.find(f => f.id === 'animal'), line: `${pn} is only ${ctx.bondClosest.toNext} bond from ${ctx.bondClosest.tier.next.name} — feeding, leveling and battling all raise it` });
+  }
+  if (ctx.evolvable > 0) out.push({ f: FEATURES.find(f => f.id === 'evolve'), line: `${ctx.evolvable} pet(s) are level ${db.EVOLUTION_MIN_LEVEL}+ and ready to evolve` });
+  if (ctx.merchantUnsold > 0) out.push({ f: FEATURES.find(f => f.id === 'merchant'), line: `the merchant still has ${ctx.merchantUnsold} unsold slot(s) available` });
+  if (ctx.summonOptOut) out.push({ f: FEATURES.find(f => f.id === 'summon'), line: 'inactivity summons are switched off — `v summon` controls that' });
   if (!ctx.married) out.push({ f: FEATURES.find(f => f.id === 'marry'), line: 'unmarried in a marriage-multiplier economy' });
   if (!ctx.clanName) out.push({ f: FEATURES.find(f => f.id === 'clan'), line: 'no clan yet — one per player, joinable from any server' });
   if (ctx.event) out.push({ f: FEATURES.find(f => f.id === 'event'), line: `a community event is live right now (${ctx.event.key.replace(/_/g, ' ')})` });
@@ -133,6 +171,8 @@ module.exports = {
   helpArgs: '[tip|list]',
   description: 'recommend what you have not done yet in Gambot',
   aliases: ['suggest', 'todo'],
+  buildContext,
+  buildRecommendations,
   execute(message, args) {
     const uid = message.author.id;
     const mode = (args[0] || '').toLowerCase().trim();

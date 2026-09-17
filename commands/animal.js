@@ -37,6 +37,13 @@ module.exports = {
     const xpPct = Math.min(100, Math.floor((a.exp / xpNeed) * 100));
     const bar = '█'.repeat(Math.floor(xpPct / 10)) + '░'.repeat(10 - Math.floor(xpPct / 10));
 
+    const bt = db.bondTier(a.bond || 0);
+    const bondPct = bt.next ? Math.min(100, Math.floor(((a.bond - bt.min) / (bt.next.min - bt.min)) * 100)) : 100;
+    const bondBar = '█'.repeat(Math.floor(bondPct / 10)) + '░'.repeat(10 - Math.floor(bondPct / 10));
+    const bondLine = bt.next
+      ? `${bondBar} **${bt.name}** · ${a.bond}/${bt.next.min} bond → **${bt.next.name}** (+${Math.round(bt.mult * 100)}% battle now)`
+      : `**${bt.name}** · ${a.bond} bond (+${Math.round(bt.mult * 100)}% battle)`;
+
 const team = db.getTeam(message.author.id);
     const onTeam = team && [team.slot1, team.slot2, team.slot3].includes(a.id);
     const fed = db.isFed(a);
@@ -51,8 +58,9 @@ const team = db.getTeam(message.author.id);
       ['Info', `${a.rarity.toUpperCase()} · Lv.**${a.level}** · \`#${a.id}\`${onTeam ? ' · 🛡️ on battle team' : ''}${a.shiny ? '\n✨ **SHINY** (2x sell price)' : ''}\npersonality: ${traitEmoji || ''} **${a.trait || 'none'}**${fed ? '\n🍖 **fed** (+10% battle stats)' : ''}`],
       ['Combat', `${traitEmoji || ''} **${a.hp}**/${a.max_hp} HP\n🗡️ **${a.attack}** attack\n🛡️ **${a.defense}** defense`],
       ['XP', `${bar} **${a.exp}/${xpNeed}** (${xpPct}%)`],
+      ['Bond', bondLine],
       ['Pet Achievements', achievLine],
-      ['', `\`v team\` to put it on your battle team · \`v rename ${a.id} <name>\` to name it · \`v feed ${a.id}\` · \`v evolve ${a.id}\``],
+      ['', `\`v team\` to put it on your battle team · \`v rename ${a.id} <name>\` to name it · \`v feed ${a.id}\` · \`v evolve ${a.id}\` · bond grows from feeding, leveling, evolving & battles`],
     ], 0x57f287)] });
   },
 };

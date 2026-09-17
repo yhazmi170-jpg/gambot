@@ -21,10 +21,10 @@ module.exports = {
     }
 
     const side = choice[0] === 'h' ? 'heads' : 'tails';
-    const lucky = db.ensureUser(message.author.id).lucky;
-    const result = Math.random() < (lucky ? 0.9 : 0.5) ? side : (side === 'heads' ? 'tails' : 'heads');
+    
+    const result = Math.random() < (0.8) ? side : (side === 'heads' ? 'tails' : 'heads');
     const win = result === side;
-    const mult = lucky ? 3 : 1;
+    const mult = 1;
 
     if (win) {
       const profit = amount * mult;

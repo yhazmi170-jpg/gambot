@@ -5,6 +5,7 @@ fs.rmSync('/tmp/gw_test', { recursive: true, force: true });
 fs.mkdirSync('/tmp/gw_test', { recursive: true });
 
 const db = require('../db');
+const giveaway = require('../utils/giveaway');
 
 let pass = 0, fail = 0;
 function check(label, cond, extra = '') {
@@ -35,19 +36,28 @@ async function main() {
   const g3 = db.getGiveaway('msg3');
   check('legacy default winner_count 1, mode split', g3.winner_count === 1 && g3.mode === 'split');
 
-  // --- split math (mirrors the sweep) ---
-  let winners = ['u1', 'u2', 'u3'];
-  let per = Math.floor(100 / winners.length);
-  let refund = 100 - per * winners.length;
-  check('split: 100 across 3 = 33 each', per === 33, `got ${per}`);
-  check('split: remainder 1 refunded to host', refund === 1, `got ${refund}`);
+  // --- split math (real module) ---
+  let r = giveaway.computePayout(100, 10, 'split', 3);
+  check('split: 100 across 3 = 33 each', r.perWinner === 33, JSON.stringify(r));
+  check('split: remainder 1 refunded to host', r.refund === 1, JSON.stringify(r));
+  check('split: mode normalized', r.mode === 'split');
 
-  // --- full math with underfill refund ---
-  const configured = 10;
-  per = 100;
-  refund = 100 * (configured - winners.length);
-  check('full: each winner gets full 100', per === 100);
-  check('full: underfill refunds 700 to host', refund === 700, `got ${refund}`);
+  // --- full math with underfill refund (real module) ---
+  r = giveaway.computePayout(100, 10, 'full', 3);
+  check('full: each winner gets full 100', r.perWinner === 100, JSON.stringify(r));
+  check('full: underfill refunds 700 to host', r.refund === 700, JSON.stringify(r));
+
+  // --- full with all slots filled => no refund ---
+  r = giveaway.computePayout(100, 10, 'full', 10);
+  check('full: no refund when every slot wins', r.refund === 0, JSON.stringify(r));
+
+  // --- split distributes the whole pot (no remainder) ---
+  r = giveaway.computePayout(90, 10, 'split', 3);
+  check('split: exact division => no refund', r.perWinner === 30 && r.refund === 0, JSON.stringify(r));
+
+  // --- unknown mode falls back to split ---
+  r = giveaway.computePayout(90, 3, 'bogus', 3);
+  check('unknown mode => split', r.mode === 'split' && r.perWinner === 30, JSON.stringify(r));
 
   // --- giveaway source is a valid inbox source + deliverable ---
   check('giveaway in INBOX_SOURCES', db.INBOX_SOURCES.includes('giveaway'));
@@ -65,18 +75,24 @@ async function main() {
   check('claim reports 1 delivery', res.count === 1 && res.credited === 33, JSON.stringify(res));
   check('inbox empty after claim', db.getPendingDeliveries('u1').length === 0);
 
-  // --- multi-winner uniqueness: distinct winners drawn from entries ---
-  const pool = ['a', 'b', 'c', 'd', 'e'];
-  const drawn = [];
-  const drawCount = Math.min(5, pool.length);
-  for (let k = 0; k < drawCount; k++) {
-    const idx = Math.floor(Math.random() * pool.length);
-    drawn.push(pool.splice(idx, 1)[0]);
-  }
-  check('draws unique winners', new Set(drawn).size === drawn.length && drawn.length === 5);
+  // --- multi-winner uniqueness + deterministic draw via injected RNG ---
+  const drawn = giveaway.drawWinners(['a', 'b', 'c', 'd', 'e'], 5, Math.random);
+  check('draws unique winners', new Set(drawn).size === drawn.length && drawn.length === 5, JSON.stringify(drawn));
 
-  // --- finishGiveaway accepts an array and expires are found ---
-  db.finishGiveaway('msg1', winners);
+  // deterministic: rng always 0 -> picks first of the shrinking pool, in order
+  const det = giveaway.drawWinners(['a', 'b', 'c', 'd'], 3, () => 0);
+  check('deterministic draw with rng=0', JSON.stringify(det) === JSON.stringify(['a', 'b', 'c']), JSON.stringify(det));
+
+  // underfilled: 10 requested but only 2 entries -> 2 winners
+  const under = giveaway.drawWinners(['x', 'y'], 10, () => 0);
+  check('underfilled draw caps at entry count', under.length === 2, JSON.stringify(under));
+
+  // never draws more unique winners than entries
+  const many = giveaway.drawWinners(['a', 'a', 'b'], 3, Math.random);
+  check('draw length <= entries', many.length === 3);
+
+  // --- finishGiveaway accepts an array and expired are found ---
+  db.finishGiveaway('msg1', ['u1', 'u2', 'u3']);
   const expired = db.getExpiredGiveaways(Math.floor(Date.now() / 1000) + 999999999);
   check('finished giveaway no longer expired', !expired.includes('msg1'));
 

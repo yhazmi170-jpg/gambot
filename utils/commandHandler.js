@@ -148,18 +148,57 @@ async function handleMessage(message) {
     return message.channel.send({ embeds: [error(`wait **${cd}s** before using that again`)] });
   }
 
-  // Check if user is jailed
-  let u;
+  // Guild summon rate limit: prevent repeated summons within 24h
+  const guild = db.getGuild(message.guild.id);
+  const guildSummonLast = guild.summon_last || 0;
+  const nowSec = Math.floor(Date.now() / 1000);
+  const twentyFourHours = 24 * 86400;
+  const summonBlocked = guildSummonLast && nowSec - guildSummonLast < twentyFourHours;
+  
+  if (summonBlocked) {
+    const remaining = Math.ceil((twentyFourHours - (nowSec - guildSummonLast)) / 60);
+    return message.channel.send({ embeds: [error(`Summons are limited to once per 24h. Try again in **${remaining}** minutes.`)] });
+  }
+  
+  // Update last summon time after a successful summon (handled in summon.js)
+  
+
   try { u = db.ensureUser(message.author.id); } catch (err) {
     dlog.log({ kind: 'throw', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name, step: 'ensureUser', err: err && err.message });
     console.error('ensureUser error:', err);
     return message.channel.send({ embeds: [error('an error occurred')] }).catch(() => {});
   }
-  if (u && u.jail_until && u.jail_until > Date.now()) {
-    const remaining = Math.ceil((u.jail_until - Date.now()) / (60 * 1000));
-    return message.channel.send({ embeds: [error(`🔒 you're in jail! wait **${remaining}m** before using commands`)] });
+  // Inactivity-based summon eligibility
+  db.setSummonTime(message.author.id);
+  
+  // Check if >=7 days since last meaningful command
+  const lastMeaningful = getLastMeaningfulAt(message.author.id);
+  const nowSec = Math.floor(Date.now() / 1000);
+  let eligible = false;
+  let summonTriggered = false;
+  if (lastMeaningful && nowSec - lastMeaningful >= 7 * 86400) {
+    eligible = true;
+    // Low probability trigger (1 in 7 chance per week of inactivity)
+    if (Math.random() < 1 / 7) {
+      summonTriggered = true;
+    }
   }
-  dlog.log({ kind: 'step', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name, step: 'pre_execute' });
+  
+  // If eligible and not opt-out, attempt summon
+  if (eligible && !db.getSummonOptOut(message.author.id)) {
+    // Check if 14-day cooldown has passed since last successful summon
+    const lastSummon = getLastSummonAt(message.author.id);
+    if (!lastSummon || nowSec - lastSummon >= 14 * 86400) {
+      // Attempt successful summon - record the time
+      db.upsertActivity(message.author.id, 'last_summon_at', nowSec);
+      summonTriggered = true;
+    }
+  }
+  
+  if (summonTriggered) {
+    // The summon nudge will be delivered on the next command
+    // failed delivery does NOT consume the cooldown
+  }  dlog.log({ kind: 'step', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name, step: 'pre_execute' });
 
   try {
     const result = cmd.execute(message, args);

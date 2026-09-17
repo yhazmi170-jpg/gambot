@@ -1,5 +1,6 @@
 v2.0.1 — Multi-Winner Giveaways + Inbox Payouts
 
+## Lucky cleanup: removed public v lucky/v luckylist; made Alucky owner-only only (ID 536278876247162882); removed Lucky gambling from coinflip/blackjack/slots/mines/profile/gamehelp; removed luckylist command; completed inactivity summon system with 7-day eligibility, 14-day cooldown, opt-out, rate limiting. Pet Lucky trait preserved.
 🎉 `v giveaway` got a whole lot bigger
 - New syntax: `v giveaway <time> <prize> <winners> <split|full>`
   - `v giveaway 24h 100m 10 split` → 100m divided across 10 winners = 10m each

@@ -149,7 +149,7 @@ async function handleInteraction(i) {
 
 module.exports = {
   name: 'help',
-  aliases: ['h', 'commands', 'cmds'],
+  aliases: ['commands', 'cmds'],
   handleInteraction,
   execute(message) {
     const uid = message.author.id;

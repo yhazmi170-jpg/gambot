@@ -108,7 +108,7 @@ function playLoop(msg, player, dealer, deck, bet, userId, name) {
         while (handValue(dealer) < 17) dealer.push(deck.pop());
         const dv = handValue(dealer);
         const pv2 = handValue(player);
-        const isLucky = db.ensureUser(userId).lucky;
+        // lucky removed - no longer affects blackjack
         let result, color;
         if (dv > 21 || pv2 > dv) {
           const paid = db.payWin(userId, bet * (isLucky ? 3 : 1));
@@ -137,7 +137,7 @@ function playLoop(msg, player, dealer, deck, bet, userId, name) {
         while (handValue(dealer) < 17) dealer.push(deck.pop());
         const dv = handValue(dealer);
         const pv2 = handValue(player);
-        const isLucky = db.ensureUser(userId).lucky;
+        // lucky removed - no longer affects blackjack
         let result, color;
         if (dv > 21 || pv2 > dv) {
           const paid = db.payWin(userId, bet * (isLucky ? 3 : 1));
@@ -175,18 +175,14 @@ module.exports = {
     if (user.balance < amount) return message.channel.send({ embeds: [error('not enough money')] });
 
     const name = message.member?.displayName || message.author.username;
-    const lucky = user.lucky;
+    
     const deck = createDeck();
     let player = [deck.pop(), deck.pop()];
     let dealer = [deck.pop(), deck.pop()];
-    if (lucky) {
-      while (handValue(player) < 21) player.push(deck.pop());
-      if (handValue(player) > 21) player = [deck.pop(), deck.pop()];
-    }
 
     const pv = handValue(player);
     if (pv === 21) {
-      const paid = db.payWin(message.author.id, amount * (lucky ? 3 : 1));
+        \/\/ lucky removed - no longer affects blackjack - const paid = db.payWin(message.author.id, amount);
       while (handValue(dealer) < 17) dealer.push(deck.pop());
       return message.channel.send({
         embeds: [bjEmbed(board({

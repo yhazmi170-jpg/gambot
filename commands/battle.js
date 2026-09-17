@@ -33,9 +33,12 @@ function battleMods(pet) {
     defBonus = weapon.def || 0;
     if (weapon.type === 'aegis') defBonus += Math.floor((weapon.atk || 0) * 0.9); // aegis leans into defense
   }
+  const bondMod = db.bondMultiplier(pet.bond || 0); // 1.0 -> 1.10 from bond tiers
   return {
-    effAtk: Math.floor((pet.attack || 0) * atkMod) + atkBonus,
-    effDef: Math.floor((pet.defense || 0) * defMod) + defBonus,
+    effAtk: Math.floor((pet.attack || 0) * atkMod * bondMod) + atkBonus,
+    effDef: Math.floor((pet.defense || 0) * defMod * bondMod) + defBonus,
+    effHp: Math.floor((pet.hp || 0) * bondMod),
+    effMaxHp: Math.floor((pet.max_hp || 0) * bondMod),
   };
 }
 
@@ -64,8 +67,8 @@ async function runBattle(message, target) {
   const theirPets = [theirTeam.slot1, theirTeam.slot2, theirTeam.slot3].filter(Boolean).map(id => db.getAnimal(id)).filter(Boolean);
   if (!myPets.length || !theirPets.length) return message.channel.send({ embeds: [error('one of the teams has no valid animals')] });
 
-  const myCopy = myPets.map(p => { const wp = attachWeapons(p); return { ...wp, ...battleMods(wp) }; });
-  const theirCopy = theirPets.map(p => { const wp = attachWeapons(p); return { ...wp, ...battleMods(wp) }; });
+  const myCopy = myPets.map(p => { const wp = attachWeapons(p); const mods = battleMods(wp); return { ...wp, ...mods, hp: mods.effHp, max_hp: mods.effMaxHp }; });
+  const theirCopy = theirPets.map(p => { const wp = attachWeapons(p); const mods = battleMods(wp); return { ...wp, ...mods, hp: mods.effHp, max_hp: mods.effMaxHp }; });
   const myStatus = makeStatuses(myCopy);
   const theirStatus = makeStatuses(theirCopy);
 
@@ -206,15 +209,18 @@ async function runBattle(message, target) {
       db.addWeaponCrate(winner.id, 1);
       result += ' 🏴‍☠️ **WEAPON CRATE DROP!**';
     }
+    const winnerPetIds = new Set(winnerPets.map(p => p.id));
     for (const pet of myPets) {
       const survived = myCopy.find(p => p.id === pet.id);
       if (survived && survived.hp > 0) db.addExp(pet.id, 20);
       else db.addExp(pet.id, 5);
+      db.addBond(pet.id, winnerPetIds.has(pet.id) ? (survived && survived.hp > 0 ? 3 : 1) : 1);
     }
     for (const pet of theirPets) {
       const survived = theirCopy.find(p => p.id === pet.id);
       if (survived && survived.hp > 0) db.addExp(pet.id, 20);
       else db.addExp(pet.id, 5);
+      db.addBond(pet.id, winnerPetIds.has(pet.id) ? (survived && survived.hp > 0 ? 3 : 1) : 1);
     }
   }
 

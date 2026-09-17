@@ -9,7 +9,9 @@ const { embed, updateEmbed } = require('./utils/embed');
 const http = require('http');
 const path = require('path');
 const { version } = require('./package.json');
-const { setClient: setLogClient } = require('./utils/logger');
+const logger = require('./utils/logger');
+const { setClient: setLogClient } = logger;
+const giveaway = require('./utils/giveaway');
 
 if (!config.token) {
   console.error('no token set — set TOKEN env var or put it in config.json');
@@ -456,24 +458,8 @@ start().catch(e => console.error('[START] FATAL:', e));
       }
 
       // draw up to winner_count unique winners
-      const pool = [...g.entries];
-      const winners = [];
-      const drawCount = Math.min(Math.max(1, g.winner_count || 1), pool.length);
-      for (let k = 0; k < drawCount; k++) {
-        const idx = Math.floor(Math.random() * pool.length);
-        winners.push(pool.splice(idx, 1)[0]);
-      }
-
-      const mode = g.mode === 'full' ? 'full' : 'split';
-      let perWinner;
-      let refund = 0;
-      if (mode === 'full') {
-        perWinner = g.prize;
-        refund = g.prize * ((g.winner_count || 1) - winners.length);
-      } else {
-        perWinner = Math.floor(g.prize / winners.length);
-        refund = g.prize - perWinner * winners.length;
-      }
+      const winners = giveaway.drawWinners(g.entries, g.winner_count);
+      const { mode, perWinner, refund } = giveaway.computePayout(g.prize, g.winner_count, g.mode, winners.length);
 
       // prizes land in the inbox so winners must claim them
       for (const w of winners) {
@@ -488,10 +474,38 @@ start().catch(e => console.error('[START] FATAL:', e));
       db.finishGiveaway(gwId, winners);
       console.log(`[gw] giveaway ${gwId} won by ${winners.join(', ')} (${perWinner} coins each, ${mode})`);
 
+      // DM every winner so they know to claim their inbox delivery
+      for (const w of winners) {
+        client.users.fetch(w).then(u => {
+          u.send(`🎉 you won **${perWinner.toLocaleString()}** ${config.currency}${winners.length > 1 ? ' (split)' : ''} in <@${g.host_id}>'s giveaway!\nClaim it with \`v inbox\` (or the **Claim All** button).`).catch(() => {});
+        }).catch(() => {});
+      }
+
       const winnerList = winners.slice(0, 10).map(w => `<@${w}>`).join(', ') + (winners.length > 10 ? ` +${winners.length - 10} more` : '');
       client.channels.fetch(g.channel_id).then(ch => {
         if (!ch || typeof ch.edit !== 'function') return;
         try { if (ch.guild) db.addIncident(ch.guild.id, 'giveaway', `${winners.length} winner(s) drew a **${g.prize.toLocaleString()}** giveaway`); } catch (e) {}
+        // announce + ping the winners in chat (restricted mentions)
+        try {
+          if (typeof ch.send === 'function') {
+            ch.send({
+              content: `🎉 ${winnerList} won${winners.length > 1 ? '' : ' the'} giveaway — **${perWinner.toLocaleString()}** ${config.currency}${winners.length > 1 ? ' each' : ''}! Claim it in \`v inbox\`.`,
+              allowedMentions: { users: winners },
+            }).catch(() => {});
+          }
+        } catch (e) {}
+        // write the result to the guild's log channel (set via `Aovo log #channel`)
+        try {
+          if (ch.guild) {
+            logger.log(ch.guild.id, '🎉 Giveaway ended', [
+              ['Host', `<@${g.host_id}>`],
+              ['Winner(s)', winnerList],
+              ['Mode', mode],
+              ['Per winner', `**${perWinner.toLocaleString()}** ${config.currency}`],
+              ['Entries', `${g.entries.length}`],
+            ], 0xfee75c);
+          }
+        } catch (e) {}
         ch.messages.fetch(g.message_id).then(msg => {
           msg.edit({
             embeds: [embed('🎉 Giveaway', [

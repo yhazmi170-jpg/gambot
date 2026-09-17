@@ -1,4 +1,5 @@
 # Gambot Changelog (full history)
+## 2.0.2 - Lucky cleanup and summon system (pending deploy)
 
 Complete list of every update shipped, newest first. Source: git history (`master`) + release notes + `HANDOFF.md` session logs.
 
