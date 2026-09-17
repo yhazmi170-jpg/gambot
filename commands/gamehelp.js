@@ -21,7 +21,7 @@ module.exports = {
       },
       slots: {
         name: 'Slots',
-        aliases: 'slot, spin',
+        aliases: 'slot',
         desc: 'A 3-reel slot machine. Match symbols to win multipliers on your bet.',
         play: `\`${prefix} slots <amount>\`\nExample: \`${prefix} slots 1000\``,
         tips: '3-of-a-kind: 🍒2× 🍇2× 🍊3× 🍋3× 🍉5× 💎8× 7️⃣30×\nPairs: 🍒1× 🍇1× 🍊1× 🍋1× 🍉2× 💎3× 7️⃣6×\nHigh bal slightly lowers net wins. Lucky perk pays 3×.',
@@ -35,7 +35,7 @@ module.exports = {
       },
       roulette: {
         name: 'Roulette',
-        aliases: 'roul, wheel',
+        aliases: 'roul',
         desc: 'Bet on red, black, green, or a number. Wheel spins.',
         play: `\`${prefix} roulette <amount> <red/black/green/num>\`\nExample: \`${prefix} roulette 1000 red\``,
         tips: 'Red/black ~2x. Green ~14x. Exact number ~36x.',
@@ -119,7 +119,7 @@ heist: {
       },
       stocks: {
         name: 'Stocks',
-        aliases: 'stock, market',
+        aliases: 'stock',
         desc: 'Buy and sell stocks. The market drifts every hour — buy low, sell high.',
         play: `\`${prefix} stocks\` — view market\n\`${prefix} stocks buy <symbol> <amount>\`\n\`${prefix} stocks sell <symbol> <amount>\`\n\`${prefix} stocks port\` — your portfolio`,
         tips: 'Check the market before buying. Prices change every hour.',
@@ -140,7 +140,7 @@ heist: {
       },
       animal: {
         name: 'Animal Stats',
-        aliases: 'pet, info, stats',
+        aliases: 'pet, info',
         desc: 'View an animal\'s full combat stats — HP, attack, defense, and XP progress.',
         play: `\`${prefix} animal <id>\` — by id from \`v zoo\`\n\`${prefix} animal dragon\` — by species\n\`${prefix} animal rex\` — by custom name`,
         tips: 'Matches by id, species, or your custom name. Shows the progress bar to its next level.',

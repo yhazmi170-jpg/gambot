@@ -8,7 +8,7 @@ module.exports = {
   name: 'stocks',
   helpCategory: 'Economy',
   helpArgs: '[buy|sell|port] [symbol] [shares]',
-  aliases: ['stock', 'market'],
+  aliases: ['stock'],
   description: 'buy and sell stocks — the market drifts every hour',
   execute(message, args) {
     const uid = message.author.id;

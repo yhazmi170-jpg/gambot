@@ -15,7 +15,9 @@ module.exports = {
     const todo = list.filter(a => !unlocked.has(a.key));
 
     const doneLines = done.length ? done.map(a => `${a.name} — ${a.desc}`) : ['none yet — go play!'];
-    const todoLines = todo.length ? todo.slice(0, 12).map(a => `🔒 ${a.name} — ${a.desc}`) : [];
+    const hiddenLocked = todo.filter(a => a.hidden);
+    const todoLines = todo.filter(a => !a.hidden).slice(0, 12).map(a => `🔒 ${a.name} — ${a.desc}`);
+    if (hiddenLocked.length) todoLines.push(`❔ **${hiddenLocked.length} hidden** achievement(s) out there — ???`);
 
     const pct = Math.floor((done.length / list.length) * 100);
     const bar = '█'.repeat(Math.floor(pct / 10)) + '░'.repeat(10 - Math.floor(pct / 10));

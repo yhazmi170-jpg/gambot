@@ -1,3 +1,9 @@
+// NEVER touches production balances — DB_PATH redirected to a temp dir.
+process.env.DB_PATH = '/tmp/db_smoke';
+const fs = require('fs');
+fs.rmSync('/tmp/db_smoke', { recursive: true, force: true });
+fs.mkdirSync('/tmp/db_smoke', { recursive: true });
+
 const database = require("../db");
 
 async function main() {

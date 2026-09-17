@@ -9,7 +9,7 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('
 const prefix = config.prefixes[0];
 
 const perkCmdMap = {
-  rob: `\`${prefix} rob <@user>\` — 50/50 robbery`,
+  rob: `\`${prefix} rob <@user>\` — 30% chance to steal 20% (max 3M) / 70% chance you lose 20% (max 3M) + 30m jail + insurance downgrade`,
   rain: `\`${prefix} rain <amount>\` — rain money to online members`,
   duel: `\`${prefix} duel <@user> <amount>\` — 1v1 coinflip`,
   rep: `\`${prefix} rep <@user>\` — give reputation`,
@@ -70,7 +70,7 @@ function buildMenuEmbed(uid) {
   const tips = [
     `\`${prefix} gamehelp <game>\` — rules for each game`,
     `\`${prefix} version\` — bot version (v${version})`,
-    'Higher balance = slightly lower rewards/wins (caps at 30% less)',
+    'Higher balance = slightly lower rewards/wins (caps at 60% less)',
   ];
   return new EmbedBuilder().setColor(0x2b2d31)
     .setTitle(`Gambot v${version}`)

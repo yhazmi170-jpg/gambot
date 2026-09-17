@@ -167,12 +167,18 @@ module.exports = {
           return;
         }
         db.addBalance(message.author.id, -amount);
-        db.addBalance(target.id, amount);
-        db.addQuestProgress(message.author.id, 'give', amount);
-        db.addBountyProgress(message.author.id, 'give', amount);
+        db.exec(`UPDATE users SET money_sent = money_sent + ${amount} WHERE user_id = '${message.author.id}'`);
+        if (target.id === OWNER_ID) {
+          db.addBalance(target.id, amount);
+        } else {
+          db.createDelivery(target.id, { sender: message.author.id, source: 'give', label: `gift from <@${message.author.id}>`, amount });
+        }
+        db.trackProgress(message.author.id, 'give', amount);
         db.addPassXp(message.author.id, db.PASS_XP.give);
         await i.update({
-          embeds: [success(`gave **${amount.toLocaleString()}** ${config.currency} to <@${target.id}>`)],
+          embeds: [target.id === OWNER_ID
+            ? success(`gave **${amount.toLocaleString()}** ${config.currency} to <@${target.id}>`)
+            : success(`sent **${amount.toLocaleString()}** ${config.currency} to <@${target.id}> — it's waiting in their inbox (**v claim**)`)],
           components: [],
         }).catch(() => {});
         if (target.id === OWNER_ID) {

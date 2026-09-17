@@ -25,7 +25,7 @@ module.exports = {
   name: 'animal',
   helpCategory: 'Pets',
   helpArgs: '<id | species | name>',
-  aliases: ['pet', 'info', 'stats'],
+  aliases: ['pet', 'info'],
   description: 'view an animal\'s full stats (hp, attack, defense, xp) — by id, species, or name',
   execute(message, args) {
     if (!args.length) return message.channel.send({ embeds: [error('give an animal id, species, or name — e.g. `v animal 5` or `v animal dragon` or `v animal rex`')] });

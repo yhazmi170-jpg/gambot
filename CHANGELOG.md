@@ -4,6 +4,26 @@ Complete list of every update shipped, newest first. Source: git history (`maste
 
 ---
 
+## v2.0.0 — Social Commands + `v try` + Community Events + Server Lore (big update)
+
+- **NEW social command family (`v hug/kiss/pat/slap/cuddle/bite/punch/lick`):** each posts a real 2D-anime GIF clip matched to the action from a verified pool (82 clips live-checked at build time), replies charmingly to a mentioned target, and reacts once with an action emoji. A self-line plays when no target is mentioned (`v hug` alone). Reaction permission failures never drop the GIF (`utils/social.js` `safeSelfReact`). Tied into stats/titles: `social_used` feeds `cuddle bug` (1) + `influencer` (5) titles. **Caution flag:** `v kill` uses 4 verified non-graphic comedic stand-ins (punch-category clips) instead of true defeat kills — flagged as unfinished content polish; quality-over-quantity, a real pool is planned later.
+- **NEW silly justice system (Fun):** `v case [@user]` opens a legally-fictional case file (occupation, record from REAL harmless Gambot stats, suspected crime, evidence); `v judge [@user]` passes a non-binding sentence (counts `judged`, unlocks hidden 🕵️ "Alright What Is Going On"); `v compare [@user]` pits two players' real stats against certified commentary. Never appearance/intelligence-sensitive.
+- **NEW server lore:** `v incidents [n]` (aliases `lore`/`history`/`eventslog`) shows the guild's light rolling history — achievements, titles, raid resolutions, giveaway wins, community events. Capped at 60/guild, stores event text only, never message content.
+- **NEW `v try` (recommendation engine):** recommends what you have NOT done — never-tried features, must-act contexts (unclaimed quest/bounty, unhatched eggs, inbox deliveries), gaps (dex completion, marriage, clan, pets without battle team), stale features, live community events. `v try list` = full 43-feature tracker with ✨/✔️; `v try tip` = mechanic tips with numbers derived from real runtime constants (hunt cost 5/animal, egg drop 8%, weapon crate 15k, insurance tiers, balance factor floor, etc.). Zero gambling-behavior targeting.
+- **NEW community events (rare, non-gambling):** auto-starts up every 4h — The Button (`v button`, $2500 reward ramping every 5th press), Roll Call (`v here`, 1500), Creature Sighting (`v creature`, 2500 + wanted mark), Quest Rush, Double Pet XP. Each unlocks a hidden achievement (🔘 The Button, 🫡 Roll Call Veteran, 🚨 Wanted).
+- **NEW rare proactive summons:** if a user has been generally inactive 3+ days, Gambot may DM one gentle nudge (max 3 per 30 min globally) — `v summon off` opts out permanently per-user; never based on gambling activity.
+- **NEW `v new`:** "what's new in this release" overview + search.
+- **NEW update-DM rollout:** the 2.0 announcement is delivered to every player who opted into DMs, one-time-only, tracked in `update_dm_delivery` (sent/failed, batched, persisted so it can never re-fire after restart). Failed/open DMs are retired, not retried forever.
+- **Profile stat card expanded** (`v profile`): level/xp, pets+team, bank, eggs & seals, battle wins, daily streak, lucky status, insurance tier, free bet, credit score, loan/clan/plot/jail (when active), member since.
+- **Credit-score bug fixed:** profile showed a raw timestamp (wrong column). `ensureUser` now maps by column name; jail state + rob-cooldown reads fixed.
+- **8ball expanded:** 45 → 120 diabolical/casual answers, compact reply quoting your question (auto-truncate), one vibe-matched self-reaction (😭/☠️ etc.), never random.
+- **`v give` to owner:** owner gets a DM approval card (Keep / Decline / Mute 30m); money moves only on confirm. Owner-only feature.
+- **Alias cleanup (zero collisions):** `market` → shop; `stats` → profile; `wheel`/`spin` → wheel; `snailgarden` → snailgarden command; `blackmarket` → `bm`. Roulette drops the ambiguous `wheel` alias; slots drops `spin`; animal drops `stats`; garden drops `snailgarden`; blackmarket self-alias removed. gamehelp alias lists synced.
+- **Stale mechanic text fixed:** help no longer claims rob is 50/50 (real: 30% success / 20% steal capped 3M) or that balance cuts "cap at 30%" (real: per-500k 1%, floor at 40% payout). AGENTS.md insurance tiers corrected to 10/15/20/25%.
+- **`v gamehelp` new entries/aliases** for the Fun commands and event commands; `v help` bucket & command count refreshed.
+
+---
+
 ## v1.8.1 — Coinflip clarity fix
 
 - **Coinflip reply now shows the player's pick AND the landed side** (`🪙 picked **heads** — landed **tails** — lost **100**`). Root cause of the "tails always loses / it ignored my heads pick" reports: the old reply only printed the **landed** side (`🪙 **heads** — ...`), so every loss looked like the bot had switched the player's selection. The RNG and settlement were always correct (`result === side`); only the display omitted the choice. Fixed in `commands/coinflip.js`; help text in `commands/gamehelp.js` now states the amount-first syntax and picked/landed display.

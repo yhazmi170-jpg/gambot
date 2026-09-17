@@ -10,7 +10,7 @@ module.exports = {
   helpCategory: 'Games',
   helpArgs: '<amount> <red/black/green/num>',
   description: 'spin the roulette wheel',
-  aliases: ['roul', 'wheel'],
+  aliases: ['roul'],
   execute(message, args) {
     const { amount, error: betError } = db.parseBet(message.author.id, args[0]);
     if (betError) return message.channel.send({ embeds: [error(betError)] });

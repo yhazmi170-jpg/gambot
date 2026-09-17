@@ -192,8 +192,7 @@ async function runBattle(message, target) {
   if (winner) {
     const reward = Math.floor((50 + myPets.length * 10) * db.eventMult('battleMult'));
     db.payWin(winner.id, reward);
-    db.addQuestProgress(winner.id, 'battle', 1);
-    db.addBountyProgress(winner.id, 'battle', 1);
+    db.trackProgress(winner.id, 'battle', 1);
     db.addChecklistProgress(winner.id, 'daily', 'battle', 1);
     db.addChecklistProgress(winner.id, 'weekly', 'battle', 1);
     db.addPassXp(winner.id, db.PASS_XP.battle);

@@ -1,4 +1,5 @@
 const MAX_QUESTION_LEN = 100;
+const { safeSelfReact } = require('../utils/social');
 
 const ANSWERS = [
   // yes / positive
@@ -149,7 +150,7 @@ module.exports = {
     const pick = ANSWERS[Math.floor(Math.random() * ANSWERS.length)];
 
     message.reply({ content: pick.text, allowedMentions: { repliedUser: false } })
-      .then(sent => sent.react(pick.reaction).catch(() => {}))
+      .then(sent => safeSelfReact(sent, pick.reaction))
       .catch(() => {});
   },
 };

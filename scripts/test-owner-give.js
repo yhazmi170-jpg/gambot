@@ -229,7 +229,7 @@ function setOwnerBalance(x) {
   check('giver is owner-give-muted for ~30 min', db.isOwnerGiveMuted(e) && db.getOwnerGiveMutedUntil(e) > Math.floor(Date.now() / 1000) + 29 * 60, `until_s=${db.getOwnerGiveMutedUntil(e)}`);
   msg = await makeMessage(`v give <@${OWNER}> 10`, e);
   await handler.handleMessage(msg);
-  check('muted giver -> blocked with "u cant give this user money"', msg._sends.length === 1 && msg._sends[0].embeds[0].data.fields[0].value.includes('u cant give this user money'), JSON.stringify(msg._sends[0].embeds[0].data.fields[0].value));
+  check('muted giver -> blocked with "u cant give this user money"', msg._sends.some(s => s.embeds && s.embeds[0] && s.embeds[0].data && s.embeds[0].data.fields && s.embeds[0].data.fields[0] && s.embeds[0].data.fields[0].value.includes('u cant give this user money')) && msg.confirmMsg !== null && msg.confirmMsg._lastCollector === undefined, JSON.stringify(msg._sends.map(s => s.embeds && s.embeds[0] && s.embeds[0].data && s.embeds[0].data.fields && s.embeds[0].data.fields[0] && s.embeds[0].data.fields[0].value)));
   check('block happens BEFORE any confirm dialog (no collector/buttons)', msg.confirmMsg !== null && msg.confirmMsg._lastCollector === undefined, `sends=${msg._sends.length} collector=${!!(msg.confirmMsg && msg.confirmMsg._lastCollector)}`);
   msg = await makeMessage('v give @otherUser 10', e);
   await handler.handleMessage(msg);

@@ -35,6 +35,13 @@ module.exports = {
     const insPct = { insurance: 10, insurance2: 15, insurance3: 20, insurance4: 25 };
     const inJail = user.jail_until > Date.now();
 
+    const titleLine = (uid) => {
+      const eq = db.getEquippedTitle(uid);
+      const count = db.getTitles(uid).length;
+      if (eq && db.TITLES[eq]) return `**${db.TITLES[eq].name}** · ${count} owned`;
+      return count > 0 ? `${count} owned — none equipped` : 'none yet';
+    };
+
     const fields = [
       ['Balance', `**${user.balance.toLocaleString()}** ${config.currency}`],
       ['Level', `Lv.**${li.level}** — ${li.xp.toLocaleString()}/${li.needed.toLocaleString()} xp (${Math.floor(li.progress * 100)}%)`],
@@ -51,6 +58,7 @@ module.exports = {
       ['Insurance', ins ? `**${insPct[ins]}%** loss refund` : 'none'],
       ['Free Bet', `**${freeBet.toLocaleString()}** free coins`],
       ['Credit Score', `**${user.credit_score}**`],
+      ['Titles', titleLine(target.id)],
     ];
 
     if (user.loan > 0) fields.push(['Loan', `**${user.loan.toLocaleString()}** outstanding`]);
@@ -81,8 +89,9 @@ module.exports = {
       fields.push(['Perks', lines.join(', ')]);
     }
 
-    message.channel.send({
-      embeds: [embed(`${badge}📊 ${target.username}'s Profile`, fields, 0x2b2d31)],
-    });
+    const e = embed(`${badge}📊 ${target.username}'s Profile`, fields, 0x2b2d31);
+    if (user.avatar_url) e.setThumbnail(user.avatar_url);
+    if (user.banner_url) e.setImage(user.banner_url);
+    message.channel.send({ embeds: [e] });
   },
 };

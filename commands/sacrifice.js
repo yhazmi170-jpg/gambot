@@ -32,8 +32,7 @@ module.exports = {
 
     const lines = [`sacrificed **${result.sacrificed}** animal(s) for **${result.essence}** essence`, `you now have **${db.getEssence(userId)}** essence`];
     if (result.skipped > 0) lines.push(`${result.skipped} team animal(s) were skipped`);
-    db.addQuestProgress(userId, 'sacrifice', result.sacrificed);
-    db.addBountyProgress(userId, 'sacrifice', result.sacrificed);
+    db.trackProgress(userId, 'sacrifice', result.sacrificed);
     db.addPassXp(userId, db.PASS_XP.sacrifice * result.sacrificed);
     lines.push('`v upgrade <trait>` to boost hunts · `v autohuntbot` to upgrade the autohunt bot');
 

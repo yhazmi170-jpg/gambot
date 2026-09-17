@@ -184,14 +184,47 @@ async function handleMessage(message) {
     console.error('grantXp error:', err);
   }
 
+  // lightweight feature usage + activity signal (powers v try, summons, tips).
+  // stores command NAME only — never arguments or message content.
+  try {
+    db.recordFeatureUse(message.author.id, cmd.name);
+    db.recordActivity(message.author.id, db.CLAIM_ONLY_COMMANDS.includes(cmd.name) ? 'claim' : 'meaningful');
+  } catch (err) {
+    console.error('usage tracking error:', err);
+  }
+
   try {
     const unlocked = db.checkAchievements(message.author.id);
     if (unlocked.length) {
-      const fields = unlocked.map(ach => [ach.name, `${ach.desc}\n+**${ach.reward.toLocaleString()}** ${config.currency}`]);
+      const fields = unlocked.map(ach => {
+        if (ach.rewardType === 'title') return [ach.name, `${ach.desc}\n+🎖️ **${db.TITLES[ach.titleKey || ach.key] ? db.TITLES[ach.titleKey || ach.key].name : 'title'}** unlocked`];
+        if (ach.rewardType === 'none') return [ach.name, `${ach.desc}`];
+        return [ach.name, `${ach.desc}\n+**${ach.reward.toLocaleString()}** ${config.currency}`];
+      });
       message.channel.send({ embeds: [require('./embed').embed('🏅 Achievements Unlocked!', fields, 0xf1c40f)] }).catch(() => {});
+      if (message.guild) {
+        try {
+          for (const ach of unlocked) db.addIncident(message.guild.id, 'achievement', `<@${message.author.id}> unlocked ${ach.name.replace(/[^\w ]+/g, '').trim() || 'an achievement'}`);
+        } catch (err) { console.error('incident achievement error:', err); }
+      }
     }
   } catch (err) {
     console.error('checkAchievements error:', err);
+  }
+
+  try {
+    const unlockedTitles = db.checkTitles(message.author.id);
+    if (unlockedTitles.length) {
+      const fields = unlockedTitles.map(key => [db.TITLES[key].name, db.TITLES[key].desc]);
+      message.channel.send({ embeds: [require('./embed').embed('🎖️ Title Unlocked!', fields, 0x57f287)] }).catch(() => {});
+      if (message.guild) {
+        try {
+          for (const key of unlockedTitles) db.addIncident(message.guild.id, 'title', `<@${message.author.id}> claimed the title "${db.TITLES[key].name}"`);
+        } catch (err) { console.error('incident title error:', err); }
+      }
+    }
+  } catch (err) {
+    console.error('checkTitles error:', err);
   }
 }
 

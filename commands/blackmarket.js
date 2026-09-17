@@ -8,7 +8,7 @@ module.exports = {
   helpCategory: 'Economy',
   helpArgs: '',
   description: 'rotating special deals — limited stock, refresh every 6h',
-  aliases: ['bm', 'blackmarket', 'market'],
+  aliases: ['bm'],
   async execute(message, args) {
     const userId = message.author.id;
     const items = db.getBlackMarket();

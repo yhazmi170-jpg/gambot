@@ -5,7 +5,7 @@ module.exports = {
   name: 'garden',
   helpCategory: 'Pets',
   helpArgs: '[buy|sell] [count]',
-  aliases: ['snails', 'snail', 'snailgarden'],
+  aliases: ['snails', 'snail'],
   description: 'snail garden — buy snails and they breed over time (sell them for profit)',
   execute(message, args) {
     const userId = message.author.id;

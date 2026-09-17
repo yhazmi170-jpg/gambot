@@ -353,6 +353,18 @@ start().catch(e => console.error('[START] FATAL:', e));
         db.markNotified(`v${ver2}`);
       }
     }
+
+    // One-time 2.0 update-DM rollout. Gated by the notifications table so it
+    // can NEVER re-fire after restart/redeploy; queueUpdateDm is INSERT OR
+    // IGNORE per (user, release) so even a double-run is idempotent.
+    if (!db.wasNotified(`udm_${ver2}`)) {
+      try {
+        const userIds = (db.getAllUsers() || []).map(u => u.user_id);
+        db.queueUpdateDm(userIds, ver2);
+        db.markNotified(`udm_${ver2}`);
+        console.log(`[udm] queued ${userIds.length} update DMs for v${ver2}`);
+      } catch (e) { console.error('[udm] enqueue error:', e); }
+    }
   });
 
 
@@ -396,6 +408,8 @@ start().catch(e => console.error('[START] FATAL:', e));
     if (ended > 0) console.log(`[auction] ${ended} auction(s) ended`);
     const expiredBountyRefund = db.pruneExpiredBounties();
     if (expiredBountyRefund > 0) console.log(`[bounty] expired bounty refunded ${expiredBountyRefund}`);
+    const ce = db.expireContracts();
+    if (ce.expired > 0) console.log(`[contract] expired ${ce.expired}, refunded ${ce.refunded}`);
     const lbWeek = db.currentLbWeek();
     const lbPosted = db.getLbState('week');
     if (lbPosted && lbPosted !== String(lbWeek)) {
@@ -425,7 +439,10 @@ start().catch(e => console.error('[START] FATAL:', e));
       const boss = db.getBoss(guild.id);
       if (boss && (boss.hp <= 0 || Math.floor(Date.now() / 1000) > boss.ends_at)) {
         const res = db.resolveBoss(guild.id);
-        if (res && res.payouts && res.payouts.length) console.log(`[boss] ${res.species} resolved in ${guild.id}: ${res.payouts.length} payouts`);
+        if (res && res.payouts && res.payouts.length) {
+          console.log(`[boss] ${res.species} resolved in ${guild.id}: ${res.payouts.length} payouts`);
+          try { db.addIncident(guild.id, 'boss', `a ${res.species} raid ended with ${res.payouts.length} survivor(s)`); } catch (e) {}
+        }
       }
     }
 
@@ -443,6 +460,7 @@ start().catch(e => console.error('[START] FATAL:', e));
       console.log(`[gw] giveaway ${gwId} won by ${winner} (${g.prize} coins)`);
       client.channels.fetch(g.channel_id).then(ch => {
         if (!ch || typeof ch.edit !== 'function') return;
+        try { if (ch.guild) db.addIncident(ch.guild.id, 'giveaway', `<@${winner}> won a **${g.prize.toLocaleString()}** giveaway`); } catch (e) {}
         ch.messages.fetch(g.message_id).then(msg => {
           msg.edit({
             embeds: [embed('🎉 Giveaway', [
@@ -456,6 +474,94 @@ start().catch(e => console.error('[START] FATAL:', e));
       }).catch(() => {});
     }
   }, 60000);
+
+  // ---- 2.0: community events (rare, non-gambling) ----
+  // Auto-start every cooldown window and post to all guilds + record server lore.
+  setInterval(() => {
+    try {
+      const ev = db.startCommunityEvent();
+      if (!ev) return;
+      console.log(`[event] started: ${ev.key}`);
+      const announce = {
+        embeds: [embed(`${ev.emoji} ${ev.name} has begun!`, [
+          ['What', ev.desc],
+          ['How Long', `${Math.round(ev.duration / 60)}m`],
+          ['', db.COMMUNITY_EVENTS[ev.key] && db.COMMUNITY_EVENTS[ev.key].entry ? db.COMMUNITY_EVENTS[ev.key].entry : 'v event to check'],
+        ], 0x57f287)],
+      };
+      for (const guild of client.guilds.cache.values()) {
+        const ch = guild.channels.cache.find(c => c.type === 0 && c.name.includes('general'));
+        if (ch && typeof ch.send === 'function') ch.send(announce).catch(() => {});
+        try { db.addIncident(guild.id, 'event', `"${ev.name}" started in this server`); } catch (e) {}
+      }
+    } catch (e) { console.error('[event] start error:', e); }
+  }, 60000);
+
+  // ---- 2.0: rare proactive Gambot summons (opt-out aware, long cooldown) ----
+  // Based on GENERAL Gambot inactivity (not gambling). Max 3 DM pokes / half hour.
+  let summonBudget = 3;
+  setInterval(() => { summonBudget = 3; }, 1800000);
+  setInterval(() => {
+    if (summonBudget <= 0 || !client.isReady()) return;
+    try {
+      const users = db.getAllUsers();
+      const now = Math.floor(Date.now() / 1000);
+      const DAY = 86400;
+      const candidates = users
+        .map(u => ({ id: u.user_id, act: db.getActivity(u.user_id) }))
+        .filter(x => x.act && !x.act.summon_opt_out && x.act.last_command_at && x.act.first_seen)
+        .filter(x => now - x.act.last_command_at > 3 * DAY)     // idle 3+ days
+        .filter(x => (x.act.last_summon_at || 0) < now - 2 * DAY) // summoned >2 days ago
+        .sort((a, b) => b.act.last_command_at - a.act.last_command_at);
+      if (!candidates.length) return;
+      const pick = candidates[Math.floor(Math.random() * Math.min(5, candidates.length))];
+      client.users.fetch(pick.id).then(u => {
+        if (!u || (u.bot)) return;
+        return u.send("👋 Gambot noticed you've been gone from the servers.\n```\n┌─ gambot 2.0 ────────────────\n│ no pressure, no nagging. \n│ when you're back:\n│   v try      → what you haven't done yet\n│   v try tip  → one real mechanic tip\n│   v lore     → what happened while you were gone\n└────────────────────────────\n```\nreply `v summon off` to turn these off.")
+          .then(() => { db.setSummonTime(pick.id); db.bumpCounter(pick.id, 'summoned'); summonBudget--; })
+          .catch(() => db.setLastDmOk(pick.id, false));
+      }).catch(() => {});
+    } catch (e) { console.error('[summon] error:', e); }
+  }, 900000);
+
+  // ---- 2.0: one-time major-update update DMs (batched slowly) ----
+  const SEND_UPDATE_DM_BATCH = 5;
+  setInterval(() => {
+    if (!client.isReady()) return;
+    try {
+      const batch = db.getUpdateDmBatch(SEND_UPDATE_DM_BATCH);
+      if (!batch.length) return;
+      for (const item of batch) {
+        const msg = (() => { try { return require('fs').readFileSync(path.join(__dirname, 'update_msg.txt'), 'utf8').trim(); } catch { return ''; } })();
+        client.users.fetch(item.user_id).then(u => {
+          if (!u || u.bot) return db.updateDmStatus(item.user_id, item.release_id, 'failed', 'nouser');
+          u.send(`📣 Gambot update — v${item.release_id}\n\`\`\`\n${msg || 'see v new'}\n\`\`\`\nrun \`v try\` to see what might be new for you.`)
+            .then(() => db.updateDmStatus(item.user_id, item.release_id, 'sent'))
+            .catch(() => db.updateDmStatus(item.user_id, item.release_id, 'failed', 'dmclosed'));
+        }).catch(() => {});
+      }
+    } catch (e) { console.error('[udm] send error:', e); }
+  }, 60000);
+
+  // ---- 2.0: passive contextual tip (kept VERY rare — once per channel per hour) ----
+  const passiveTipLog = new Map();
+  setInterval(() => {
+    if (!client.isReady()) return;
+    try {
+      for (const guild of client.guilds.cache.values()) {
+        const ch = guild.channels.cache.find(c => c.type === 0 && c.name.includes('general'));
+        if (!ch || typeof ch.send !== 'function') continue;
+        const last = passiveTipLog.get(ch.id) || 0;
+        if (Date.now() - last < 3600000) continue;
+        const { pickPassiveTip } = require('./utils/tips');
+        const tip = pickPassiveTip();
+        if (!tip) continue;
+        ch.send({ embeds: [embed('💡 Passive tip', [['', tip], ['', 'kept rare so I do not nag — hide me if you like']], 0x2b2d31)] }).then(() => {
+          passiveTipLog.set(ch.id, Date.now());
+        }).catch(() => {});
+      }
+    } catch (e) { console.error('[tip] passive error:', e); }
+  }, 1800000);
 
 
 
@@ -531,6 +637,14 @@ client.on('interactionCreate', (i) => {
     require('./commands/give').handleInteraction(i);
     return;
   }
+  if (i.customId.startsWith('inbox_')) {
+    require('./commands/inbox').handleInteraction(i);
+    return;
+  }
+  if (i.customId.startsWith('cnt_')) {
+    require('./commands/contract').handleInteraction(i);
+    return;
+  }
   const fallback = setTimeout(() => i.deferUpdate().catch(() => {}), 2500);
   i._ackFallback = fallback;
 });
@@ -583,10 +697,33 @@ function resolveEmoji(message, emoji) {
   return emoji;
 }
 
+const ERR_LOG_MAX = 50 * 1024 * 1024; // rotate once bot.err exceeds 50MB
+const ERR_LOG_KEEP = 5 * 1024 * 1024;  // keep the most recent 5MB tail
+// Rotate bot.err in place: keep the recent tail, retire the rest (bot.err.1),
+// so unbounded append can never grow the file into gigabytes again.
+function rotateErrLog() {
+  try {
+    const p = path.join(__dirname, 'bot.err');
+    const st = fs.statSync(p);
+    if (!st.isFile() || st.size < ERR_LOG_MAX) return;
+    const keep = Buffer.alloc(Math.min(ERR_LOG_KEEP, st.size));
+    const fd = fs.openSync(p, 'r');
+    fs.readSync(fd, keep, 0, keep.length, st.size - keep.length);
+    fs.closeSync(fd);
+    try { fs.unlinkSync(p + '.1'); } catch {}
+    try { fs.renameSync(p, p + '.1'); } catch {}
+    fs.writeFileSync(p, keep);
+    console.error(`[ERRLOG] rotated bot.err (${st.size} -> ${keep.length} bytes)`);
+  } catch (e) {}
+}
+
 function logCrash(tag, err) {
   const line = `${new Date().toISOString()} [${tag}] ${(err && (err.stack || err.message)) || err}\n`;
   console.error(line);
-  try { fs.appendFileSync(path.join(__dirname, 'bot.err'), line); } catch {}
+  try {
+    rotateErrLog();
+    fs.appendFileSync(path.join(__dirname, 'bot.err'), line);
+  } catch {}
 }
 process.on('unhandledRejection', (err) => logCrash('UNHANDLED_REJECTION', err));
 process.on('uncaughtException', (err) => logCrash('UNCAUGHT_EXCEPTION', err));

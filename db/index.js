@@ -315,6 +315,107 @@ async function init() {
     stock INTEGER NOT NULL,
     expires_at INTEGER NOT NULL
   )`);
+
+  // ===================== 2.0 systems (inbox / contracts / titles / incidents / activity) =====================
+  db.run(`CREATE TABLE IF NOT EXISTS inbox_deliveries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    recipient_id TEXT NOT NULL,
+    sender_id TEXT NOT NULL DEFAULT '',
+    source TEXT NOT NULL DEFAULT 'system',
+    label TEXT NOT NULL DEFAULT '',
+    amount INTEGER NOT NULL DEFAULT 0,
+    payload TEXT NOT NULL DEFAULT '{}',
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at INTEGER NOT NULL,
+    claimed_at INTEGER NOT NULL DEFAULT 0,
+    release_id TEXT NOT NULL DEFAULT ''
+  )`);
+  db.run(`CREATE INDEX IF NOT EXISTS inbox_recipient_idx ON inbox_deliveries (recipient_id, status)`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS contracts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    creator_id TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    objective TEXT NOT NULL,
+    objective_n INTEGER NOT NULL DEFAULT 1,
+    reward INTEGER NOT NULL DEFAULT 0,
+    escrow INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at INTEGER NOT NULL,
+    accepted_at INTEGER NOT NULL DEFAULT 0,
+    completed_at INTEGER NOT NULL DEFAULT 0,
+    expires_at INTEGER NOT NULL DEFAULT 0,
+    progress INTEGER NOT NULL DEFAULT 0,
+    finished INTEGER NOT NULL DEFAULT 0
+  )`);
+  db.run(`CREATE INDEX IF NOT EXISTS contracts_target_idx ON contracts (target_id, status)`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS user_titles (
+    user_id TEXT NOT NULL,
+    title_key TEXT NOT NULL,
+    unlocked_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+    PRIMARY KEY (user_id, title_key)
+  )`);
+  try { db.run(`ALTER TABLE users ADD COLUMN equipped_title TEXT NOT NULL DEFAULT ''`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN account_age INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN shiny_found INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN quests_done INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN money_sent INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN social_used INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN showoff INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN summoned INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN wanted_marked INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN button_pressed INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN rollcalls INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN judged INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN bm_buys INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN merchant_buys INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN worked INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN avatar_url TEXT`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN banner_url TEXT`); } catch (e) {}
+
+  db.run(`CREATE TABLE IF NOT EXISTS incidents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL DEFAULT '',
+    type TEXT NOT NULL DEFAULT 'event',
+    text TEXT NOT NULL,
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+  )`);
+  db.run(`CREATE INDEX IF NOT EXISTS incidents_guild_idx ON incidents (guild_id, created_at)`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS user_feature_usage (
+    user_id TEXT NOT NULL,
+    feature TEXT NOT NULL,
+    first_used_at INTEGER NOT NULL DEFAULT 0,
+    last_used_at INTEGER NOT NULL DEFAULT 0,
+    use_count INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, feature)
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS user_activity (
+    user_id TEXT PRIMARY KEY,
+    first_seen INTEGER NOT NULL DEFAULT 0,
+    last_command_at INTEGER NOT NULL DEFAULT 0,
+    last_meaningful_at INTEGER NOT NULL DEFAULT 0,
+    last_claim_only_at INTEGER NOT NULL DEFAULT 0,
+    last_summon_at INTEGER NOT NULL DEFAULT 0,
+    summon_opt_out INTEGER NOT NULL DEFAULT 0,
+    last_dm_ok INTEGER NOT NULL DEFAULT 1
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS community_events (
+    key TEXT PRIMARY KEY,
+    ends_at INTEGER NOT NULL
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS update_dm_delivery (
+    user_id TEXT PRIMARY KEY,
+    release_id TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    attempted_at INTEGER NOT NULL DEFAULT 0,
+    sent_at INTEGER NOT NULL DEFAULT 0,
+    error TEXT NOT NULL DEFAULT ''
+  )`);
   save();
 }
 
@@ -383,6 +484,22 @@ function ensureUser(userId) {
       crate_pity: get('crate_pity', 0) || 0,
       zoo_decor: get('zoo_decor', '[]') || '[]',
       seals: get('seals', 0) || 0,
+      equipped_title: get('equipped_title', '') || '',
+      shiny_found: get('shiny_found', 0) || 0,
+      quests_done: get('quests_done', 0) || 0,
+      money_sent: get('money_sent', 0) || 0,
+      social_used: get('social_used', 0) || 0,
+      showoff: get('showoff', 0) || 0,
+      summoned: get('summoned', 0) || 0,
+      wanted_marked: get('wanted_marked', 0) || 0,
+      button_pressed: get('button_pressed', 0) || 0,
+      rollcalls: get('rollcalls', 0) || 0,
+      judged: get('judged', 0) || 0,
+      bm_buys: get('bm_buys', 0) || 0,
+      merchant_buys: get('merchant_buys', 0) || 0,
+      worked: get('worked', 0) || 0,
+      avatar_url: get('avatar_url', null) || null,
+      banner_url: get('banner_url', null) || null,
       jail_until: get('jail_until', 0) || 0,
       credit_score: get('credit_score', 700) || 700,
       rob_cooldown: get('rob_cooldown', 0) || 0,
@@ -458,6 +575,30 @@ function getSeals(userId) {
   return u ? (u.seals || 0) : 0;
 }
 
+function setAvatarUrl(userId, url) {
+  if (!/^https?:\/\/[^\s]+$/.test(url || '')) return null;
+  db.run(`UPDATE users SET avatar_url = '${safeStr(url)}' WHERE user_id = '${safeStr(userId)}'`);
+  save();
+  return url;
+}
+
+function clearAvatarUrl(userId) {
+  db.run(`UPDATE users SET avatar_url = NULL WHERE user_id = '${safeStr(userId)}'`);
+  save();
+}
+
+function setBannerUrl(userId, url) {
+  if (!/^https?:\/\/[^\s]+$/.test(url || '')) return null;
+  db.run(`UPDATE users SET banner_url = '${safeStr(url)}' WHERE user_id = '${safeStr(userId)}'`);
+  save();
+  return url;
+}
+
+function clearBannerUrl(userId) {
+  db.run(`UPDATE users SET banner_url = NULL WHERE user_id = '${safeStr(userId)}'`);
+  save();
+}
+
 function addSeals(userId, amount) {
   let u = ensureUser(userId);
   if (!u) {
@@ -491,6 +632,9 @@ function mergeUser(srcId, destId) {
     ['vault_deposits', 'user_id'],
     ['achievements', 'user_id'],
     ['marriages', 'user_id'],
+    ['user_titles', 'user_id'],
+    ['user_feature_usage', 'user_id'],
+    ['user_activity', 'user_id'],
   ];
   // tables referencing the user via a non-primary column (re-point those too)
   const refs = [
@@ -499,6 +643,10 @@ function mergeUser(srcId, destId) {
     ['adoption', 'child_id'],
     ['pending_battles', 'challenger_id'],
     ['pending_battles', 'target_id'],
+    ['inbox_deliveries', 'recipient_id'],
+    ['inbox_deliveries', 'sender_id'],
+    ['contracts', 'creator_id'],
+    ['contracts', 'target_id'],
   ];
 
   // 1) drop the destination's own rows ONLY in tables the source actually has rows in
@@ -537,7 +685,8 @@ function wipeUser(userId) {
     'stocks', 'quests', 'bounties', 'vault_deposits', 'achievements',
     'streaks', 'weekly_lb', 'lottery', 'purchases', 'plots',
     'checklist_daily', 'checklist_weekly', 'battlepass', 'boss_contrib',
-    'clan_members', 'clan_war_fighters',
+    'clan_members', 'clan_war_fighters', 'user_titles', 'user_feature_usage',
+    'user_activity', 'update_dm_delivery',
   ];
   for (const t of userTables) {
     try { db.run(`DELETE FROM ${t} WHERE user_id = '${userId}'`); } catch (e) {}
@@ -549,6 +698,8 @@ function wipeUser(userId) {
   try { db.run(`DELETE FROM pvp_bounties WHERE poster_id = '${userId}' OR target_id = '${userId}'`); } catch (e) {}
   try { db.run(`DELETE FROM giveaways WHERE host_id = '${userId}'`); } catch (e) {}
   try { db.run(`DELETE FROM bids WHERE seller_id = '${userId}' OR current_bidder = '${userId}'`); } catch (e) {}
+  try { db.run(`UPDATE inbox_deliveries SET status = 'cancelled' WHERE recipient_id = '${userId}' AND status = 'pending'`); } catch (e) {}
+  try { db.run(`UPDATE contracts SET status = 'cancelled' WHERE (creator_id = '${userId}' OR target_id = '${userId}') AND status IN ('pending','active')`); } catch (e) {}
   // if they owned a clan, delete the clan too (members already cleared above)
   try { db.run(`DELETE FROM clans WHERE owner_id = '${userId}'`); } catch (e) {}
   // un-mark any merchant stock they bought
@@ -653,7 +804,7 @@ function claimWork(userId, amount) {
   const now = Math.floor(Date.now() / 1000);
   const mult = marriedMult(userId);
   const final = Math.floor(amount * mult);
-  db.run(`UPDATE users SET work_time = ${now}, balance = balance + ${final} WHERE user_id = '${userId}'`);
+  db.run(`UPDATE users SET work_time = ${now}, balance = balance + ${final}, worked = worked + 1 WHERE user_id = '${userId}'`);
   save();
   return { mult };
 }
@@ -1265,12 +1416,12 @@ function getUserPerks(userId) {
 }
 
 const SPECIES = {
-  common: ['Rabbit', 'Squirrel', 'Mouse', 'Sparrow', 'Frog', 'Chick', 'Duckling', 'Hamster', 'Fish', 'Butterfly', 'Otter', 'Penguin', 'Koala', 'Sloth', 'Capybara'],
-  uncommon: ['Fox', 'Owl', 'Raccoon', 'Hedgehog', 'Ferret', 'Parrot', 'Turtle', 'Lizard', 'Guinea Pig', 'Skunk', 'Wallaby', 'Puffin'],
-  rare: ['Wolf', 'Eagle', 'Deer', 'Panther', 'Hawk', 'Lynx', 'Cobra', 'Boar', 'Jaguar', 'Grizzly', 'Moose', 'Hippo'],
-  epic: ['Dragon', 'Phoenix', 'Griffin', 'Unicorn', 'Pegasus', 'Kraken', 'Basilisk', 'Manticore', 'Sphinx', 'Roc', 'Wyvern'],
-  legendary: ['Leviathan', 'Thunderbird', 'Kirin', 'Cerberus', 'Fenrir', 'Jormungandr'],
-  mythic: ['Odin', 'Tiamat', 'Bahamut', 'Cthulhu', 'Godzilla'],
+  common: ['Rabbit', 'Squirrel', 'Mouse', 'Sparrow', 'Frog', 'Chick', 'Duckling', 'Hamster', 'Fish', 'Butterfly', 'Otter', 'Penguin', 'Koala', 'Sloth', 'Capybara', 'Duck', 'Goldfish', 'Ladybug', 'Cricket', 'Bumblebee', 'Chicken', 'Sheep', 'Goat', 'Piglet', 'Bunny'],
+  uncommon: ['Fox', 'Owl', 'Raccoon', 'Hedgehog', 'Ferret', 'Parrot', 'Turtle', 'Lizard', 'Guinea Pig', 'Skunk', 'Wallaby', 'Puffin', 'Beaver', 'Swan', 'Peacock', 'Meerkat', 'Marmot', 'Iguana', 'Dolphin'],
+  rare: ['Wolf', 'Eagle', 'Deer', 'Panther', 'Hawk', 'Lynx', 'Cobra', 'Boar', 'Jaguar', 'Grizzly', 'Moose', 'Hippo', 'Lion', 'Tiger', 'Cheetah', 'Rhino', 'Elephant', 'Gorilla', 'Crocodile'],
+  epic: ['Dragon', 'Phoenix', 'Griffin', 'Unicorn', 'Pegasus', 'Kraken', 'Basilisk', 'Manticore', 'Sphinx', 'Roc', 'Wyvern', 'Hydra', 'Chimera', 'Golem', 'Naga'],
+  legendary: ['Leviathan', 'Thunderbird', 'Kirin', 'Cerberus', 'Fenrir', 'Jormungandr', 'Sleipnir', 'Titanoboa'],
+  mythic: ['Odin', 'Tiamat', 'Bahamut', 'Cthulhu', 'Godzilla', 'Zeus'],
 };
 
 const RARITY_WEIGHTS = { common: 50, uncommon: 25, rare: 15, epic: 8, legendary: 2, mythic: 0.2 };
@@ -1373,6 +1524,7 @@ function addAnimal(userId, effLevel) {
   const species = randomSpecies(rarity);
   const stats = randomStats(rarity);
   const shiny = rollShiny() ? 1 : 0;
+  if (shiny) db.run(`UPDATE users SET shiny_found = shiny_found + 1 WHERE user_id = '${safeStr(userId)}'`);
   const trait = rollTrait();
   db.run(`INSERT INTO animals (user_id, species, rarity, hp, max_hp, attack, defense, shiny, trait) VALUES ('${userId}', '${species}', '${rarity}', ${stats.hp}, ${stats.hp}, ${stats.attack}, ${stats.defense}, ${shiny}, '${trait}')`);
   const rows = db.exec('SELECT last_insert_rowid() AS id');
@@ -1502,6 +1654,7 @@ function addEgg(userId, n = 1) {
 function hatchEgg(userId) {
   if (getEggs(userId) <= 0) return null;
   db.run(`UPDATE users SET eggs = eggs - 1, hatched = hatched + 1 WHERE user_id = '${userId}'`);
+  addContractProgress(userId, 'hatch', 1);
   const r = Math.random();
   let rarity = 'common';
   let acc = 0;
@@ -1509,6 +1662,7 @@ function hatchEgg(userId) {
   const species = randomSpecies(rarity);
   const stats = randomStats(rarity);
   const shiny = rollShiny() ? 1 : 0;
+  if (shiny) db.run(`UPDATE users SET shiny_found = shiny_found + 1 WHERE user_id = '${safeStr(userId)}'`);
   const trait = rollTrait();
   db.run(`INSERT INTO animals (user_id, species, rarity, hp, max_hp, attack, defense, shiny, trait) VALUES ('${userId}', '${species}', '${rarity}', ${stats.hp}, ${stats.hp}, ${stats.attack}, ${stats.defense}, ${shiny}, '${trait}')`);
   const rows = db.exec('SELECT last_insert_rowid() AS id');
@@ -2094,6 +2248,8 @@ function claimQuest(userId) {
   const reward = hasPerk(userId, 'double_quest') ? q.reward * 2 : q.reward;
   addBalance(userId, reward);
   addPassXp(userId, PASS_XP.quest);
+  db.run(`UPDATE users SET quests_done = quests_done + 1 WHERE user_id = '${userId}'`);
+  addContractProgress(userId, 'quest', 1);
   save();
   return { ...q, reward };
 }
@@ -2125,6 +2281,8 @@ function claimBounty(userId) {
   const reward = hasPerk(userId, 'double_quest') ? b.reward * 2 : b.reward;
   addBalance(userId, reward);
   addPassXp(userId, PASS_XP.bounty);
+  db.run(`UPDATE users SET quests_done = quests_done + 1 WHERE user_id = '${userId}'`);
+  addContractProgress(userId, 'quest', 1);
   save();
   return { ...b, reward };
 }
@@ -2202,6 +2360,7 @@ function claimChecklist(userId, period) {
   addBalance(userId, c.reward);
   addSeals(userId, c.seals);
   addPassXp(userId, period === 'weekly' ? PASS_XP.checklist_weekly : PASS_XP.checklist_daily);
+  addContractProgress(userId, 'checklist', 1);
   save();
   return { ...c, claimed: true };
 }
@@ -2474,6 +2633,25 @@ const ACHIEVEMENTS = [
   { key: 'bal_1m', name: '🏦 Reached 1M', desc: 'hold 1M coins', reward: 100000, test: u => (u.balance || 0) >= 1000000 },
   { key: 'bal_10m', name: '🏦🏦 Reached 10M', desc: 'hold 10M coins', reward: 500000, test: u => (u.balance || 0) >= 10000000 },
   { key: 'first_legendary', name: '🌟 Legendary Owner', desc: 'own a legendary animal', reward: 250000, test: u => u.has_legendary === true },
+  { key: 'mythic_1', name: '🦄 Mythic Keeper', desc: 'own a mythic animal', reward: 750000, test: u => u.has_mythic === true },
+  { key: 'shiny_1', name: '✨ Shiny Catcher', desc: 'catch ur first shiny', reward: 150000, test: u => (u.shiny_found || 0) >= 1 },
+  { key: 'shiny_3', name: '💫 Prismatic', desc: 'catch 3 shinies', reward: 500000, test: u => (u.shiny_found || 0) >= 3 },
+  { key: 'dex_10', name: '🗂️ Wildlife Watcher', desc: 'discover 10 different species', reward: 50000, test: u => u.dex_species >= 10 },
+  { key: 'dex_25', name: '🧭 Beast Master', desc: 'discover 25 different species', reward: 200000, test: u => u.dex_species >= 25 },
+  { key: 'quests_10', name: '🗒️ Quest Regular', desc: 'complete 10 daily quests', reward: 100000, test: u => (u.quests_done || 0) >= 10 },
+  { key: 'seals_10', name: '🎟️ Seal Collector', desc: 'hold 10 seals', reward: 50000, test: u => (u.seals || 0) >= 10 },
+  { key: 'streak_7', name: '🔥 Week Streak', desc: 'hit a 7-day streak', reward: 100000, test: u => (u.daily_streak || 0) >= 7 },
+  { key: 'streak_30', name: '⏰ Monthly Grind', desc: 'hit a 30-day streak', reward: 500000, test: u => (u.daily_streak || 0) >= 30 },
+  { key: 'work_100', name: '💼 Hustler', desc: 'work 100 times', reward: 100000, test: u => (u.worked || 0) >= 100 },
+  { key: 'contract_1', name: '📜 Paper Pusher', desc: 'complete ur first contract', reward: 100000, rewardType: 'title', titleKey: 'contract_killer', test: u => (u.contracts_done || 0) >= 1 },
+  { key: 'marry_1', name: '💍 Till Death', desc: 'get married', reward: 100000, test: u => u.is_married === true },
+  { key: 'give_1', name: '🎁 Generous Soul', desc: 'send somebody coins', reward: 25000, test: u => (u.money_sent || 0) >= 1 },
+  // hidden ones — show as ??? until earned
+  { key: 'the_button', name: '🔘 The Button', desc: 'pressed the button during the event. obviously.', reward: 0, rewardType: 'none', hidden: true, test: u => (u.button_pressed || 0) >= 1 },
+  { key: 'the_summoned', name: '📢 Summoned', desc: 'was summoned by a friend. legend.', reward: 0, rewardType: 'title', titleKey: 'unexplained', hidden: true, test: u => (u.summoned || 0) >= 1 },
+  { key: 'conspiracy', name: '🕵️ Alright What Is Going On', desc: 'judged someone in a case. certified conspiracy theorist.', reward: 0, rewardType: 'none', hidden: true, test: u => (u.judged || 0) >= 1 },
+  { key: 'veteran', name: '🫡 Roll Call Veteran', desc: 'showed up for roll call once. once.', reward: 0, rewardType: 'none', hidden: true, test: u => (u.rollcalls || 0) >= 1 },
+  { key: 'wanted', name: '🚨 Wanted', desc: 'was seen in a wanted notice. try to stay calm.', reward: 0, rewardType: 'none', hidden: true, test: u => (u.wanted_marked || 0) >= 1 },
 ];
 
 function getAchievements(userId) {
@@ -2487,22 +2665,49 @@ function checkAchievements(userId) {
   const u = ensureUser(userId);
   if (!u) return [];
   const animals = getUserAnimals(userId);
+  const ownedSpecies = getOwnedSpecies(userId);
+  let contractsDone = 0;
+  try {
+    const r = db.exec(`SELECT COUNT(*) FROM contracts WHERE target_id = '${safeStr(userId)}' AND status = 'completed'`);
+    contractsDone = r[0] ? r[0].values[0][0] : 0;
+  } catch {}
   const state = {
     animals: animals.length,
     has_legendary: animals.some(a => a.rarity === 'legendary'),
+    has_mythic: animals.some(a => a.rarity === 'mythic'),
+    dex_species: Object.values(ownedSpecies).reduce((s, arr) => s + arr.length, 0),
+    shiny_found: u.shiny_found || 0,
     hatched: u.hatched,
     battles_won: u.battles_won,
     gems: u.gems,
     essence: u.essence,
+    seals: u.seals || 0,
+    quests_done: u.quests_done || 0,
+    daily_streak: u.daily_streak || 0,
+    worked: u.worked || 0,
+    money_sent: u.money_sent || 0,
+    contracts_done: contractsDone,
+    is_married: !!getMarriage(userId),
     total_gambled: u.total_gambled,
     total_won: u.total_won,
     balance: u.balance,
+    button_pressed: u.button_pressed || 0,
+    summoned: u.summoned || 0,
+    judged: u.judged || 0,
+    rollcalls: u.rollcalls || 0,
+    wanted_marked: u.wanted_marked || 0,
   };
   const owned = new Set(getAchievements(userId));
   const unlocked = [];
   for (const ach of ACHIEVEMENTS) {
     if (!owned.has(ach.key) && ach.test(state)) {
-      addBalance(userId, ach.reward);
+      if (ach.rewardType === 'none') {
+        // hidden flavor only — no payout
+      } else if (ach.rewardType === 'title') {
+        unlockTitle(userId, ach.titleKey || ach.key);
+      } else {
+        addBalance(userId, ach.reward);
+      }
       db.run(`INSERT INTO achievements (user_id, key) VALUES ('${userId}', '${ach.key}')`);
       unlocked.push(ach);
     }
@@ -2568,6 +2773,7 @@ function buyBlackMarketItem(userId, slot) {
   addBalance(userId, -it.price);
   it.def.grant(userId);
   db.run(`UPDATE blackmarket SET stock = stock - 1 WHERE slot = ${slot}`);
+  db.run(`UPDATE users SET bm_buys = bm_buys + 1 WHERE user_id = '${safeStr(userId)}'`);
   save();
   return { ok: true, item: it.def, price: it.price };
 }
@@ -3035,6 +3241,7 @@ function buyMerchantItem(userId, slot) {
     addEssence(userId, parseInt(item.extra || '25', 10));
   }
   db.run(`UPDATE merchant_stock SET sold_to = '${userId}' WHERE slot = ${item.slot}`);
+  db.run(`UPDATE users SET merchant_buys = merchant_buys + 1 WHERE user_id = '${safeStr(userId)}'`);
   save();
   return { ok: true, item };
 }
@@ -3729,6 +3936,614 @@ function distributeBossPot(guildId, contrib, pot) {
   return payouts;
 }
 
+// =====================================================================================
+//  2.0 systems — inbox / contracts / titles / incidents / activity / discovery / events
+// =====================================================================================
+
+const INBOX_SOURCES = ['give', 'contract', 'event', 'achievement', 'gift', 'quest_bonus', 'title', 'system'];
+const CONTRACT_TTL_PENDING = 24 * 3600;   // undoable proposal window
+const CONTRACT_TTL_ACTIVE = 72 * 3600;    // window to actually finish
+const INCIDENT_LIMIT_PER_GUILD = 60;
+
+function safeStr(v) { return String(v).replace(/'/g, '').slice(0, 200); }
+
+// ---------------- INBOX ----------------
+
+function createDelivery(recipientId, opts = {}) {
+  if (!recipientId) return null;
+  const source = INBOX_SOURCES.includes(opts.source) ? opts.source : 'system';
+  const amount = Number.isFinite(opts.amount) ? Math.max(0, Math.floor(opts.amount)) : 0;
+  const payload = JSON.stringify(opts.payload || {});
+  db.run(`INSERT INTO inbox_deliveries (recipient_id, sender_id, source, label, amount, payload, status, created_at)
+          VALUES ('${safeStr(recipientId)}', '${safeStr(opts.sender || '')}', '${source}', '${safeStr(opts.label || '')}', ${amount}, '${payload.replace(/'/g, '')}', 'pending', ${Math.floor(Date.now() / 1000)})`);
+  const row = db.exec('SELECT last_insert_rowid() AS id')[0].values[0][0];
+  save();
+  return Number(row);
+}
+
+function getPendingDeliveries(recipientId, limit = 25) {
+  const rows = db.exec(`SELECT id, sender_id, source, label, amount, payload, status, created_at, claimed_at
+                        FROM inbox_deliveries WHERE recipient_id = '${safeStr(recipientId)}' AND status = 'pending'
+                        ORDER BY created_at DESC LIMIT ${Math.max(1, Math.min(limit, 50))}`);
+  if (!rows.length) return [];
+  return rows[0].values.map(v => ({
+    id: v[0], sender_id: v[1], source: v[2], label: v[3], amount: v[4],
+    payload: (() => { try { return JSON.parse(v[5] || '{}'); } catch { return {}; } })(),
+    status: v[6], created_at: v[7], claimed_at: v[8],
+  }));
+}
+
+function getPendingDeliveryCount(recipientId) {
+  const rows = db.exec(`SELECT COUNT(*) FROM inbox_deliveries WHERE recipient_id = '${safeStr(recipientId)}' AND status = 'pending'`);
+  return rows.length ? rows[0].values[0][0] : 0;
+}
+
+function hasPendingSource(recipientId, source) {
+  const rows = db.exec(`SELECT COUNT(*) FROM inbox_deliveries WHERE recipient_id = '${safeStr(recipientId)}' AND status = 'pending' AND source = '${safeStr(source)}'`);
+  return !!(rows.length && rows[0].values[0][0]);
+}
+
+function getDelivery(id) {
+  const rows = db.exec(`SELECT * FROM inbox_deliveries WHERE id = ${Number(id)}`);
+  if (!rows.length || !rows[0].values.length) return null;
+  const v = rows[0].values[0];
+  const c = rows[0].columns;
+  const get = (n, d = 0) => { const i = c.indexOf(n); return i === -1 ? d : v[i]; };
+  return { id: get('id'), recipient_id: get('recipient_id'), sender_id: get('sender_id'), source: get('source'), label: get('label'), amount: get('amount'), payload: (() => { try { return JSON.parse(get('payload', '{}')); } catch { return {}; } })(), status: get('status'), created_at: get('created_at'), claimed_at: get('claimed_at') };
+}
+
+// Credit one non-coin payload (pet / title / currency-ish extras). Returns text summary.
+function creditPayload(userId, payload) {
+  if (!payload || typeof payload !== 'object') return '';
+  const out = [];
+  if (payload.title) { unlockTitle(userId, payload.title); out.push('title'); }
+  if (payload.seals) { addSeals(userId, Number(payload.seals)); out.push('seals'); }
+  if (payload.gems) { addGems(userId, Number(payload.gems)); out.push('gems'); }
+  if (payload.essence) { db.run(`UPDATE users SET essence = essence + ${Number(payload.essence)} WHERE user_id = '${safeStr(userId)}'`); out.push('essence'); }
+  if (payload.xp) { grantXp(userId, Number(payload.xp)); out.push('xp'); }
+  if (payload.pet) {
+    try {
+      const a = getAnimal(Number(payload.pet));
+      if (a && a.user_id === '__merchant__') { db.run(`UPDATE animals SET user_id = '${safeStr(userId)}' WHERE id = ${Number(payload.pet)}`); out.push('a pet'); }
+    } catch {}
+  }
+  if (out.length) save();
+  return out.join(', ');
+}
+
+function safeClaim(deliveryId, recipientId) {
+  const d = getDelivery(deliveryId);
+  if (!d) return { ok: false, reason: 'gone' };
+  if (d.recipient_id !== recipientId) return { ok: false, reason: 'not-yours' };
+  if (d.status !== 'pending') return { ok: false, reason: 'already' };
+  db.run(`UPDATE inbox_deliveries SET status = 'claimed', claimed_at = ${Math.floor(Date.now() / 1000)} WHERE id = ${Number(deliveryId)} AND status = 'pending'`);
+  const changed = db.exec('SELECT changes() AS c')[0].values[0][0];
+  if (changed !== 1) return { ok: false, reason: 'already' };
+  if (d.amount > 0) addBalance(recipientId, d.amount);
+  creditPayload(recipientId, d.payload);
+  save();
+  return { ok: true, delivery: d };
+}
+
+function claimAllDeliveries(recipientId) {
+  const pending = getPendingDeliveries(recipientId, 50);
+  let credited = 0;
+  let count = 0;
+  for (const d of pending) {
+    const res = safeClaim(d.id, recipientId);
+    if (res.ok) { credited += res.delivery.amount; count++; }
+  }
+  return { count, credited };
+}
+
+// ---------------- CONTRACTS ----------------
+
+// Measurable objectives Gambot actually tracks. Keys must line up with the same
+// counters fed by addQuestProgress / addBountyProgress / claimQuest / claimChecklist / hatchEgg.
+const CONTRACT_OBJECTIVES = {
+  hunt:      { label: 'animals hunted',       unit: 'hunt' },
+  sacrifice: { label: 'animals sacrificed',   unit: 'sacrifice' },
+  battle:    { label: 'pet battles won',      unit: 'battle' },
+  work:      { label: 'times worked',         unit: 'work' },
+  give:      { label: 'coins sent to people', unit: 'give' },
+  hatch:     { label: 'eggs hatched',         unit: 'hatch' },
+  quest:     { label: 'daily quests done',    unit: 'quest' },
+  checklist: { label: 'daily checklists done', unit: 'checklist' },
+};
+
+function createContract(creatorId, targetId, objective, n, reward) {
+  const def = CONTRACT_OBJECTIVES[objective];
+  if (!def || !targetId || targetId === creatorId) return { ok: false, reason: 'bad-contract' };
+  n = Math.floor(n); reward = Math.floor(reward);
+  if (n < 1 || n > 500) return { ok: false, reason: 'objective-range' };
+  if (reward < 1000 || reward > 100000000) return { ok: false, reason: 'reward-range' };
+  const creator = ensureUser(creatorId);
+  if (!creator || creator.balance < reward) return { ok: false, reason: 'no-funds' };
+  db.run(`UPDATE users SET balance = ${creator.balance - reward} WHERE user_id = '${safeStr(creatorId)}'`);
+  const now = Math.floor(Date.now() / 1000);
+  db.run(`INSERT INTO contracts (creator_id, target_id, objective, objective_n, reward, escrow, status, created_at, expires_at)
+          VALUES ('${safeStr(creatorId)}', '${safeStr(targetId)}', '${objective}', ${n}, ${reward}, ${reward}, 'pending', ${now}, ${now + CONTRACT_TTL_PENDING})`);
+  const id = db.exec('SELECT last_insert_rowid() AS id')[0].values[0][0];
+  save();
+  return { ok: true, id: Number(id) };
+}
+
+function getContract(id) {
+  const i = Number(id);
+  if (!Number.isFinite(i) || i <= 0) return null;
+  const rows = db.exec(`SELECT * FROM contracts WHERE id = ${i}`);
+  if (!rows.length || !rows[0].values.length) return null;
+  const v = rows[0].values[0]; const c = rows[0].columns;
+  const get = (n, d = 0) => { const i = c.indexOf(n); return i === -1 ? d : v[i]; };
+  return {
+    id: get('id'), creator_id: get('creator_id'), target_id: get('target_id'),
+    objective: get('objective'), objective_n: get('objective_n'), reward: get('reward'),
+    escrow: get('escrow'), status: get('status'), created_at: get('created_at'),
+    accepted_at: get('accepted_at'), completed_at: get('completed_at'),
+    expires_at: get('expires_at'), progress: get('progress'), finished: get('finished'),
+  };
+}
+
+function listContractsFor(userId, statuses = []) {
+  const where = statuses.length ? ` AND status IN (${statuses.map(s => `'${safeStr(s)}'`).join(',')})` : '';
+  const rows = db.exec(`SELECT id FROM contracts WHERE (creator_id = '${safeStr(userId)}' OR target_id = '${safeStr(userId)}')${where} ORDER BY created_at DESC LIMIT 40`);
+  if (!rows.length) return [];
+  return rows[0].values.map(v => getContract(v[0]));
+}
+
+function refundContractEscrow(id) {
+  const c = getContract(id);
+  if (!c || c.escrow <= 0) return false;
+  db.run(`UPDATE contracts SET escrow = 0 WHERE id = ${Number(id)} AND escrow > 0`);
+  const changed = db.exec('SELECT changes() AS c')[0].values[0][0];
+  if (changed !== 1) return false;
+  addBalance(c.creator_id, c.escrow);
+  save();
+  return true;
+}
+
+function acceptContract(id, targetId) {
+  const c = getContract(id);
+  if (!c) return { ok: false, reason: 'gone' };
+  if (c.target_id !== targetId) return { ok: false, reason: 'not-yours' };
+  if (c.status !== 'pending') return { ok: false, reason: 'status' };
+  db.run(`UPDATE contracts SET status = 'active', accepted_at = ${Math.floor(Date.now() / 1000)}, created_at = ${Math.floor(Date.now() / 1000)}, expires_at = ${Math.floor(Date.now() / 1000) + CONTRACT_TTL_ACTIVE} WHERE id = ${Number(id)} AND status = 'pending'`);
+  const changed = db.exec('SELECT changes() AS c')[0].values[0][0];
+  if (changed !== 1) return { ok: false, reason: 'status' };
+  save();
+  return { ok: true, contract: getContract(id) };
+}
+
+function declineContract(id, targetId) {
+  const c = getContract(id);
+  if (!c) return { ok: false, reason: 'gone' };
+  if (c.target_id !== targetId) return { ok: false, reason: 'not-yours' };
+  if (c.status !== 'pending') return { ok: false, reason: 'status' };
+  db.run(`UPDATE contracts SET status = 'declined', finished = 1 WHERE id = ${Number(id)} AND status = 'pending'`);
+  const changed = db.exec('SELECT changes() AS c')[0].values[0][0];
+  if (changed !== 1) return { ok: false, reason: 'status' };
+  refundContractEscrow(id);
+  save();
+  return { ok: true };
+}
+
+function cancelContract(id, creatorId) {
+  const c = getContract(id);
+  if (!c) return { ok: false, reason: 'gone' };
+  if (c.creator_id !== creatorId) return { ok: false, reason: 'not-yours' };
+  if (c.status !== 'pending') return { ok: false, reason: 'already-active' };
+  db.run(`UPDATE contracts SET status = 'cancelled', finished = 1 WHERE id = ${Number(id)} AND status = 'pending'`);
+  const changed = db.exec('SELECT changes() AS c')[0].values[0][0];
+  if (changed !== 1) return { ok: false, reason: 'status' };
+  refundContractEscrow(id);
+  save();
+  return { ok: true };
+}
+
+function addContractProgress(targetId, objective, amount) {
+  const rows = db.exec(`SELECT id FROM contracts WHERE target_id = '${safeStr(targetId)}' AND objective = '${safeStr(objective)}' AND status = 'active'`);
+  if (!rows.length || !rows[0].values.length) return;
+  for (const v of rows[0].values) {
+    db.run(`UPDATE contracts SET progress = MIN(progress + ${Math.floor(amount)}, objective_n) WHERE id = ${Number(v[0])} AND status = 'active'`);
+  }
+  save();
+}
+
+function settleCompletedContract(contractId) {
+  const c = getContract(contractId);
+  if (!c || c.status !== 'active' || c.finished) return { ok: false, reason: 'not-settlable' };
+  if (c.progress < c.objective_n) return { ok: false, reason: 'not-done' };
+  db.run(`UPDATE contracts SET status = 'completed', completed_at = ${Math.floor(Date.now() / 1000)}, escrow = 0, finished = 1 WHERE id = ${Number(contractId)} AND status = 'active' AND finished = 0`);
+  const changed = db.exec('SELECT changes() AS c')[0].values[0][0];
+  if (changed !== 1) return { ok: false, reason: 'already' };
+  const deliveryId = createDelivery(c.target_id, { sender: c.creator_id, source: 'contract', label: `${CONTRACT_OBJECTIVES[c.objective].label} — contract with <@${c.creator_id}>`.slice(0, 90), amount: c.reward });
+  save();
+  return { ok: true, deliveryId };
+}
+
+// User presses claim on a finished contract (target sees it via contracts list). Idempotent.
+function claimCompletedContract(contractId, targetId) {
+  const c = getContract(contractId);
+  if (!c) return { ok: false, reason: 'gone' };
+  if (c.target_id !== targetId) return { ok: false, reason: 'not-yours' };
+  if (c.status !== 'completed') return { ok: false, reason: 'status' };
+  if (c.finished !== 1) { settleCompletedContract(contractId); }
+  const after = getContract(contractId);
+  if (after && after.finished === 1 && !hasPendingSource(targetId, 'contract')) {
+    return { ok: false, reason: 'paid' };
+  }
+  // Delivery already created on settle → just surface it.
+  return { ok: true, inbox: getPendingDeliveryCount(targetId) };
+}
+
+function expireContracts(nowTs) {
+  if (!nowTs) nowTs = Math.floor(Date.now() / 1000);
+  let refunded = 0, expired = 0;
+  const pend = db.exec(`SELECT id FROM contracts WHERE status = 'pending' AND expires_at < ${nowTs} AND escrow > 0`);
+  if (pend && pend[0] && pend[0].values.length) {
+    for (const v of pend[0].values) { if (refundContractEscrow(v[0])) { expired++; refunded++; } }
+  }
+  const act = db.exec(`SELECT id FROM contracts WHERE status = 'active' AND expires_at < ${nowTs}`);
+  if (act && act[0] && act[0].values.length) {
+    for (const v of act[0].values) {
+      db.run(`UPDATE contracts SET status = 'expired', finished = 1 WHERE id = ${Number(v[0])} AND status = 'active'`);
+      const changed = db.exec('SELECT changes() AS c')[0].values[0][0];
+      if (changed === 1) { refundContractEscrow(v[0]); expired++; }
+    }
+  }
+  if (expired) save();
+  return { expired, refunded };
+}
+
+// Add contract progress whenever the shared tracking hook fires.
+function trackProgress(userId, key, amount) {
+  addQuestProgress(userId, key, amount);
+  addBountyProgress(userId, key, amount);
+  addContractProgress(userId, key, amount);
+}
+
+// ---------------- TITLES ----------------
+
+const TITLES = {
+  // normal collection
+  first_catch:      { name: 'first catch',      rarity: 'common',  desc: 'caught ur first animal', award: u => u.animals >= 1 },
+  collector:        { name: 'collector',        rarity: 'common',  desc: 'owned 10 animals', award: u => u.animals >= 10 },
+  zookeeper:        { name: 'zoo keeper',       rarity: 'common',  desc: 'owned 25 animals', award: u => u.animals >= 25 },
+  safarilegend:     { name: 'safari legend',    rarity: 'rare',    desc: 'owned 50 animals', award: u => u.animals >= 50 },
+  crypto_dex:       { name: 'specialist',       rarity: 'common',  desc: 'caught 10 different species', award: u => u.dex_species >= 10 },
+  collector_xl:     { name: 'completionist',    rarity: 'rare',    desc: 'caught 20 different species', award: u => u.dex_species >= 20 },
+  hatcher:          { name: 'egg opener',       rarity: 'common',  desc: 'hatched ur first egg', award: u => u.hatched >= 1 },
+  egg_enthusiast:   { name: 'hatchery',         rarity: 'common',  desc: 'hatched 10 eggs', award: u => u.hatched >= 10 },
+  shiny_finder:     { name: 'shiny hunter',     rarity: 'rare',    desc: 'caught a shiny', award: u => u.shiny_found >= 1 },
+  shiny_collector:  { name: 'prismatic',        rarity: 'legendary', desc: 'caught 3 shinies', award: u => u.shiny_found >= 3 },
+  mythic_owner:     { name: 'mythic owner',     rarity: 'legendary', desc: 'owned a mythic animal', award: u => u.has_mythic },
+  legendary_owner:  { name: 'legendary owner',  rarity: 'rare',    desc: 'owned a legendary animal', award: u => u.has_legendary },
+  world_warrior:    { name: 'battle hardened',  rarity: 'common',  desc: 'won ur first pet battle', award: u => u.battles_won >= 1 },
+  guild_conqueror:  { name: 'guild conqueror',  rarity: 'rare',    desc: 'won 25 pet battles', award: u => u.battles_won >= 25 },
+  oldschool:        { name: 'oldschool',        rarity: 'rare',    desc: 'level 25 reached', award: u => u.level >= 25 },
+  high_roller:      { name: 'high roller',      rarity: 'rare',    desc: 'reached 1M balance', award: u => u.balance >= 1000000 },
+  tycoon:           { name: 'tycoon',           rarity: 'legendary', desc: 'reached 10M balance', award: u => u.balance >= 10000000 },
+  quest_doer:       { name: 'errand boy/girl',  rarity: 'common',  desc: 'completed a quest', award: u => u.quests_done >= 1 },
+  dedicated:        { name: 'dedicated',        rarity: 'rare',    desc: 'completed 10 daily quests', award: u => u.quests_done >= 10 },
+  influencer:       { name: 'influencer',       rarity: 'common',  desc: 'used social commands — ur everywhere', award: u => (u.social_used || 0) >= 5 },
+  // progress / community
+  merchant_mate:    { name: 'merchant mate',    rarity: 'common',  desc: 'bought from the merchant', award: u => u.merchant_buys >= 1 },
+  blackmarket_reg:  { name: 'black market regular', rarity: 'rare', desc: 'bought from the black market', award: u => u.bm_buys >= 1 },
+  contract_giver:   { name: 'contract giver',   rarity: 'rare',    desc: 'offered ur first contract', award: u => u.contracts_given >= 1 },
+  contract_killer:  { name: 'contract killer',  rarity: 'legendary', desc: 'finished 5 contracts', award: u => u.contracts_done >= 5 },
+  clan_blood:       { name: 'clan blood',       rarity: 'rare',    desc: 'joined a clan', award: u => u.in_clan },
+  family_man:       { name: 'family oriented',  rarity: 'common',  desc: 'married somebody', award: u => u.is_married },
+  adoption_arch:    { name: 'adoption agency',  rarity: 'rare',    desc: 'adopted somebody', award: u => u.children > 0 },
+  decorated:        { name: 'decorated',        rarity: 'common',  desc: 'unlocked 5 achievements', award: u => u.achievements >= 5 },
+  // funny / hidden
+  gift_giver:       { name: 'generous',         rarity: 'common',  desc: 'sent somebody money', award: u => u.money_sent >= 100000 },
+  animal_hoarder:   { name: 'animal hoarder',   rarity: 'rare',    desc: 'owned 30 eggs somehow', award: u => u.egg_hopper >= 30 },
+  cuddle_bug:       { name: 'cuddle bug',       rarity: 'common',  desc: 'used a social command', award: u => u.social_used >= 1 },
+  showoff:          { name: 'showoff',          rarity: 'common',  desc: 'used v av on another person', award: u => u.showoff >= 1 },
+  unexplained:      { name: 'unexplained',      rarity: 'legendary', desc: 'gambot remembers u exist', award: u => u.summoned >= 1 },
+  the_unemployed:   { name: 'the unemployed',   rarity: 'rare',    desc: 'did 0 work across an entire summer', award: () => false },
+  professional_victim: { name: 'professional victim', rarity: 'rare', desc: 'lost a battle 10 times', award: u => u.losses >= 10 },
+  nonetheless_alive:{ name: 'somehow alive',    rarity: 'legendary', desc: 'survived 30 days of gambot', award: u => u.account_days >= 30 },
+  wanted_for_nothing: { name: 'wanted for nothing', rarity: 'hidden', desc: 'got a wanted event badge', award: u => u.wanted_marked >= 1 },
+  the_button_order: { name: 'the button',       rarity: 'hidden',  desc: 'pressed the button', award: u => u.button_pressed >= 1 },
+  rollcall_veteran: { name: 'roll call veteran',rarity: 'hidden',  desc: 'showed up for roll call', award: u => u.rollcalls >= 1 },
+  council_member:   { name: 'council member',   rarity: 'hidden',  desc: 'was judged by common sense', award: u => u.judged >= 1 },
+};
+const TITLES_BY_KEY = Object.keys(TITLES);
+const TITLE_RARITY_COLOR = { common: '0x9b59b6', rare: '0x3498db', legendary: '0xf1c40f', hidden: '0x95a5a6' };
+
+function getTitles(userId) {
+  const rows = db.exec(`SELECT title_key FROM user_titles WHERE user_id = '${safeStr(userId)}'`);
+  if (!rows.length) return [];
+  return rows[0].values.map(v => v[0]);
+}
+
+function getEquippedTitle(userId) {
+  const u = ensureUser(userId);
+  return u && u.equipped_title ? u.equipped_title : '';
+}
+
+function unlockTitle(userId, key) {
+  if (!TITLES[key]) return false;
+  db.run(`INSERT OR IGNORE INTO user_titles (user_id, title_key) VALUES ('${safeStr(userId)}', '${key}')`);
+  const changed = db.exec('SELECT changes() AS c')[0].values[0][0];
+  if (changed) save();
+  return changed === 1;
+}
+
+function equipTitle(userId, key) {
+  const owned = getTitles(userId);
+  if (key && !owned.includes(key)) return { ok: false, reason: 'locked' };
+  db.run(`UPDATE users SET equipped_title = '${safeStr(key || '')}' WHERE user_id = '${safeStr(userId)}'`);
+  save();
+  return { ok: true };
+}
+
+function clearTitle(userId) { return equipTitle(userId, ''); }
+
+// Build state for title checks from persisted counters.
+function titleStateFor(userId) {
+  const u = ensureUser(userId);
+  if (!u) return null;
+  const animals = getUserAnimals(userId);
+  const ownedSpecies = getOwnedSpecies(userId);
+  const ach = getAchievements(userId);
+  let contractsDone = 0, contractsGiven = 0;
+  try { const r = db.exec(`SELECT COUNT(*) FROM contracts WHERE target_id = '${safeStr(userId)}' AND status = 'completed'`); contractsDone = r[0] ? r[0].values[0][0] : 0; } catch {}
+  try { const r = db.exec(`SELECT COUNT(*) FROM contracts WHERE creator_id = '${safeStr(userId)}' AND status IN ('completed','active')`); contractsGiven = r[0] ? r[0].values[0][0] : 0; } catch {}
+  const clan = getClanOf(userId);
+  const act = getActivity(userId);
+  const days = act && act.first_seen ? Math.max(1, Math.floor((Date.now() / 1000 - act.first_seen) / 86400)) : 1;
+  return {
+    animals: animals.length,
+    dex_species: Object.values(ownedSpecies).reduce((s, a) => s + a.length, 0),
+    has_legendary: animals.some(a => a.rarity === 'legendary'),
+    has_mythic: animals.some(a => a.rarity === 'mythic'),
+    shiny_found: u.shiny_found || 0,
+    hatched: u.hatched || 0,
+    battles_won: u.battles_won || 0,
+    losses: u.losses || 0,
+    eggs: u.eggs || 0,
+    egg_hopper: (u.eggs || 0) + (u.hatched || 0),
+    level: u.level || 1,
+    balance: u.balance || 0,
+    quests_done: u.quests_done || 0,
+    in_clan: !!clan,
+    is_married: !!getMarriage(userId),
+    children: getChildren(userId).length,
+    achievements: ach.length,
+    money_sent: u.money_sent || 0,
+    social_used: u.social_used || 0,
+    showoff: u.showoff || 0,
+    summoned: u.summoned || 0,
+    contracts_done: contractsDone,
+    contracts_given: contractsGiven,
+    merchant_buys: u.merchant_buys || 0,
+    bm_buys: u.bm_buys || 0,
+    wanted_marked: u.wanted_marked || 0,
+    button_pressed: u.button_pressed || 0,
+    rollcalls: u.rollcalls || 0,
+    judged: u.judged || 0,
+    account_days: days,
+  };
+}
+
+// Returns newly unlocked titles (does NOT drip coins — titles are cosmetic).
+function checkTitles(userId) {
+  const state = titleStateFor(userId);
+  if (!state) return [];
+  const owned = new Set(getTitles(userId));
+  const unlocked = [];
+  for (const key of Object.keys(TITLES)) {
+    const t = TITLES[key];
+    if (!owned.has(key) && typeof t.award === 'function' && t.award(state)) {
+      if (unlockTitle(userId, key)) unlocked.push(key);
+    }
+  }
+  return unlocked;
+}
+
+// ---------------- INCIDENTS ----------------
+
+function addIncident(guildId, type, text) {
+  if (!text) return;
+  db.run(`INSERT INTO incidents (guild_id, type, text) VALUES ('${safeStr(guildId)}', '${safeStr(type)}', '${safeStr(text)}')`);
+  const rows = db.exec(`SELECT COUNT(*) FROM incidents WHERE guild_id = '${safeStr(guildId)}'`);
+  const total = rows[0] ? rows[0].values[0][0] : 0;
+  if (total > INCIDENT_LIMIT_PER_GUILD) {
+    db.run(`DELETE FROM incidents WHERE guild_id = '${safeStr(guildId)}' AND id NOT IN (
+      SELECT id FROM incidents WHERE guild_id = '${safeStr(guildId)}' ORDER BY created_at DESC LIMIT ${INCIDENT_LIMIT_PER_GUILD}
+    )`);
+  }
+  save();
+}
+
+function getIncidents(guildId, limit = 15) {
+  const rows = db.exec(`SELECT id, type, text, created_at FROM incidents WHERE guild_id = '${safeStr(guildId)}' ORDER BY created_at DESC LIMIT ${Math.max(1, Math.min(limit, 30))}`);
+  if (!rows.length) return [];
+  return rows[0].values.map(v => ({ id: v[0], type: v[1], text: v[2], created_at: v[3] }));
+}
+
+// ---------------- ACTIVITY / DISCOVERY ----------------
+
+function getActivity(userId) {
+  const rows = db.exec(`SELECT * FROM user_activity WHERE user_id = '${safeStr(userId)}'`);
+  if (!rows.length || !rows[0].values.length) return null;
+  const v = rows[0].values[0]; const c = rows[0].columns;
+  const get = (n, d = 0) => { const i = c.indexOf(n); return i === -1 ? d : v[i]; };
+  return {
+    user_id: get('user_id'), last_command_at: get('last_command_at'), last_meaningful_at: get('last_meaningful_at'),
+    last_claim_only_at: get('last_claim_only_at'), last_summon_at: get('last_summon_at'),
+    summon_opt_out: get('summon_opt_out', 0) === 1, last_dm_ok: get('last_dm_ok', 1) === 1,
+    first_seen: get('first_seen', get('last_command_at')),
+  };
+}
+
+function upsertActivity(userId, field, value) {
+  const now = value || Math.floor(Date.now() / 1000);
+  db.run(`INSERT INTO user_activity (user_id, ${field}, first_seen) VALUES ('${safeStr(userId)}', ${now}, ${now})
+          ON CONFLICT(user_id) DO UPDATE SET ${field} = MAX(${field}, ${now})`);
+  save();
+}
+
+// kind: 'any' | 'meaningful' | 'claim'
+function recordActivity(userId, kind = 'any') {
+  const now = Math.floor(Date.now() / 1000);
+  upsertActivity(userId, 'last_command_at', now);
+  if (kind === 'claim') upsertActivity(userId, 'last_claim_only_at', now);
+  else if (kind === 'meaningful') upsertActivity(userId, 'last_meaningful_at', now);
+}
+
+function bumpSocial(userId) {
+  db.run(`UPDATE users SET social_used = social_used + 1 WHERE user_id = '${safeStr(userId)}'`);
+  save();
+}
+
+// Whitelisted per-command counters (event/wanted/social achievements read these).
+const COUNTER_COLS = ['judged', 'button_pressed', 'rollcalls', 'summoned', 'wanted_marked'];
+function bumpCounter(userId, col) {
+  if (!COUNTER_COLS.includes(col)) return false;
+  db.run(`UPDATE users SET ${col} = ${col} + 1 WHERE user_id = '${safeStr(userId)}'`);
+  save();
+  return true;
+}
+
+function setSummonTime(userId) { upsertActivity(userId, 'last_summon_at'); }
+function setSummonOptOut(userId, optOut) {
+  db.run(`INSERT INTO user_activity (user_id, summon_opt_out) VALUES ('${safeStr(userId)}', ${optOut ? 1 : 0})
+          ON CONFLICT(user_id) DO UPDATE SET summon_opt_out = ${optOut ? 1 : 0}`);
+  save();
+}
+function getSummonOptOut(userId) {
+  const a = getActivity(userId);
+  return a ? a.summon_opt_out : false;
+}
+function setLastDmOk(userId, ok) {
+  db.run(`INSERT INTO user_activity (user_id, last_dm_ok) VALUES ('${safeStr(userId)}', ${ok ? 1 : 0})
+          ON CONFLICT(user_id) DO UPDATE SET last_dm_ok = ${ok ? 1 : 0}`);
+  save();
+}
+
+const CLAIM_ONLY_COMMANDS = ['daily', 'weekly', 'streak', 'luckylist', 'bal', 'bank'];
+
+function recordFeatureUse(userId, feature) {
+  const now = Math.floor(Date.now() / 1000);
+  db.run(`INSERT INTO user_feature_usage (user_id, feature, first_used_at, last_used_at, use_count)
+          VALUES ('${safeStr(userId)}', '${safeStr(feature)}', ${now}, ${now}, 1)
+          ON CONFLICT(user_id, feature) DO UPDATE SET last_used_at = ${now}, use_count = use_count + 1`);
+  save();
+}
+
+function getFeatureUse(userId, feature) {
+  const rows = db.exec(`SELECT first_used_at, last_used_at, use_count FROM user_feature_usage WHERE user_id = '${safeStr(userId)}' AND feature = '${safeStr(feature)}'`);
+  if (!rows.length || !rows[0].values.length) return null;
+  return { used: true, first: rows[0].values[0][0], last: rows[0].values[0][1], count: rows[0].values[0][2] };
+}
+
+function unseenFeatures(userId, features) {
+  const out = [];
+  const seen = new Set();
+  const rows = db.exec(`SELECT feature FROM user_feature_usage WHERE user_id = '${safeStr(userId)}'`);
+  if (rows.length && rows[0].values.length) { for (const v of rows[0].values) seen.add(v[0]); }
+  for (const f of features) if (!seen.has(f)) out.push(f);
+  return out;
+}
+
+// ---------------- UPDATE DM ROLLOUT ----------------
+
+function queueUpdateDm(userIds, releaseId) {
+  const now = Math.floor(Date.now() / 1000);
+  db.run(`BEGIN`);
+  try {
+    for (const id of userIds) {
+      db.run(`INSERT OR IGNORE INTO update_dm_delivery (user_id, release_id, status) VALUES ('${safeStr(id)}', '${safeStr(releaseId)}', 'pending')`);
+    }
+    db.run(`COMMIT`);
+  } catch (e) { db.run(`ROLLBACK`); }
+  save();
+}
+
+function getUpdateDmBatch(limit = 30) {
+  const rows = db.exec(`SELECT user_id, release_id FROM update_dm_delivery WHERE status = 'pending' ORDER BY user_id LIMIT ${Math.max(1, Math.min(limit, 100))}`);
+  if (!rows.length) return [];
+  return rows[0].values.map(v => ({ user_id: v[0], release_id: v[1] }));
+}
+
+function updateDmStatus(userId, releaseId, status, err = '') {
+  const now = Math.floor(Date.now() / 1000);
+  db.run(`UPDATE update_dm_delivery SET status = '${safeStr(status)}', attempted_at = ${now}, sent_at = CASE WHEN '${safeStr(status)}' = 'sent' THEN ${now} ELSE sent_at END, error = '${safeStr(err)}' WHERE user_id = '${safeStr(userId)}' AND release_id = '${safeStr(releaseId)}'`);
+  save();
+}
+
+function countUpdateDm(status) {
+  const rows = db.exec(`SELECT COUNT(*) FROM update_dm_delivery WHERE status = '${safeStr(status)}'`);
+  return rows.length ? rows[0].values[0][0] : 0;
+}
+
+// ---------------- COMMUNITY EVENTS (non-gambling, rare) ----------------
+
+// Safe domain events — none touch gambling odds. Reward amounts are modest & bounded.
+const COMMUNITY_EVENTS = {
+  the_button:   { name: 'The Button',   emoji: '🔘', duration: 600,  desc: 'there is a button. do not press it.' },
+  roll_call:    { name: 'Roll Call',    emoji: '📣', duration: 900,  desc: 'report for duty with v here' },
+  creature:     { name: 'Creature Sighting', emoji: '🦄', duration: 1800, desc: 'the local creature is around — sightings confirmed' },
+  quest_rush:   { name: 'Quest Rush',   emoji: '🗒️', duration: 1800, desc: 'daily quests are juicier this hour' },
+  double_petxp: { name: 'Double Pet XP', emoji: '📚', duration: 1800, desc: 'pet exp is doubled while this is up' },
+};
+const COMMUNITY_COOLDOWN_S = 4 * 3600;
+const COMMUNITY_TYPES_BY_KEY = Object.keys(COMMUNITY_EVENTS);
+
+function getActiveCommunityEvent() {
+  const rows = db.exec(`SELECT key, ends_at FROM community_events ORDER BY ends_at DESC LIMIT 1`);
+  if (!rows.length || !rows[0].values.length) return null;
+  const [key, endsAt] = rows[0].values[0];
+  if (Date.now() / 1000 > endsAt) {
+    db.run(`DELETE FROM community_events WHERE key = '${safeStr(key)}'`);
+    save();
+    return null;
+  }
+  return { key, endsAt };
+}
+
+function isCommunityEvent(key) {
+  const ev = getActiveCommunityEvent();
+  return !!(ev && ev.key === key);
+}
+
+function canStartCommunityEvent() {
+  const now = Math.floor(Date.now() / 1000);
+  const rows = db.exec(`SELECT value FROM lb_state WHERE key = 'last_community_event'`);
+  const last = rows.length ? Number(rows[0].values[0][0]) : 0;
+  if (getActiveCommunityEvent()) return false;
+  return now - last >= COMMUNITY_COOLDOWN_S;
+}
+
+function startCommunityEvent() {
+  if (!canStartCommunityEvent()) return null;
+  const key = COMMUNITY_TYPES_BY_KEY[Math.floor(Math.random() * COMMUNITY_TYPES_BY_KEY.length)];
+  const ev = COMMUNITY_EVENTS[key];
+  const now = Math.floor(Date.now() / 1000);
+  db.run(`INSERT INTO community_events (key, ends_at) VALUES ('${key}', ${now + ev.duration})`);
+  db.run(`INSERT OR REPLACE INTO lb_state (key, value) VALUES ('last_community_event', ${now})`);
+  save();
+  return { key, ...ev, endsAt: now + ev.duration };
+}
+
+function endCommunityEvent(key) {
+  const rows = db.exec(`DELETE FROM community_events WHERE key = '${safeStr(key)}'`);
+  const changed = db.exec('SELECT changes() AS c')[0].values[0][0];
+  if (changed) save();
+  return changed === 1;
+}
+
+function recordIncidentFromEvent(prefix) {
+  return prefix;
+}
+
+// =====================================================================================
+//  END 2.0 systems
+// =====================================================================================
+
 module.exports = {
   init,
   ensureUser,
@@ -3819,6 +4634,7 @@ module.exports = {
   rollEggDrop, getEggs, addEgg, hatchEgg, transferAnimal, EGG_DROP_CHANCE, EGG_HATCH_RARITY,
   getQuest, addQuestProgress, claimQuest, getBounty, addBountyProgress, claimBounty,
   getChecklist, addChecklistProgress, claimChecklist, getSeals, addSeals,
+  setAvatarUrl, clearAvatarUrl, setBannerUrl, clearBannerUrl,
   currentSeason, addPassXp, passProgress, buyPassPremium, claimPassLevel, claimAllPass, passTop, passReward,
   PASS_MAX_LEVEL, PASS_DURATION, PASS_PREM_COST, PASS_XP,
   createPvpBounty, getPvpBounty, listActiveBounties, getPvpBountyBetween, recordPvpDuelWin, cancelPvpBounty, pruneExpiredBounties, PVP_BOUNTY_LIFETIME,
@@ -3857,5 +4673,14 @@ module.exports = {
   weaponBattleMods, makeWeapon, rollWeaponType, rollWeaponRarity,
    isMarried, marriedMult,
    SHINY_CHANCE, PERSONALITIES, rollShiny, rollTrait,
+   // 2.0 systems
+   INBOX_SOURCES, createDelivery, getPendingDeliveries, getPendingDeliveryCount, hasPendingSource, getDelivery, creditPayload, safeClaim, claimAllDeliveries,
+   CONTRACT_OBJECTIVES, createContract, getContract, listContractsFor, refundContractEscrow,
+   acceptContract, declineContract, cancelContract, addContractProgress, settleCompletedContract, claimCompletedContract, expireContracts, trackProgress,
+   TITLES, TITLES_BY_KEY, TITLE_RARITY_COLOR, getTitles, getEquippedTitle, unlockTitle, equipTitle, clearTitle, checkTitles,
+   addIncident, getIncidents,
+   getActivity, recordActivity, bumpSocial, bumpCounter, setSummonTime, setSummonOptOut, getSummonOptOut, setLastDmOk, recordFeatureUse, getFeatureUse, unseenFeatures, CLAIM_ONLY_COMMANDS,
+   queueUpdateDm, getUpdateDmBatch, updateDmStatus, countUpdateDm,
+   COMMUNITY_EVENTS, getActiveCommunityEvent, isCommunityEvent, canStartCommunityEvent, startCommunityEvent, endCommunityEvent,
    exec: (sql) => db ? db.exec(sql) : null,
 };

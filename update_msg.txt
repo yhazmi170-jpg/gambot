@@ -1,11 +1,34 @@
-v1.8.1 — What's New
+v2.0.0 — What's New
 
-- 🪙 Coinflip is now crystal clear! The reply shows exactly what you chose:
-  - `🪙 picked **heads** — landed **tails** — lost **100**`
-  - Format: `v cf <amount> <heads/tails>` (amount first, then your side)
-  - You can now always see your pick vs. the landed side — no more "it ignored my choice" confusion
-  - Win messages now show the exact amount you received
-- ✅ TOS "I Agree" button is reliable now (no more repeated prompts)
-- 📛 Short aliases added: `wc`, `wep`, `z`, `bd`, `hst`, `lck`, `rn`, `sb`, `rwd`, `gp`
+❤️ Social Commands (animated GIFs!)
+- `v hug` `v kiss` `v pat` `v slap` `v cuddle` `v bite` `v punch` `v lick` — real 2D-anime GIF clips matching each action, plus a one-action react from Gambot
+- Add a friend with `v hug @user` — a self-line plays if you use it alone
+- 😅 `v kill` — 4 comedic, non-graphic stand-ins for now; a real defeat-pool pass is on the list
+
+🔍 `v try` — your personal "what's next"
+- Recommends only what you HAVEN'T done: unclaimed quests/bounties, unhatched eggs, inbox deliveries, missing dex, marriage, clan, pets without a battle team, and never-tried features
+- `v try list` — full 43-feature tracker (never-tried vs tried)
+- `v try tip` — one verified mechanic tip (real caps from real code, e.g. hunt costs 5/animal, egg drop 8%, weapon crate 15k)
+
+📣 Community Events (rare, non-gambling, announced in-server)
+- The Button (`v button`), Roll Call (`v here`), Creature Sighting (`v creature`), Quest Rush, Double Pet XP — each has a hidden achievement
+- Check status anytime: `v event`
+
+⚖️ Silly Justice + Server Lore
+- `v case @user` — a totally fictional case file about anyone
+- `v judge @user` — a legally non-binding sentence (hidden 🕵️ achievement too)
+- `v compare @user` — real stats vs certified commentary
+- `v lore` — what's been happening in the server (achievements, raids, giveaways, events)
+
+📢 Rare DM summons after long absences
+- If you go quiet for days, Gambot might send one gentle nudge — `v summon off` turns them off forever
+- `v new` — presets of this release
+
+📊 Everything else in 2.0
+- Profile card expanded: streak, lucky, insurance tier, free bet, credit, clan/loan/plot/jail, member since
+- Credit score display fixed (was showing a timestamp)
+- 8ball: 120 answers with vibe-matched reactions
+- Alias cleanup — `v market` is the shop, `v stats` is your profile, `v spin` is the wheel, `v snailgarden` is the garden, `v bm` = black market
+- Rob help text corrected (30% success, 20% steal capped 3M)
 
 Enjoy!

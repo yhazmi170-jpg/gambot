@@ -5,6 +5,16 @@ const HUNT_COST = db.HUNT_COST_BASE;
 
 const rarityColors = { common: 0x95a5a6, uncommon: 0x2ecc71, rare: 0x3498db, epic: 0x9b59b6, legendary: 0xf1c40f, mythic: 0xffd700 };
 const rarityEmojis = { common: '⚪', uncommon: '🟢', rare: '🔵', epic: '🟣', legendary: '🟡', mythic: '👑' };
+const HUNT_VIBES = [
+  'the woods are alive tonight', 'a weird chill runs through the air',
+  'u hear rustling in every bush', 'the trail is fresh — something big passed here',
+  'the pet gods smile on u', 'u feel watched by a dozen small eyes',
+  'daylight fades but the hunting is good', 'a shooting star zips overhead',
+  'the air smells like pine and mystery', 'luck is on ur side today',
+  'something shiny glints in the distance', 'the forest whispers ur name (slightly creepy)',
+  'u found a secret grove', 'the tracks split in every direction — u pick one',
+  'a crow watches from a branch, judging', 'the moon peeks out just for u',
+];
 
 module.exports = {
   name: 'hunt',
@@ -70,8 +80,7 @@ module.exports = {
       coinsEarned = yieldInfo.coins * count;
     }
     const xpResult = yieldInfo.xp > 0 ? db.addXpRaw(userId, xpEarned) : null;
-    db.addQuestProgress(userId, 'hunt', count);
-    db.addBountyProgress(userId, 'hunt', count);
+    db.trackProgress(userId, 'hunt', count);
     db.addChecklistProgress(userId, 'daily', 'hunt', count);
     db.addChecklistProgress(userId, 'weekly', 'hunt', count);
     db.addPassXp(userId, db.PASS_XP.hunt * count);
@@ -84,6 +93,7 @@ module.exports = {
     ]);
 
     const summary = [`\`v zoo\` to see all your animals`];
+    summary.push(HUNT_VIBES[Math.floor(Math.random() * HUNT_VIBES.length)]);
     summary.push(`spent **${coins}** coins`);
     if (coinsEarned > 0) summary.push(`gain trait: **+${coinsEarned}** coins`);
     if (gemsEarned > 0) summary.push(`💎 found **${gemsEarned} gem${gemsEarned > 1 ? 's' : ''}**!`);
