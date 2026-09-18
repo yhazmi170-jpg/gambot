@@ -6,7 +6,7 @@ module.exports = {
   name: 'lb',
   helpCategory: 'Economy',
   helpArgs: '',
-  description: 'global leaderboard — richest players by money (wallet only)',
+  description: 'global leaderboard — richest players (wallet + bank)',
   aliases: ['top', 'rich'],
   execute(message, args) {
     const limit = Math.min(parseInt(args[0]) || 10, 20);
