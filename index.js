@@ -22,7 +22,8 @@ const gwAnnouncing = new Set();
 // announce the winners in the channel, DM the winners, and write to the log channel.
 // Returns true if the original message was updated (the visible completion marker).
 async function announceGiveaway(client, gw, winners, mode, perWinner) {
-  const winnerList = winners.slice(0, 10).map(w => `<@${w}>`).join(', ') + (winners.length > 10 ? ` +${winners.length - 10} more` : '');
+  // ONE combined winner list — every actual winner, with their payout, no @everyone/@here.
+  const winnerList = giveaway.winnerLines(winners, mode, perWinner, gw.prize, config.currency).join('\n');
   let updated = false;
   const ch = await client.channels.fetch(gw.channel_id).catch(() => null);
   if (ch) {
@@ -31,7 +32,7 @@ async function announceGiveaway(client, gw, winners, mode, perWinner) {
       const msg = await ch.messages.fetch(gw.message_id);
       await msg.edit({
         embeds: [embed('🎉 Giveaway', [
-          ['Winner(s)', `${winnerList} 🎉`],
+          ['Winner(s)', winnerList],
           ['Prize', mode === 'full'
             ? `**${gw.prize.toLocaleString()}** ${config.currency} each`
             : `**${gw.prize.toLocaleString()}** ${config.currency} split → **${perWinner.toLocaleString()}** each`],
@@ -42,15 +43,15 @@ async function announceGiveaway(client, gw, winners, mode, perWinner) {
       });
       updated = true;
     } catch (e) { dlog.log({ kind: 'gwedit_error', gw: gw.message_id, err: e && e.message }); }
-    // 2) announce the winners in the channel
+    // 2) announce the winners in the channel — ONE message per giveaway (all winners)
     try {
       if (typeof ch.send === 'function' && winners.length) {
         await ch.send({
-          content: `🎉 ${winnerList} won${winners.length > 1 ? '' : ' the'} giveaway — **${perWinner.toLocaleString()}** ${config.currency}${winners.length > 1 ? ' each' : ''}! Claim it in \`v inbox\`.`,
+          content: giveaway.formatAnnouncement(winners, mode, perWinner, gw.prize, config.currency),
           allowedMentions: { users: winners },
         });
       }
-    } catch (e) {}
+    } catch (e) { dlog.log({ kind: 'gwsend_error', gw: gw.message_id, err: e && e.message }); }
     // 3) log to the guild's configured log channel
     try {
       if (ch.guild) {

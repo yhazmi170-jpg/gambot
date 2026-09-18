@@ -42,4 +42,51 @@ function computePayout(prize, winnerCount, mode, actualWinners) {
   return { mode: m, perWinner, refund: Math.max(0, refund) };
 }
 
-module.exports = { drawWinners, computePayout };
+/**
+ * Per-winner prizer shown in announcements: split -> per-winner split amount,
+ * full -> the whole prize beside every winner.
+ */
+function shownPayout(mode, perWinner, prize) {
+  return mode === 'full' ? prize : perWinner;
+}
+
+/**
+ * One line per actual winner: `<@id> — **amount** currency`.
+ * Never @everyone/@here.
+ * @param {string[]} winners
+ * @param {'split'|'full'} mode
+ * @param {number} perWinner
+ * @param {number} prize
+ * @param {string} currency
+ */
+function winnerLines(winners, mode, perWinner, prize, currency) {
+  const shown = shownPayout(mode, perWinner, prize);
+  return (winners || []).map(w => `<@${w}> — **${shown.toLocaleString()}** ${currency}`);
+}
+
+/**
+ * Build the SINGLE channel announcement for a resolved giveaway.
+ * - 1 winner  -> compact singular wording
+ * - N winners -> one combined message listing EVERY winner + their payout
+ * Falls back to a compressed winner list (same single message, every winner,
+ * payout noted once) if the full per-winner lines would exceed Discord's
+ * 2000-char message limit.
+ * @param {string[]} winners
+ * @param {'split'|'full'} mode
+ * @param {number} perWinner
+ * @param {number} prize
+ * @param {string} currency
+ */
+function formatAnnouncement(winners, mode, perWinner, prize, currency) {
+  const list = winners || [];
+  if (!list.length) return '';
+  if (list.length === 1) {
+    return `🎉 <@${list[0]}> won the giveaway — **${shownPayout(mode, perWinner, prize).toLocaleString()}** ${currency}! Claim it in \`v inbox\`.`;
+  }
+  const full = `🎉 **Giveaway Winners**\n\n${winnerLines(list, mode, perWinner, prize, currency).join('\n')}\n\nClaim your prizes in \`v inbox\`.`;
+  if (full.length <= 2000) return full;
+  const compressed = `🎉 **Giveaway Winners** — **${shownPayout(mode, perWinner, prize).toLocaleString()}** ${currency} each\n\n${list.map(w => `<@${w}>`).join(' ')}\n\nClaim your prizes in \`v inbox\`.`;
+  return compressed;
+}
+
+module.exports = { drawWinners, computePayout, winnerLines, formatAnnouncement };

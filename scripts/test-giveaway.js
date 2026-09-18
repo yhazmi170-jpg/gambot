@@ -160,6 +160,34 @@ async function main() {
   check('B: future giveaway not in expired sweep', !db.getExpiredGiveaways(nowSec).includes('future'));
   check('B: future giveaway not announceable', !db.getGiveawaysToAnnounce().includes('future'));
 
+  // === 2.0.3.x announcement PRESENTATION: one combined message per giveaway ===
+  // 10 winners -> exactly ONE announcement containing ALL 10 winner ids + payouts
+  const ann = giveaway.formatAnnouncement(w, 'split', 10000000, 100000000, 'money');
+  check('Ann: single combined message (no per-winner spam)', (ann.match(/Giveaway Winners/g) || []).length === 1, ann);
+  check('Ann: contains ALL 10 winner ids', w.every(wid => ann.includes(`<@${wid}>`)), ann);
+  check('Ann: excludes non-winners', !ann.includes('<@e1>') || w.includes('e1'), ann);
+  check('Ann: shows each split payout (10m)', (ann.match(/10,000,000/g) || []).length === w.length, ann);
+  check('Ann: no @everyone/@here', !/@everyone|@here/.test(ann), ann);
+  check('Ann: mentioned ids are all actual winners', (ann.match(/<@(\d+|\w+)>/g) || []).every(m => w.some(wid => m.includes(wid))), ann);
+  check('Ann: actually expected len', ann.length < 2000 && ann.length > 200, `len ${ann.length}`);
+
+  // singular winner keeps compact wording
+  const ann1 = giveaway.formatAnnouncement(['solo'], 'split', 10000000, 100000000, 'money');
+  check('Ann1: singular keeps compact wording', /^🎉 <@solo> won the giveaway/.test(ann1), ann1);
+
+  // full mode shows full prize beside every winner
+  const annFull = giveaway.formatAnnouncement(['a', 'b', 'c'], 'full', 100000000, 100000000, 'money');
+  check('AnnFull: full mode shows prize per winner', (annFull.match(/100,000,000/g) || []).length === 3, annFull);
+
+  // fewer entrants than requested -> only actual winners listed
+  const annUnder = giveaway.formatAnnouncement(under, 'split', 25, 50, 'money');
+  check('AnnUnder: only actual winners listed', under.every(wid => annUnder.includes(`<@${wid}>`)) && (annUnder.match(/<@/g) || []).length === under.length, annUnder);
+
+  // >2000-char edge -> compressed single message keeps every winner
+  const manyW = Array.from({ length: 50 }, (_, i) => `w${i}`.padEnd(18, '0'));
+  const annBig = giveaway.formatAnnouncement(manyW, 'full', 100000000, 100000000, 'money');
+  check('AnnBig: stays under 2000, keeps all 50 winners', annBig.length < 2000 && manyW.every(wid => annBig.includes(`<@${wid}>`)), `len ${annBig.length}`);
+
   console.log(`\n${fail === 0 ? 'PASS' : 'FAIL'} — ${pass} passed, ${fail} failed`);
   process.exit(fail === 0 ? 0 : 1);
 }
