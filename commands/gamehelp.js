@@ -15,9 +15,9 @@ module.exports = {
       cf: {
         name: 'Coinflip',
         aliases: 'cf, coin, flip',
-        desc: 'A 50/50 gambling game. Bet on heads or tails. Wins pay even money.'
+        desc: 'A 50/50 gambling game. Bet on heads or tails. Wins pay even money (more with lucky).',
         play: `\`${prefix} cf <amount> <heads/tails>\` — amount first, then your side\nExample: \`${prefix} cf 1000 heads\``,
-        tips: 'Pure luck. The reply shows **picked** vs **landed** so you can always see your own choice. High balance slightly lowers win payouts.'
+        tips: 'Pure luck. The reply shows **picked** vs **landed** so you can always see your own choice. High balance slightly lowers win payouts. Lucky perk pays 3x (toggle with `v lucky`).',
       },
       slots: {
         name: 'Slots',

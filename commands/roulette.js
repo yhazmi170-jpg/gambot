@@ -21,8 +21,9 @@ module.exports = {
     const bet = args.slice(1).join(' ').toLowerCase();
     if (!bet) return message.channel.send({ embeds: [error('bet on red, black, green, or 0-36')] });
 
-    
+    const lucky = db.ensureUser(message.author.id).lucky;
     let result, color;
+    if (lucky && Math.random() < 0.9) {
       if (bet === 'red') { result = red[Math.floor(Math.random() * red.length)]; color = 'red'; }
       else if (bet === 'black') { result = black[Math.floor(Math.random() * black.length)]; color = 'black'; }
       else if (bet === 'green') { result = 0; color = 'green'; }
@@ -35,7 +36,7 @@ module.exports = {
     const emoji = color === 'red' ? '🔴' : color === 'black' ? '⚫' : '🟢';
     let won = false;
     let payout = 0;
-    const mult = 1;
+    const mult = lucky ? 3 : 1;
 
     if (bet === 'red' && color === 'red') { won = true; payout = amount * 2 * mult; }
     else if (bet === 'black' && color === 'black') { won = true; payout = amount * 2 * mult; }
