@@ -8,10 +8,71 @@ const db = require('./db');
 const { embed, updateEmbed } = require('./utils/embed');
 const http = require('http');
 const path = require('path');
+const dlog = require('./debuglog');
 const { version } = require('./package.json');
 const logger = require('./utils/logger');
 const { setClient: setLogClient } = logger;
 const giveaway = require('./utils/giveaway');
+
+// In-memory guards so the 60s sweep can never process the same giveaway twice in one tick.
+const gwProcessing = new Set();
+const gwAnnouncing = new Set();
+
+// Discord-side giveaway completion: edit the original message (removes Enter button),
+// announce the winners in the channel, DM the winners, and write to the log channel.
+// Returns true if the original message was updated (the visible completion marker).
+async function announceGiveaway(client, gw, winners, mode, perWinner) {
+  const winnerList = winners.slice(0, 10).map(w => `<@${w}>`).join(', ') + (winners.length > 10 ? ` +${winners.length - 10} more` : '');
+  let updated = false;
+  const ch = await client.channels.fetch(gw.channel_id).catch(() => null);
+  if (ch) {
+    // 1) edit the original giveaway message into its finished state + strip buttons
+    try {
+      const msg = await ch.messages.fetch(gw.message_id);
+      await msg.edit({
+        embeds: [embed('🎉 Giveaway', [
+          ['Winner(s)', `${winnerList} 🎉`],
+          ['Prize', mode === 'full'
+            ? `**${gw.prize.toLocaleString()}** ${config.currency} each`
+            : `**${gw.prize.toLocaleString()}** ${config.currency} split → **${perWinner.toLocaleString()}** each`],
+          ['Entries', `${gw.entries.length} people entered`],
+          ['', 'prizes are in the winners\' inbox — claim with `v inbox`'],
+        ], 0xfee75c)],
+        components: [],
+      });
+      updated = true;
+    } catch (e) { dlog.log({ kind: 'gwedit_error', gw: gw.message_id, err: e && e.message }); }
+    // 2) announce the winners in the channel
+    try {
+      if (typeof ch.send === 'function' && winners.length) {
+        await ch.send({
+          content: `🎉 ${winnerList} won${winners.length > 1 ? '' : ' the'} giveaway — **${perWinner.toLocaleString()}** ${config.currency}${winners.length > 1 ? ' each' : ''}! Claim it in \`v inbox\`.`,
+          allowedMentions: { users: winners },
+        });
+      }
+    } catch (e) {}
+    // 3) log to the guild's configured log channel
+    try {
+      if (ch.guild) {
+        logger.log(ch.guild.id, '🎉 Giveaway ended', [
+          ['Host', `<@${gw.host_id}>`],
+          ['Winner(s)', winnerList],
+          ['Mode', mode],
+          ['Per winner', `**${perWinner.toLocaleString()}** ${config.currency}`],
+          ['Entries', `${gw.entries.length}`],
+        ], 0xfee75c);
+      }
+    } catch (e) {}
+    try { if (ch.guild) db.addIncident(ch.guild.id, 'giveaway', `${winners.length} winner(s) drew a **${gw.prize.toLocaleString()}** giveaway`); } catch (e) {}
+  }
+  // 4) DM every winner so they know to claim their inbox delivery
+  for (const w of winners) {
+    client.users.fetch(w).then(u => {
+      u.send(`🎉 you won **${perWinner.toLocaleString()}** ${config.currency}${winners.length > 1 ? ' (split)' : ''} in <@${gw.host_id}>'s giveaway!\nClaim it with \`v inbox\` (or the **Claim All** button).`).catch(() => {});
+    }).catch(() => {});
+  }
+  return updated;
+}
 
 if (!config.token) {
   console.error('no token set — set TOKEN env var or put it in config.json');
@@ -135,46 +196,62 @@ const server = http.createServer((req, res) => {
     }
     return;
   }
-  if (u.pathname === '/guilddebug') {
-    async function flush() { return; }
+  if (u.pathname === '/guilddebug' || u.pathname === '/logs') {
+    const out = [];
     try {
-      const gid = '1420532695313813566';
-      const g = client.guilds.cache.get(gid);
-      const out = [];
-      if (!g) { out.push('guild not found'); }
-      else {
-        out.push(`guild=${g.name} (${g.id})`);
-        const me = g.members.me;
-        out.push(`bot tag: ${g.members.me ? g.members.me.user.tag : 'null'}`);
-        out.push(`bot perms (guild-level): ${me ? me.permissions.toArray().join(',') : 'n/a'}`);
-        const chans = [...g.channels.cache.values()];
-        out.push(`cached channels: ${chans.length}`);
-        let viewable = 0, text = 0, below = 0;
-        const botRole = me ? me.roles.highest : null;
-        for (const c of chans) {
-          if (!c.viewable) continue;
-          viewable++;
-          if (c.isTextBased && c.isTextBased()) {
-            text++;
-            try {
-              const p = c.permissionsFor(me);
-              const send = p && p.has('SendMessages') ? 'S' : 'noSend';
-              const embed = p && p.has('EmbedLinks') ? 'E' : 'noEmbed';
-              out.push(`\n#${c.name} (${c.id}) ${send}${embed}`);
-            } catch (e) { out.push(`\n#${c.name} perm-err`); }
+      if (u.pathname === '/logs') {
+        out.push('--- console log tail (last 100) ---');
+      } else {
+        const gid = '1420532695313813566';
+        const g = client.guilds.cache.get(gid);
+        out.push('--- guild debug ---');
+        if (!g) { out.push('guild not found'); }
+        else {
+          out.push(`guild=${g.name} (${g.id})`);
+          const me = g.members.me;
+          out.push(`bot tag: ${g.members.me ? g.members.me.user.tag : 'null'}`);
+          out.push(`bot perms (guild-level): ${me ? me.permissions.toArray().join(',') : 'n/a'}`);
+          const chans = [...g.channels.cache.values()];
+          out.push(`cached channels: ${chans.length}`);
+          let viewable = 0, text = 0;
+          for (const c of chans) {
+            if (!c.viewable) continue;
+            viewable++;
+            if (c.isTextBased && c.isTextBased()) {
+              text++;
+              try {
+                const p = c.permissionsFor(me);
+                const send = p && p.has('SendMessages') ? 'S' : 'noSend';
+                const embedP = p && p.has('EmbedLinks') ? 'E' : 'noEmbed';
+                out.push(`\n#${c.name} (${c.id}) ${send}${embedP}`);
+              } catch (e) { out.push(`\n#${c.name} perm-err`); }
+            }
           }
+          out.push(`\nviewable=${viewable} text=${text}`);
         }
-        out.push(`\nviewable=${viewable} text=${text}`);
-        out.push(`bot highestRole: ${botRole ? botRole.name : 'n/a'} at pos ${botRole ? botRole.position : -1}`);
+        out.push('\n--- console log tail (last 100) ---');
       }
-      res.writeHead(200, { 'Content-Type': 'text/plain' });
-      res.end(out.join('\n'));
+      out.push(_logs.slice(-100).map(l => `[${new Date(l.t).toISOString()}] ${l.l}: ${l.m}`).join('\n'));
+    } catch (e) { out.push(`error: ${e.message}`); }
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end(out.join('\n'));
+    return;
+  }
+  if (u.pathname === '/giveaways' && req.method === 'GET') {
+    try {
+      const rows = db.exec('SELECT message_id, channel_id, host_id, prize, ends_at, entries, winner_id, winner_count, mode, announced FROM giveaways');
+      const list = (!rows.length || !rows[0].values.length) ? [] : rows[0].values.map(v => {
+        let entries = [];
+        try { entries = JSON.parse(v[5] || '[]'); } catch {}
+        return { message_id: v[0], channel_id: v[1], host_id: v[2], prize: v[3], ends_at: v[4], entries: entries.length, winner_id: v[6], winner_count: v[7], mode: v[8], announced: v[9] };
+      });
+      list.sort((a, b) => b.ends_at - a.ends_at);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ now: Math.floor(Date.now() / 1000), giveaways: list }, null, 2));
     } catch (e) {
       res.writeHead(500, { 'Content-Type': 'text/plain' });
-      res.end(`guilddebug error: ${e.message}`);
+      res.end(`giveaways error: ${e.message}`);
     }
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end(_logs.slice(-50).map(l => `[${new Date(l.t).toISOString()}] ${l.l}: ${l.m}`).join('\n'));
     return;
   }
   res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -405,7 +482,7 @@ start().catch(e => console.error('[START] FATAL:', e));
 
 
   // v1.7.0: expire auctions + clean up dead/expired boss raids
-  setInterval(() => {
+  setInterval(async () => {
     const ended = db.cleanupExpiredAuctions();
     if (ended > 0) console.log(`[auction] ${ended} auction(s) ended`);
     const expiredBountyRefund = db.pruneExpiredBounties();
@@ -448,78 +525,76 @@ start().catch(e => console.error('[START] FATAL:', e));
       }
     }
 
-    // giveaway sweep: draw winners for expired giveaways
-    const expiredGw = db.getExpiredGiveaways(Math.floor(Date.now() / 1000));
-    for (const gwId of expiredGw) {
-      const g = db.getGiveaway(gwId);
-      if (!g || !g.entries.length) {
-        db.finishGiveaway(gwId, '__none__');
-        continue;
-      }
-
-      // draw up to winner_count unique winners
-      const winners = giveaway.drawWinners(g.entries, g.winner_count);
-      const { mode, perWinner, refund } = giveaway.computePayout(g.prize, g.winner_count, g.mode, winners.length);
-
-      // prizes land in the inbox so winners must claim them
-      for (const w of winners) {
-        db.createDelivery(w, {
-          sender: g.host_id,
-          source: 'giveaway',
-          label: mode === 'full' ? 'giveaway prize (full)' : `giveaway prize (1 of ${winners.length})`,
-          amount: perWinner,
-        });
-      }
-      if (refund > 0) db.addBalance(g.host_id, refund);
-      db.finishGiveaway(gwId, winners);
-      console.log(`[gw] giveaway ${gwId} won by ${winners.join(', ')} (${perWinner} coins each, ${mode})`);
-
-      // DM every winner so they know to claim their inbox delivery
-      for (const w of winners) {
-        client.users.fetch(w).then(u => {
-          u.send(`🎉 you won **${perWinner.toLocaleString()}** ${config.currency}${winners.length > 1 ? ' (split)' : ''} in <@${g.host_id}>'s giveaway!\nClaim it with \`v inbox\` (or the **Claim All** button).`).catch(() => {});
-        }).catch(() => {});
-      }
-
-      const winnerList = winners.slice(0, 10).map(w => `<@${w}>`).join(', ') + (winners.length > 10 ? ` +${winners.length - 10} more` : '');
-      client.channels.fetch(g.channel_id).then(ch => {
-        if (!ch || typeof ch.edit !== 'function') return;
-        try { if (ch.guild) db.addIncident(ch.guild.id, 'giveaway', `${winners.length} winner(s) drew a **${g.prize.toLocaleString()}** giveaway`); } catch (e) {}
-        // announce + ping the winners in chat (restricted mentions)
-        try {
-          if (typeof ch.send === 'function') {
-            ch.send({
-              content: `🎉 ${winnerList} won${winners.length > 1 ? '' : ' the'} giveaway — **${perWinner.toLocaleString()}** ${config.currency}${winners.length > 1 ? ' each' : ''}! Claim it in \`v inbox\`.`,
-              allowedMentions: { users: winners },
-            }).catch(() => {});
+    // giveaway sweep — exactly-once, survives restarts.
+    // Phase 1: draw + RESERVE winners for expired giveaways (reserve FIRST so a crash
+    // mid-payout can never double-pay; Phase 2 completes missing deliveries).
+    // Phase 2: ensure every winner's inbox delivery exists, then announce + edit the
+    // original message exactly once (announced flag persists across restarts).
+    for (const gwId of db.getExpiredGiveaways(Math.floor(Date.now() / 1000))) {
+      if (gwProcessing.has(gwId)) continue;
+      gwProcessing.add(gwId);
+      try {
+        const gw = db.getGiveaway(gwId);
+        if (!gw || !gw.entries.length) {
+          db.finishGiveaway(gwId, '__none__');
+          console.log(`[gw] giveaway ${gwId} closed with no entries`);
+          continue;
+        }
+        const winners = giveaway.drawWinners(gw.entries, gw.winner_count);
+        const { mode, perWinner, refund } = giveaway.computePayout(gw.prize, gw.winner_count, gw.mode, winners.length);
+        // reserve the draw FIRST — winner_id is the exactly-once guard.
+        db.finishGiveaway(gwId, winners);
+        for (const w of winners) {
+          if (!db.hasGiveawayDelivery(gwId, w)) {
+            db.createDelivery(w, {
+              sender: gw.host_id,
+              source: 'giveaway',
+              label: mode === 'full' ? 'giveaway prize (full)' : `giveaway prize (1 of ${winners.length})`,
+              amount: perWinner,
+              payload: { gw: gwId },
+            });
           }
-        } catch (e) {}
-        // write the result to the guild's log channel (set via `Aovo log #channel`)
-        try {
-          if (ch.guild) {
-            logger.log(ch.guild.id, '🎉 Giveaway ended', [
-              ['Host', `<@${g.host_id}>`],
-              ['Winner(s)', winnerList],
-              ['Mode', mode],
-              ['Per winner', `**${perWinner.toLocaleString()}** ${config.currency}`],
-              ['Entries', `${g.entries.length}`],
-            ], 0xfee75c);
+        }
+        if (refund > 0) db.addBalance(gw.host_id, refund);
+        dlog.log({ kind: 'gw', gw: gwId, stage: 'drawn', winners: winners.length, per: perWinner, mode, host: gw.host_id });
+        console.log(`[gw] giveaway ${gwId} won by ${winners.join(', ')} (${perWinner} coins each, ${mode})`);
+      } catch (err) {
+        gwProcessing.delete(gwId);
+        console.error(`[gw] finalize error for ${gwId}:`, (err && err.message) || err);
+        dlog.log({ kind: 'gw', gw: gwId, stage: 'finalize_error', err: (err && err.message) || err });
+      }
+    }
+    // Phase 2: finish the Discord side of reserved giveaways exactly once.
+    for (const gwId of db.getGiveawaysToAnnounce()) {
+      if (gwAnnouncing.has(gwId)) continue;
+      gwAnnouncing.add(gwId);
+      try {
+        const gw = db.getGiveaway(gwId);
+        if (!gw) continue;
+        const winners = db.getGiveawayWinners(gwId);
+        if (!winners.length) { db.markGiveawayAnnounced(gwId); continue; }
+        const { mode, perWinner } = giveaway.computePayout(gw.prize, gw.winner_count, gw.mode, winners.length);
+        for (const w of winners) {
+          if (!db.hasGiveawayDelivery(gwId, w)) {
+            db.createDelivery(w, {
+              sender: gw.host_id,
+              source: 'giveaway',
+              label: mode === 'full' ? 'giveaway prize (full)' : `giveaway prize (1 of ${winners.length})`,
+              amount: perWinner,
+              payload: { gw: gwId },
+            });
           }
-        } catch (e) {}
-        ch.messages.fetch(g.message_id).then(msg => {
-          msg.edit({
-            embeds: [embed('🎉 Giveaway', [
-              ['Winner(s)', `${winnerList} 🎉`],
-              ['Prize', mode === 'full'
-                ? `**${g.prize.toLocaleString()}** ${config.currency} each`
-                : `**${g.prize.toLocaleString()}** ${config.currency} split → **${perWinner.toLocaleString()}** each`],
-              ['Entries', `${g.entries.length} people entered`],
-              ['', 'prizes are in the winners\' inbox — claim with `v inbox`'],
-            ], 0xfee75c)],
-            components: [],
-          }).catch(() => {});
-        }).catch(() => {});
-      }).catch(() => {});
+        }
+        const updated = await announceGiveaway(client, gw, winners, mode, perWinner);
+        if (updated) {
+          db.markGiveawayAnnounced(gwId);
+          dlog.log({ kind: 'gw', gw: gwId, stage: 'announced', winners: winners.length, mode, per: perWinner });
+        }
+      } catch (err) {
+        gwAnnouncing.delete(gwId);
+        console.error(`[gw] announce error for ${gwId}:`, (err && err.message) || err);
+        dlog.log({ kind: 'gw', gw: gwId, stage: 'announce_error', err: (err && err.message) || err });
+      }
     }
   }, 60000);
 

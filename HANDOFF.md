@@ -5,7 +5,22 @@
 
 ## Status
 - **Branch**: `master`
-- **Version**: `2.0.1` live. A second 2.0 depth pass is COMPLETE and tested (see "Done recently (2026-09-17, pass 2)") — pet bond tiers, full 92-species dex progression, 17-objective quests/bounties, expanded community events + coop, server-lore discoveries, cross-system connections, `v try` integration, social mention fix + pair milestones, stale-test repairs. **Not yet pushed** — awaiting owner approval, then bump version + `update_msg.txt` + `CHANGELOG.md` and deploy via `deploy-gambot.sh`. Social GIF content polish is the only open item (needs human visual review).
+- **Version**: `2.0.3` live (`1d2c083`), but the deployed build was ONLINE and SILENT — commands died in the handler. Root-caused + fixed (see "Done today (2026-09-18)"). Working tree has the fixes; needs push via `deploy-gambot.sh` (user: keep version 2.0.3, single instance, no bump).
+
+## Done today (2026-09-18) — command-pipeline fix + giveaway recovery + 2.0.3 game parity (NOT pushed yet)
+- [x] **ROOT CAUSE "online but silent":** `utils/commandHandler.js` calls `getLastMeaningfulAt()`/`getLastSummonAt()` (introduced 2.0.2 `ee299e5`) that were defined NOWHERE → `ReferenceError` right after `cooldown_ok`, before `pre_execute`, killed every command silently (proven via `/debug`: messages parsed but never executed). Second bug: `const nowSec` reassigned → `TypeError`. Both fixed. `scripts/test-command-pipeline.js` (3/3) verifies `v bal` reaches execute + send.
+- [x] **Stuck giveaway recovery (100M split / 10 winners / 28 entries):** giveaway could end and never finalize. Reworked 60s sweep in `index.js` → Phase 1 (expired + winner_id NULL: draw + RESERVE winners via `db.finishGiveaway` FIRST, idempotent inbox deliveries tagged `{gw}`, refund) + Phase 2 (`getGiveawaysToAnnounce` → ensure deliveries → `announceGiveaway` edits original msg + DMs winners + log entry + incident → `markGiveawayAnnounced`). New `giveaways.announced` col + `hasGiveawayDelivery` dedup. Exactly-once across restarts. `scripts/test-giveaway.js` 40/40.
+- [x] **2.0.3 game parity restored:** the v2.0.1 rollback had re-added lucky gambling to `dice/mines/roulette` + gamehelp text. Rebuilt to intended 2.0.3 (no lucky): dice fixed payout `98/(100-num)`-style exact-original, mines `mult()` no-lucky boost 1.1 + default `BOMBS`, roulette pure random spin, gamehelp scrubbed. ALSO found live `coinflip.js` at `Math.random() < 0.8` (botched lucky-removal) = 80/20 win rate — fixed to true `0.5` (test-coinflip stale "lucky 3x" checks updated → 20/20).
+- [x] **New debug endpoints:** `/giveaways` (read-only state), `/logs` (last 100 console lines), `/guilddebug` fixed (double `writeHead` crashed it before).
+- [x] **Pre-existing (baseline) test failures unchanged:** test-2.0 / test-8ball / test-owner-give all crash on null-guild DM stubs (`message.guild.id` at commandHandler ~164) — fail identically without these changes.
+
+## Next / open
+- [ ] **Push + deploy:** `./deploy-gambot.sh` the current working tree (db/index.js, index.js, commandHandler, 4 game cmds, coinflip, tests). Verify `/health` = 2.0.3, `/giveaways` finds the stuck 100M giveaway, `/debug` + `/logs` show single executed path per command.
+- [ ] **Recover the stuck 100M giveaway** via the new sweep after deploy (idempotent; don't double-pay; host not re-charged).
+- [ ] **Delete old backup repos** (`gambot-data`, `gambot-data-v2`) — 3800+ corrupt backups
+- [ ] **Monitor for balance corruption** — integer overflow bugs
+- [ ] **@Adam and @sisi** — need to re-register (accept TOS) before balances can be set
+- [ ] **Consider balance ceiling** — max balance cap to prevent exploits
 - **Roles (v two-agent workflow):** chat agent (orchestrator, is the user's main driver) delegates coding to Claude Code CLI; git is the message bus.
 - **Change log**: complete history of every update lives in `CHANGELOG.md` (newest first) — keep it in sync with the version bump + `update_msg.txt`
 - **Host migration**: Replit → Render (free, Blueprint from `render.yaml`). Replit repl was stopped by user. **Render URL: `https://gambot-c3f5.onrender.com`** — keepalive pinger repointed to it.
@@ -123,12 +138,6 @@
 - [x] All `undefined` display bugs fixed across commands (uppercase rarity mismatch)
 - [x] Boot message: single DM with update notes
 - [x] Lottery display shows event bonus
-
-## Next / open
-- [ ] **Delete old backup repos** (`gambot-data`, `gambot-data-v2`) — 3800+ corrupt backups
-- [ ] **Monitor for balance corruption** — integer overflow bugs
-- [ ] **@Adam and @sisi** — need to re-register (accept TOS) before balances can be set
-- [ ] **Consider balance ceiling** — max balance cap to prevent exploits
 
 ## Agent prefs (Cursor)
 - Elite coding bar + OpenCode-style compact via `~/.cursor/rules/elite-compact.mdc`

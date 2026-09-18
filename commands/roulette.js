@@ -21,22 +21,12 @@ module.exports = {
     const bet = args.slice(1).join(' ').toLowerCase();
     if (!bet) return message.channel.send({ embeds: [error('bet on red, black, green, or 0-36')] });
 
-    const lucky = db.ensureUser(message.author.id).lucky;
-    let result, color;
-    if (lucky && Math.random() < 0.9) {
-      if (bet === 'red') { result = red[Math.floor(Math.random() * red.length)]; color = 'red'; }
-      else if (bet === 'black') { result = black[Math.floor(Math.random() * black.length)]; color = 'black'; }
-      else if (bet === 'green') { result = 0; color = 'green'; }
-      else { const n = parseInt(bet); if (!isNaN(n) && n >= 0 && n <= 36) { result = n; color = n === 0 ? 'green' : red.includes(n) ? 'red' : 'black'; } }
-    }
-    if (result === undefined) {
-      result = Math.floor(Math.random() * 37);
-      color = result === 0 ? 'green' : red.includes(result) ? 'red' : 'black';
-    }
+    const result = Math.floor(Math.random() * 37);
+    const color = result === 0 ? 'green' : red.includes(result) ? 'red' : 'black';
     const emoji = color === 'red' ? '🔴' : color === 'black' ? '⚫' : '🟢';
     let won = false;
     let payout = 0;
-    const mult = lucky ? 3 : 1;
+    const mult = 1;
 
     if (bet === 'red' && color === 'red') { won = true; payout = amount * 2 * mult; }
     else if (bet === 'black' && color === 'black') { won = true; payout = amount * 2 * mult; }
@@ -44,14 +34,14 @@ module.exports = {
     else if (!isNaN(parseInt(bet)) && parseInt(bet) === result) { won = true; payout = amount * 36 * mult; }
 
     if (won) {
-      const paid = db.payWin(message.author.id, payout);
-      message.channel.send(`🎡 **${result}** ${emoji} — won **${paid}** (+**${Math.max(0, paid - amount)}**)`);
+      const paid = db.payWin(message.author.id, payout - amount);
+      message.channel.send(`${emoji} **${result}** — won **${paid}**`);
     } else {
       db.addBalance(message.author.id, -amount);
       db.addGambled(message.author.id, amount);
       const refund = db.getInsuranceRefund(message.author.id, amount);
-      if (refund > 0) { db.addBalance(message.author.id, refund); message.channel.send(`🎡 **${result}** ${emoji} — lost **${amount}** (🛡️ **${refund}** refunded)`); }
-      else message.channel.send(`🎡 **${result}** ${emoji} — lost **${amount}**`);
+      if (refund > 0) { db.addBalance(message.author.id, refund); message.channel.send(`${emoji} **${result}** — lost **${amount}** (🛡️ **${refund}** refunded)`); }
+      else message.channel.send(`${emoji} **${result}** — lost **${amount}**`);
     }
   },
 };

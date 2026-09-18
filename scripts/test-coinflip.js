@@ -154,28 +154,28 @@ async function run(input) {
   r = await forced('v cf 100 tails', 0.90);
   check('tails + lands heads -> LOSS, bal 900', r.bal === 900, `bal=${r.bal} reply="${r.reply}"`);
 
-  // ---- 3. LUCKY MODE: must respect the PLAYER'S side ----
-  console.log('\n== LUCKY MODE (90% favour the selected side, 3x payout) ==');
+  // ---- 3. LUCKY MODE REMOVED: toggle must NOT affect odds or payout ----
+  console.log('\n== LUCKY REMOVED (2.0.3: toggle no longer affects coinflip) ==');
   {
     const id = uid();
-    db.acceptTerms(id); db.toggleLucky(id); // lucky ON
-    Math.random = () => 0.10; // < 0.9 -> should WIN on whatever side was picked
+    db.acceptTerms(id); db.toggleLucky(id); // lucky ON -> must be ignored now
+    Math.random = () => 0.10; // < 0.5 -> lands the picked side, even-money win
     const msg = makeMessage('v cf 100 tails', id);
     await handler.handleMessage(msg);
     Math.random = realRandom;
     const rep = coinReply(msg);
-    check('lucky + tails + roll 0.10 -> WIN on tails, bal 1300 (3x)', db.getBalance(id) === 1300, `bal=${db.getBalance(id)} reply="${rep}"`);
-    check('  lucky win RESOLVES to the picked side (tails), not heads', rep && /tails/i.test(rep) && !/heads/i.test(rep), rep);
+    check('lucky ON + tails + roll 0.10 -> WIN on tails, bal 1100 (even money, not 3x)', db.getBalance(id) === 1100, `bal=${db.getBalance(id)} reply="${rep}"`);
+    check('  win RESOLVES to the picked side (tails), not heads', rep && /tails/i.test(rep) && !/heads/i.test(rep), rep);
   }
   {
     const id = uid();
     db.acceptTerms(id); db.toggleLucky(id);
-    Math.random = () => 0.95; // >= 0.9 -> the 10% unlucky loss, must land the OPPOSITE of pick
+    Math.random = () => 0.95; // >= 0.5 -> lands the OPPOSITE of pick (loss)
     const msg = makeMessage('v cf 100 tails', id);
     await handler.handleMessage(msg);
     Math.random = realRandom;
     const rep = coinReply(msg);
-    check('lucky + tails + roll 0.95 -> loss, bal 900', db.getBalance(id) === 900, `bal=${db.getBalance(id)} reply="${rep}"`);
+    check('lucky ON + tails + roll 0.95 -> LOSS (no lucky protection), bal 900', db.getBalance(id) === 900, `bal=${db.getBalance(id)} reply="${rep}"`);
   }
   {
     const id = uid();
@@ -184,7 +184,7 @@ async function run(input) {
     const msg = makeMessage('v cf 100 heads', id);
     await handler.handleMessage(msg);
     Math.random = realRandom;
-    check('lucky + heads + roll 0.10 -> WIN on heads, bal 1300', db.getBalance(id) === 1300, `bal=${db.getBalance(id)}`);
+    check('lucky ON + heads + roll 0.10 -> WIN on heads, bal 1100', db.getBalance(id) === 1100, `bal=${db.getBalance(id)}`);
   }
 
   // ---- 4. DISPLAY vs SETTLEMENT consistency ----

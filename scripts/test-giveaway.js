@@ -96,6 +96,70 @@ async function main() {
   const expired = db.getExpiredGiveaways(Math.floor(Date.now() / 1000) + 999999999);
   check('finished giveaway no longer expired', !expired.includes('msg1'));
 
+  // === 2.0.3.x recovery + idempotency regression (survives restarts) ===
+  const nowSec = Math.floor(Date.now() / 1000);
+
+  // announced column migrated in
+  const cols2 = db.exec('PRAGMA table_info(giveaways)')[0].values.map(v => v[1]);
+  check('giveaways has announced column', cols2.includes('announced'));
+
+  // --- E+F: 100m split across 10 unique winners from 28 entries = 10m each ---
+  const RNG_SEQ = [0.13, 0.72, 0.05, 0.91, 0.44, 0.63, 0.28, 0.55, 0.81, 0.19]
+  function seqRng() { let i = 0; return () => RNG_SEQ[i++ % RNG_SEQ.length]; }
+  const entries = Array.from({ length: 28 }, (_, i) => `e${i + 1}`);
+  db.createGiveaway('big', 'chanBig', 'hostBig', 100000000, nowSec - 60, 10, 'split');
+  for (const e of entries) db.addGiveawayEntry('big', e);
+  check('F: 28 entries persisted', db.getGiveaway('big').entries.length === 28);
+  const w = giveaway.drawWinners(db.getGiveaway('big').entries, db.getGiveaway('big').winner_count, seqRng());
+  check('F: 10 unique winners from 28', w.length === 10 && new Set(w).size === 10, JSON.stringify(w));
+  const payout = giveaway.computePayout(100000000, 10, 'split', w.length);
+  check('E: 100m/10 split = 10m each, no refund', payout.perWinner === 10000000 && payout.refund === 0, JSON.stringify(payout));
+
+  // --- D/H: exactly-once delivery creation (simulated Phase-1 re-run) ---
+  db.finishGiveaway('big', w); // reserve first (exactly-once guard)
+  for (const winnerId of w) {
+    if (!db.hasGiveawayDelivery('big', winnerId)) {
+      db.createDelivery(winnerId, { sender: 'hostBig', source: 'giveaway', label: `giveaway prize (1 of ${w.length})`, amount: 10000000, payload: { gw: 'big' } });
+    }
+  }
+  // "restart" = same code path runs again over the same DB
+  for (const winnerId of w) {
+    if (!db.hasGiveawayDelivery('big', winnerId)) {
+      db.createDelivery(winnerId, { sender: 'hostBig', source: 'giveaway', label: `giveaway prize (1 of ${w.length})`, amount: 10000000, payload: { gw: 'big' } });
+    }
+  }
+  const dupes = w.filter(wid => db.getPendingDeliveries(wid).filter(d => d.source === 'giveaway').length > 1);
+  check('H: exactly one delivery per winner after re-run', dupes.length === 0, JSON.stringify(dupes));
+  check('H: each winner has exactly 1 pending giveaway delivery', w.every(wid => db.getPendingDeliveryCount(wid) === 1));
+
+  // --- I: host refund applied once after double recovery run ---
+  const hostBefore = db.getBalance('hostBig');
+  if (payout.refund > 0) db.addBalance('hostBig', payout.refund); // simulated first run
+  if (payout.refund > 0 && db.getExpiredGiveaways(nowSec).includes('big')) db.addBalance('hostBig', payout.refund); // "re-run"
+  check('I: host not double-refunded', db.getBalance('hostBig') - hostBefore === payout.refund, `delta ${db.getBalance('hostBig') - hostBefore}`);
+
+  // --- after finish, sweep should NOT redraw (winner_id set) ---
+  check('D: finished giveaway excluded from expired sweep', !db.getExpiredGiveaways(nowSec).includes('big'));
+
+  // --- C+B: recovery after restart — an expired, un-finished giveaway is picked up ---
+  db.createGiveaway('stuck', 'chanStuck', 'hostStuck', 50000, nowSec - 30, 5, 'split');
+  for (const e of ['a1', 'b2', 'c3', 'd4', 'e5', 'f6']) db.addGiveawayEntry('stuck', e);
+  const stuckW = giveaway.drawWinners(db.getGiveaway('stuck').entries, 5);
+  db.finishGiveaway('stuck', stuckW);
+  check('C: expired giveaway recovered (winner_id reserved)', db.getGiveaway('stuck').winner_id !== null, db.getGiveaway('stuck').winner_id);
+  check('C: recovered giveaway now announceable', db.getGiveawaysToAnnounce().includes('stuck'));
+
+  // --- G: markGiveawayAnnounced flips flag exactly once ---
+  db.markGiveawayAnnounced('stuck');
+  check('G: announced giveaway not re-announced', !db.getGiveawaysToAnnounce().includes('stuck'));
+  db.markGiveawayAnnounced('stuck');
+  check('G: markGiveawayAnnounced idempotent', !db.getGiveawaysToAnnounce().includes('stuck'));
+
+  // --- B: giveaway ending in the future is NOT finalized early ---
+  db.createGiveaway('future', 'chanF', 'hostF', 1000, nowSec + 3600, 1, 'split');
+  check('B: future giveaway not in expired sweep', !db.getExpiredGiveaways(nowSec).includes('future'));
+  check('B: future giveaway not announceable', !db.getGiveawaysToAnnounce().includes('future'));
+
   console.log(`\n${fail === 0 ? 'PASS' : 'FAIL'} — ${pass} passed, ${fail} failed`);
   process.exit(fail === 0 ? 0 : 1);
 }

@@ -37,7 +37,7 @@
 4. Perk customization: `v setbadge`, `v setlb`, `v autoreact`
 - Custom roles (`v customrole`): name, single color, or 2 colors = animated gradient (`color_a`/`color_b` cols in `custom_roles`, animated by a 3s interval in index.js). `v customrole delete` removes the role. Roles are always stacked directly under anchor role `1535224349965942884` (`positionToAnchor`).
 5. Shop purchase log only if log channel is set (`Aovo log #channel`) � do not flood with every command
-6. Admin: `Aovo add`, `Aovo remove`, `Aovo bal`, `Areward`, `Aremovereward`, `Arestart`, `Aovo shop add #channel`, `Aovo cmds`, `Aovo shutdown`, `v luckylist` (list lucky users). Users self-toggle lucky with `v lucky` (90% coinflip wins + 3x payout while on).
+6. Admin: `Aovo add`, `Aovo remove`, `Aovo bal`, `Areward`, `Aremovereward`, `Arestart`, `Aovo shop add #channel`, `Aovo cmds`, `Aovo shutdown`, `v luckylist` (list lucky users). Lucky gambling was removed in 2.0.2/2.0.3 — coinflip/dice/roulette/mines are pure 50/50 fair games now (the `v lucky` toggle no longer affects any game; the old command exists only as owner-only `Alucky`).
 7. Disabled commands: non-admin users can't run disabled cmds in a channel/guild � but the **owner bypasses all disabled checks** on any prefix (`v`/`ovo`, not just `A`). The message says "disabled in this channel" or "disabled in this server" depending on scope.
 
 ## Economy � progressive balance factor

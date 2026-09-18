@@ -25,19 +25,12 @@ module.exports = {
       return message.channel.send({ embeds: [error('pick a number 2-98')] });
     }
 
-    const lucky = db.ensureUser(message.author.id).lucky;
     const isOver = pred[0] === 'o';
-    let roll, win;
-    if (lucky) {
-      win = Math.random() < 0.9;
-      roll = win ? (isOver ? num + 1 + Math.floor(Math.random() * (99 - num)) : Math.floor(Math.random() * (num - 1)) + 1) : (isOver ? Math.floor(Math.random() * num) + 1 : num + 1 + Math.floor(Math.random() * (99 - num)));
-    } else {
-      roll = Math.floor(Math.random() * 100) + 1;
-      win = isOver ? roll > num : roll < num;
-    }
+    const roll = Math.floor(Math.random() * 100) + 1;
+    const win = isOver ? roll > num : roll < num;
 
     if (win) {
-      const mult = lucky ? 98 * 3 / (isOver ? (100 - num) : (num - 1)) : 98 / (isOver ? (100 - num) : (num - 1));
+      const mult = 98 / (isOver ? (100 - num) : (num - 1));
       const payout = Math.floor(amount * mult);
       const paid = db.payWin(message.author.id, payout);
       message.channel.send(`🎲 **${roll}** — won **${paid}** (bet **${amount}** → ${mult.toFixed(2)}x)`);

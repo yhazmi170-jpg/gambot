@@ -32,3 +32,9 @@ Format: one line per change, terse, no AI fluff.
 - New fun command: v 8ball / v 8b <question> - 45 silly magic answers, compact embed quoting your question (long questions auto-truncate).
 - 8ball: reply-only format with a per-answer self-reaction (😭/☠️ by vibe, plus sparing 💔/🙏/🤞/⁉️ — never random) on Gambot's own reply; answer pool expanded 45 → 120 diabolical/casual lines (roasts, dry dismissals, loaded no's), 'gang' → 'gng', no mystical filler.
 - v give to the owner: the owner alone gets a DM approval card (Keep / Decline / Mute 30m). Keep closes the card, Decline refunds the sender, Mute blocks that sender from gifting the owner for 30 min ("u cant give this user money"). Money moves on confirm; owner decides after. Owner+internal only.
+
+(queued after v2.0.3)
+- FIX: bot was online but unresponsive to ALL commands (ReferenceError: getLastMeaningfulAt/getLastSummonAt were never defined + a const reassignment) -> every command died silently after cooldown_ok. Both fixed in the command handler.
+- FIX: giveaways that END never finalized (100M split stuck with no winners/no payout/no announce) -> draw + payout reservation + exact-once inbox delivery + single announcement now all idempotent across restarts.
+- Gaming parity restored to intended 2.0.3: dice/mines/roulette lucky-gambling fully removed for real (a rollback had re-added it), coinflip was stuck at an 0.8 win-chance -> now true 50/50 even money, gamehelp text scrubbed of lucky.
+- New debug endpoints: /logs (last 100 console lines), /giveaways (read-only giveaway state), /guilddebug fixed (was double-writing headers and exposing nothing).

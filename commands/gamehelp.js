@@ -15,16 +15,16 @@ module.exports = {
       cf: {
         name: 'Coinflip',
         aliases: 'cf, coin, flip',
-        desc: 'A 50/50 gambling game. Bet on heads or tails. Wins pay even money (more with lucky).',
+        desc: 'A 50/50 gambling game. Bet on heads or tails. Wins pay even money.',
         play: `\`${prefix} cf <amount> <heads/tails>\` — amount first, then your side\nExample: \`${prefix} cf 1000 heads\``,
-        tips: 'Pure luck. The reply shows **picked** vs **landed** so you can always see your own choice. High balance slightly lowers win payouts. Lucky perk pays 3x (toggle with `v lucky`).',
+        tips: 'Pure luck. The reply shows **picked** vs **landed** so you can always see your own choice. High balance slightly lowers win payouts.',
       },
       slots: {
         name: 'Slots',
         aliases: 'slot',
         desc: 'A 3-reel slot machine. Match symbols to win multipliers on your bet.',
         play: `\`${prefix} slots <amount>\`\nExample: \`${prefix} slots 1000\``,
-        tips: '3-of-a-kind: 🍒2× 🍇2× 🍊3× 🍋3× 🍉5× 💎8× 7️⃣30×\nPairs: 🍒1× 🍇1× 🍊1× 🍋1× 🍉2× 💎3× 7️⃣6×\nHigh bal slightly lowers net wins. Lucky perk pays 3×.',
+        tips: '3-of-a-kind: 🍒2× 🍇2× 🍊3× 🍋3× 🍉5× 💎8× 7️⃣30×\nPairs: 🍒1× 🍇1× 🍊1× 🍋1× 🍉2× 💎3× 7️⃣6×\nHigh bal slightly lowers net wins.',
       },
       dice: {
         name: 'Dice',

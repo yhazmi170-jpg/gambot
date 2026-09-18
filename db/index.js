@@ -129,6 +129,7 @@ async function init() {
   )`);
   try { db.run(`ALTER TABLE giveaways ADD COLUMN winner_count INTEGER NOT NULL DEFAULT 1`); } catch (e) {}
   try { db.run(`ALTER TABLE giveaways ADD COLUMN mode TEXT NOT NULL DEFAULT 'split'`); } catch (e) {}
+  try { db.run(`ALTER TABLE giveaways ADD COLUMN announced INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   db.run(`CREATE TABLE IF NOT EXISTS streaks (user_id TEXT PRIMARY KEY, count INTEGER NOT NULL DEFAULT 0, last_time INTEGER NOT NULL DEFAULT 0, best INTEGER NOT NULL DEFAULT 0)`);
   db.run(`CREATE TABLE IF NOT EXISTS pvp_bounties (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1168,12 +1169,24 @@ function createGiveaway(messageId, channelId, hostId, prize, endsAt, winnerCount
 }
 
 function getGiveaway(messageId) {
-  const rows = db.exec(`SELECT message_id, channel_id, host_id, prize, ends_at, entries, winner_id, winner_count, mode FROM giveaways WHERE message_id = '${messageId}'`);
+  const rows = db.exec(`SELECT message_id, channel_id, host_id, prize, ends_at, entries, winner_id, winner_count, mode, announced FROM giveaways WHERE message_id = '${messageId}'`);
   if (!rows.length || !rows[0].values.length) return null;
   const v = rows[0].values[0];
   let entries = [];
   try { entries = JSON.parse(v[5] || '[]'); } catch {}
-  return { message_id: v[0], channel_id: v[1], host_id: v[2], prize: v[3], ends_at: v[4], entries, winner_id: v[6], winner_count: v[7] || 1, mode: v[8] || 'split' };
+  return { message_id: v[0], channel_id: v[1], host_id: v[2], prize: v[3], ends_at: v[4], entries, winner_id: v[6], winner_count: v[7] || 1, mode: v[8] || 'split', announced: v[9] || 0 };
+}
+
+// Parsed winner list for a finished giveaway ([] for __none__, single id wrapped).
+function getGiveawayWinners(messageId) {
+  const g = getGiveaway(messageId);
+  if (!g || g.winner_id === null || g.winner_id === '__none__' || !g.winner_id) return [];
+  try {
+    const parsed = JSON.parse(g.winner_id);
+    return Array.isArray(parsed) ? parsed : [String(parsed)];
+  } catch {
+    return g.winner_id ? [String(g.winner_id)] : [];
+  }
 }
 
 function addGiveawayEntry(messageId, userId) {
@@ -1192,6 +1205,25 @@ function getExpiredGiveaways(now) {
   const rows = db.exec(`SELECT message_id FROM giveaways WHERE ends_at <= ${now} AND winner_id IS NULL`);
   if (!rows.length) return [];
   return rows[0].values.map(r => r[0]);
+}
+
+// Giveaways that have drawn winners but haven't been announced/edited on Discord yet.
+function getGiveawaysToAnnounce() {
+  const rows = db.exec(`SELECT message_id FROM giveaways WHERE winner_id IS NOT NULL AND winner_id != '__none__' AND announced = 0`);
+  if (!rows.length) return [];
+  return rows[0].values.map(r => r[0]);
+}
+
+function markGiveawayAnnounced(messageId) {
+  db.run(`UPDATE giveaways SET announced = 1 WHERE message_id = '${messageId}'`);
+  save();
+}
+
+// Has the winner's giveaway inbox delivery already been created?
+// Tagged with payload { gw: <giveaway message_id> } so re-runs are idempotent.
+function hasGiveawayDelivery(messageId, userId) {
+  const rows = db.exec(`SELECT COUNT(*) FROM inbox_deliveries WHERE recipient_id = '${safeStr(userId)}' AND source = 'giveaway' AND status = 'pending' AND payload LIKE '%"gw":"${safeStr(messageId)}"%'`);
+  return rows.length && rows[0].values[0][0] > 0;
 }
 
 function finishGiveaway(messageId, winners) {
@@ -5062,7 +5094,7 @@ module.exports = {
   deletePendingBattle,
   cleanupPendingBattles,
   repairNaNBalances,
-  createGiveaway, getGiveaway, getExpiredGiveaways, addGiveawayEntry, finishGiveaway,
+  createGiveaway, getGiveaway, getGiveawayWinners, getExpiredGiveaways, addGiveawayEntry, finishGiveaway, getGiveawaysToAnnounce, markGiveawayAnnounced, hasGiveawayDelivery,
   toggleLucky,
   toggleInsurance,
   setLogChannel,

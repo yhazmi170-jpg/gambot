@@ -22,7 +22,7 @@ module.exports = {
 
     const side = choice[0] === 'h' ? 'heads' : 'tails';
     
-    const result = Math.random() < (0.8) ? side : (side === 'heads' ? 'tails' : 'heads');
+    const result = Math.random() < (0.5) ? side : (side === 'heads' ? 'tails' : 'heads');
     const win = result === side;
     const mult = 1;
 

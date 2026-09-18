@@ -12,6 +12,18 @@ const aliases = new Map();
 
 const COMMANDS_BEFORE_TOS = ['help', 'agree', 'disable', 'enable'];
 
+// Last meaningful command timestamp (seconds) — drives the inactivity summon system.
+function getLastMeaningfulAt(userId) {
+  const a = db.getActivity(userId);
+  return a ? (a.last_meaningful_at || 0) : 0;
+}
+
+// Last successful summon timestamp (seconds).
+function getLastSummonAt(userId) {
+  const a = db.getActivity(userId);
+  return a ? (a.last_summon_at || 0) : 0;
+}
+
 function loadCommands() {
   const dir = path.join(__dirname, '..', 'commands');
   const files = fs.readdirSync(dir).filter(f => f.endsWith('.js'));
@@ -173,7 +185,6 @@ async function handleMessage(message) {
   
   // Check if >=7 days since last meaningful command
   const lastMeaningful = getLastMeaningfulAt(message.author.id);
-  nowSec = Math.floor(Date.now() / 1000);
   let eligible = false;
   let summonTriggered = false;
   if (lastMeaningful && nowSec - lastMeaningful >= 7 * 86400) {

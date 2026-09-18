@@ -13,10 +13,10 @@ function createGrid(bc) {
   return cells;
 }
 
-function mult(gems, bombs, lucky) {
+function mult(gems, bombs) {
   let m = 1;
   for (let i = 0; i < gems; i++) m *= (ROWS * COLS - i) / (ROWS * COLS - bombs - i);
-  const boost = lucky ? 3 + gems * 0.5 : 1.1;
+  const boost = 1.1;
   return Math.round(m * boost * 100) / 100;
 }
 
@@ -56,14 +56,14 @@ function buildContainer(game, outcome) {
     lines.push('', outcome);
   } else {
     if (rc > 0) {
-      const curMult = mult(rc, b, game.lucky);
+      const curMult = mult(rc, b);
       const curPayout = Math.floor(game.bet * curMult);
       const curPaid = Math.floor((curPayout - game.bet) * db.getBalanceFactor(game.userId)) + game.bet;
       const cutNote = curPaid < curPayout ? ` (${(curPaid / game.bet).toFixed(2)}× after balance cut)` : '';
       lines.push('', `Cash Out: \`${curPaid.toLocaleString()} (${curMult.toFixed(2)}×)\`${cutNote}`);
     }
     if (rc < ROWS * COLS - b) {
-      const nextMult = mult(rc + 1, b, game.lucky);
+      const nextMult = mult(rc + 1, b);
       const nextPayout = Math.floor(game.bet * nextMult);
       const nextPaid = Math.floor((nextPayout - game.bet) * db.getBalanceFactor(game.userId)) + game.bet;
       const cutNote = nextPaid < nextPayout ? ` (${(nextPaid / game.bet).toFixed(2)}× after balance cut)` : '';
@@ -115,16 +115,15 @@ module.exports = {
         db.addGambled(message.author.id, amount);
       }
 
-      const lucky = db.ensureUser(message.author.id).lucky;
       const customMines = parseInt(args[1]);
       const hasCustomMines = !isNaN(customMines) && customMines >= 1 && customMines <= 15;
       let bombCount;
       if (hasCustomMines) {
         bombCount = customMines;
       } else {
-        bombCount = lucky ? 1 : BOMBS;
+        bombCount = BOMBS;
       }
-      const game = { bombs: createGrid(bombCount), bombCount, revealed: new Set(), bet: amount, active: true, lastSafe: -1, hitBomb: undefined, testMode, lucky, hasCustomMines, userId: message.author.id };
+      const game = { bombs: createGrid(bombCount), bombCount, revealed: new Set(), bet: amount, active: true, lastSafe: -1, hitBomb: undefined, testMode, hasCustomMines, userId: message.author.id };
       activeGames.set(message.author.id, game);
 
       message.channel.send(buildContainer(game)).then(msg => {
@@ -135,7 +134,7 @@ module.exports = {
         if (!game.active) { await i.deferUpdate().catch(() => {}); return; }
         if (i.customId === 'm_cash') {
           game.active = false; activeGames.delete(message.author.id);
-          const p = Math.floor(game.bet * mult(game.revealed.size, game.bombCount, game.lucky));
+          const p = Math.floor(game.bet * mult(game.revealed.size, game.bombCount));
           const paid = game.testMode ? (p - game.bet) : db.payWin(message.author.id, p - game.bet, game.bet);
           const total = game.bet + paid;
           const gotMult = game.testMode ? '' : ` — got **${(total / game.bet).toFixed(2)}×**${paid < p - game.bet ? ' (balance cut)' : ''}`;
@@ -158,7 +157,7 @@ module.exports = {
         const rc = game.revealed.size;
         if (rc >= ROWS * COLS - game.bombCount) {
           game.active = false; activeGames.delete(message.author.id);
-          const p = Math.floor(game.bet * mult(rc, game.bombCount, game.lucky));
+          const p = Math.floor(game.bet * mult(rc, game.bombCount));
           const paid = game.testMode ? (p - game.bet) : db.payWin(message.author.id, p - game.bet, game.bet);
           const total = game.bet + paid;
           const gotMult = game.testMode ? '' : ` — got **${(total / game.bet).toFixed(2)}×**${paid < p - game.bet ? ' (balance cut)' : ''}`;
