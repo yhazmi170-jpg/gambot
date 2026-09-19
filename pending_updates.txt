@@ -39,3 +39,4 @@ Format: one line per change, terse, no AI fluff.
 - Gaming parity restored to intended 2.0.3: dice/mines/roulette lucky-gambling fully removed for real (a rollback had re-added it), coinflip was stuck at an 0.8 win-chance -> now true 50/50 even money, gamehelp text scrubbed of lucky.
 - New debug endpoints: /logs (last 100 console lines), /giveaways (read-only giveaway state), /guilddebug fixed (was double-writing headers and exposing nothing).
 - FIX: v lb must include the money in the bank — shows + ranks wallet+bank (money in bank counted), consistent for everyone. Regression test: money=100/bank=900 -> lb shows 1000.
+- Owner gets a DM when anyone buys a shop item: "<@user> bought **Item** for `price` money!"

@@ -255,6 +255,7 @@ async function handleConfirm(j) {
     }
     pending.channel?.send(`<@${j.user.id}> bought **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency}!`).then(m => setTimeout(() => m.delete().catch(() => {}), 5000)).catch(() => {});
     j.user.send(`**Purchase Confirmation**\nYou bought **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency} in **${pending.guild?.name || 'the server'}**\n\n**How to use:** ${pending.item.use}`).catch(() => {});
+    j.client.users.fetch(config.ownerId).then(o => o.send(`<@${j.user.id}> bought **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency}!`).catch(() => {})).catch(() => {});
     await j.update({ embeds: [okEmbed(`Purchased **${pending.item.name}**!`)], components: [] });
   } catch (e) { console.error('shop confirm err:', e); }
 }
