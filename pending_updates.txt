@@ -40,3 +40,6 @@ Format: one line per change, terse, no AI fluff.
 - New debug endpoints: /logs (last 100 console lines), /giveaways (read-only giveaway state), /guilddebug fixed (was double-writing headers and exposing nothing).
 - FIX: v lb must include the money in the bank — shows + ranks wallet+bank (money in bank counted), consistent for everyone. Regression test: money=100/bank=900 -> lb shows 1000.
 - Owner gets a DM when anyone buys a shop item: "<@user> bought **Item** for `price` money!"
+- FIX: crash paid 3x + forced wins for anyone with the (removed) lucky flag — leftover lucky branch was still in commands/crash.js (crash was missed in the 2.0.2/2.0.3 removal). Crash now pure 50/50: payout = round-down(wager × multiplier), real crash curve, no lucky. Regression test scripts/test-crash.js 22/22.
+- FIX: blackjack wins were broken by the same lucky-removal (undefined isLucky -> ReferenceError on every win; natural blackjack referenced an unset paid). Wins now pay 2:1 (natural 21) / 1:1 via payWin.
+- FIX: snailgarden stored a dead lucky field (never read) — dropped.
