@@ -76,7 +76,7 @@ module.exports = {
       db.addBalance(message.author.id, -amount);
       db.addGambled(message.author.id, amount);
 
-      const game = { bet: amount, completed: 0, active: true, testMode: false, lucky: db.ensureUser(message.author.id).lucky, userId: message.author.id, username: message.author.username };
+      const game = { bet: amount, completed: 0, active: true, testMode: false, userId: message.author.id, username: message.author.username };
       activeGames.set(message.author.id, game);
 
       message.channel.send(buildContainer(game)).then(msg => {

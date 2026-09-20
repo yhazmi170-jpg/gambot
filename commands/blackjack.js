@@ -111,7 +111,7 @@ function playLoop(msg, player, dealer, deck, bet, userId, name) {
         // lucky removed - no longer affects blackjack
         let result, color;
         if (dv > 21 || pv2 > dv) {
-          const paid = db.payWin(userId, bet * (isLucky ? 3 : 1));
+          const paid = db.payWin(userId, bet);
           result = `won **${(bet + paid).toLocaleString()}** (+**${paid.toLocaleString()}**)`;
           color = 0x57f287;
         } else if (pv2 === dv) {
@@ -140,7 +140,7 @@ function playLoop(msg, player, dealer, deck, bet, userId, name) {
         // lucky removed - no longer affects blackjack
         let result, color;
         if (dv > 21 || pv2 > dv) {
-          const paid = db.payWin(userId, bet * (isLucky ? 3 : 1));
+          const paid = db.payWin(userId, bet);
           result = `won **${(bet + paid).toLocaleString()}** (+**${paid.toLocaleString()}**) (timed out)`;
           color = 0x57f287;
         } else if (pv2 === dv) {
@@ -182,8 +182,17 @@ module.exports = {
 
     const pv = handValue(player);
     if (pv === 21) {
-        // lucky removed - no longer affects blackjack - const paid = db.payWin(message.author.id, amount);
       while (handValue(dealer) < 17) dealer.push(deck.pop());
+      const dv = handValue(dealer);
+      if (dv === 21) {
+        return message.channel.send({
+          embeds: [bjEmbed(board({
+            name, player, dealer, reveal: true, bet: amount,
+            result: 'tie — **' + amount.toLocaleString() + '** returned',
+          }), 0xfee75c)],
+        });
+      }
+      const paid = db.payWin(message.author.id, amount);
       return message.channel.send({
         embeds: [bjEmbed(board({
           name, player, dealer, reveal: true, bet: amount,

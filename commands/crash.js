@@ -26,10 +26,9 @@ module.exports = {
       message.channel.send(`⚠️ **balance cut active** — at your balance, a **${target}x** cashout pays **${realMult}x**`).catch(() => {});
     }
 
-    const lucky = db.ensureUser(message.author.id).lucky;
-    const crashPoint = lucky ? target + 10 + Math.random() * 20 : 0.99 / (1 - Math.random());
+    const crashPoint = 0.99 / (1 - Math.random());
     const win = crashPoint >= target;
-    const payout = win ? Math.floor(amount * (lucky ? target * 3 : target)) : 0;
+    const payout = win ? Math.floor(amount * target) : 0;
     const net = payout - amount;
 
     if (win) {
