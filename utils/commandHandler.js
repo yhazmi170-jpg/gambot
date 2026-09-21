@@ -122,20 +122,24 @@ async function handleMessage(message) {
 
   const ALWAYS_ALLOWED = ['help', 'enable', 'disable'];
   try {
-  if (message.guild && !ALWAYS_ALLOWED.includes(cmd.name) && message.author.id !== config.ownerId) {
+  if (message.guild && message.author.id !== config.ownerId) {
     const guild = db.getGuild(message.guild.id);
-    const guildDisabled = guild.disabled_commands.includes('all') || guild.disabled_commands.includes(cmd.name);
+    const guildAll = guild.disabled_commands.includes('all');
     const channelRows = db.exec(`SELECT commands FROM channel_disabled WHERE guild_id = '${message.guild.id}' AND channel_id = '${message.channel.id}'`);
     const channelList = (channelRows.length && channelRows[0].values.length) ? JSON.parse(channelRows[0].values[0][0] || '[]') : [];
-    const channelDisabled = channelList.includes('all') || channelList.includes(cmd.name);
-    if (guildDisabled || channelDisabled) {
-      const allBlocked = guildDisabled ? guild.disabled_commands.includes('all') : channelList.includes('all');
-      const where = guildDisabled ? 'server' : 'chat';
-      const msg = allBlocked
-        ? `Commands aren't allowed in this ${where}`
-        : `\`${cmd.name}\` is disabled in this ${where}`;
-      message.channel.send({ embeds: [error(msg)] }).then(m => setTimeout(() => m.delete().catch(() => {}), 4000)).catch(() => {});
+    const channelAll = channelList.includes('all');
+    const allBlocked = guildAll || channelAll;
+    if (allBlocked) {
+      message.channel.send({ embeds: [error(`Commands aren't allowed in this ${guildAll ? 'server' : 'chat'}`)] }).then(m => setTimeout(() => m.delete().catch(() => {}), 4000)).catch(() => {});
       return;
+    }
+    if (!ALWAYS_ALLOWED.includes(cmd.name)) {
+      const guildDisabled = guild.disabled_commands.includes(cmd.name);
+      const channelDisabled = channelList.includes(cmd.name);
+      if (guildDisabled || channelDisabled) {
+        message.channel.send({ embeds: [error(`\`${cmd.name}\` is disabled in this ${guildDisabled ? 'server' : 'chat'}`)] }).then(m => setTimeout(() => m.delete().catch(() => {}), 4000)).catch(() => {});
+        return;
+      }
     }
   }
   } catch (err) {
