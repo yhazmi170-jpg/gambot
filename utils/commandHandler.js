@@ -129,8 +129,12 @@ async function handleMessage(message) {
     const channelList = (channelRows.length && channelRows[0].values.length) ? JSON.parse(channelRows[0].values[0][0] || '[]') : [];
     const channelDisabled = channelList.includes('all') || channelList.includes(cmd.name);
     if (guildDisabled || channelDisabled) {
-      const where = guildDisabled ? 'this server' : 'this channel';
-      message.channel.send({ embeds: [error(`\`${cmd.name}\` is disabled in ${where}`)] }).then(m => setTimeout(() => m.delete().catch(() => {}), 4000)).catch(() => {});
+      const allBlocked = guildDisabled ? guild.disabled_commands.includes('all') : channelList.includes('all');
+      const where = guildDisabled ? 'server' : 'chat';
+      const msg = allBlocked
+        ? `Commands aren't allowed in this ${where}`
+        : `\`${cmd.name}\` is disabled in this ${where}`;
+      message.channel.send({ embeds: [error(msg)] }).then(m => setTimeout(() => m.delete().catch(() => {}), 4000)).catch(() => {});
       return;
     }
   }
