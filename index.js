@@ -537,12 +537,13 @@ start().catch(e => console.error('[START] FATAL:', e));
       try {
         const gw = db.getGiveaway(gwId);
         if (!gw || !gw.entries.length) {
+          // reserve FIRST — winner_id is the exactly-once guard against double refunds
+          db.finishGiveaway(gwId, '__none__');
           // nobody entered — refund the full host cost so hosts can't lose money on an empty giveaway
           if (gw) {
             const { refund } = giveaway.computePayout(gw.prize, gw.winner_count, gw.mode, 0);
             if (refund > 0) db.addBalance(gw.host_id, refund);
           }
-          db.finishGiveaway(gwId, '__none__');
           console.log(`[gw] giveaway ${gwId} closed with no entries (host refunded)`);
           continue;
         }
