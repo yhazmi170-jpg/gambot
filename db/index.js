@@ -991,8 +991,14 @@ function getBattleWins(userId) {
 }
 
 function getTop(limit, excludeUserId) {
-  const where = excludeUserId ? `WHERE user_id != '${excludeUserId}'` : '';
-  const rows = db.exec(`SELECT user_id, balance + COALESCE(bank, 0) as total FROM users ${where} ORDER BY total DESC LIMIT ${limit}`);
+  const where = excludeUserId ? `WHERE u.user_id != '${excludeUserId}'` : '';
+  // lb counts wallet + bank + unclaimed inbox money (giveaway prizes, gifts) — those
+  // already belong to the player, they just haven't hit "Claim" in v inbox yet.
+  const rows = db.exec(`SELECT u.user_id, u.balance + COALESCE(u.bank, 0) + COALESCE(p.pend, 0) as total
+                        FROM users u
+                        LEFT JOIN (SELECT recipient_id, SUM(amount) as pend FROM inbox_deliveries WHERE status = 'pending' GROUP BY recipient_id) p
+                          ON p.recipient_id = u.user_id
+                        ${where} ORDER BY total DESC LIMIT ${limit}`);
   if (!rows.length) return [];
   return rows[0].values.map(v => ({ user_id: v[0], balance: v[1] }));
 }
@@ -1004,9 +1010,11 @@ function getGamblers(limit) {
 }
 
 function getAllUsers() {
-  const rows = db.exec('SELECT user_id, balance, bank, total_gambled FROM users');
+  const rows = db.exec(`SELECT u.user_id, u.balance, u.bank, u.total_gambled,
+                        COALESCE((SELECT SUM(amount) FROM inbox_deliveries d WHERE d.recipient_id = u.user_id AND d.status = 'pending'), 0) as pending_inbox
+                        FROM users u`);
   if (!rows.length) return [];
-  return rows[0].values.map(v => ({ user_id: v[0], balance: v[1], bank: v[2], total_gambled: v[3] }));
+  return rows[0].values.map(v => ({ user_id: v[0], balance: v[1], bank: v[2], total_gambled: v[3], pending_inbox: v[4] }));
 }
 
 function getLottery() {

@@ -10,7 +10,7 @@
 - **Backups**: `backup.js` writes timestamped snapshots (`backups/gambot-<ts>.db`, never overwritten) + a mirror at `gambot.db`. Restore scans ALL snapshots newest?oldest and restores the first one with >0 users (`countUsers` via sql.js) � a bad/empty backup can never block recovery. Backup **refuses to upload** a 0-user DB (prevents an empty/corrupt instance from clobbering history). `index.js` logs backup failures loudly. Backups run **every 1 min** + on **SIGTERM/SIGINT shutdown** (Render free tier wipes `./data` on every deploy � shutdown backup caps loss at 1 min).
 - **Backup repo**: `gambot-data-v3` on GitHub (old repos `gambot-data` and `gambot-data-v2` were corrupt � do NOT use them). `detectCorruption` in backup.js rejects snapshots with absurd balances (>1T), negative balances, or known-wiped users.
 - **Balance corruption (Aug 2026)**: a bug drained multiple users' balances over time (@?? lost ~52M, @meimei lost ~28M). Root cause unknown � may be integer overflow in balance calculations. If balances look wrong again, check `db/index.js` `addBalance`/`payWin`/`getBalanceFactor` for overflow bugs.
-- **Current version**: **2.0.1** (Social Commands + `v try` + Community Events + Server Lore; 2.0.1 adds multi-winner giveaways — see `CHANGELOG.md`)
+- **Current version**: **2.0.4** (Leaderboard counts unclaimed inbox money + 0-entry giveaway refund — see `CHANGELOG.md`)
 - **Change log**: every update ever shipped is documented in `CHANGELOG.md` (newest first) � update it whenever you release, right alongside the version bump + `update_msg.txt`
 
 ## Agent docs (mandatory)
@@ -132,7 +132,8 @@
 
 ## Important
 - `getMaxBet` returns Infinity for owner
-- `getTop` excludes owner from leaderboard
+- `getTop` excludes owner from leaderboard and **counts wallet + bank + unclaimed inbox money** (giveaway prizes, gifts) — fixed in 2.0.4; the v2.0.1 change that routed giveaway prizes through the pending inbox made winners/gift-recipients invisible on `v lb` until they claimed, which read as a stale board
+- 0-entry giveaways refund the host the full hostCost on sweep close (2.0.4) — before, the host's prize was silently destroyed
 - `addBalance` auto-creates users
 - Restore only if DB file is missing/empty (not every restart)
 - **EVERY PUSH (mandatory, do not skip):** bump `package.json` version, update `update_msg.txt` with a user-facing summary, verify new commands have `helpCategory` + `description` so they auto-appear in `v help`, update `gamehelp.js` when game rules/UI change, update `AGENTS.md` / `HANDOFF.md` if behavior or status changed. **Exception:** small updates skip the version bump + `update_msg.txt` and go into `pending_updates.txt` instead (see "Update announcement policy").

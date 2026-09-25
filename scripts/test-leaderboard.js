@@ -66,6 +66,28 @@ function check(name, cond) {
   const sRich = sorted.find(u => u.user_id === rich);
   check('slb wealth board uses wallet+bank (900+100=1000)', sRich && (sRich.balance + (sRich.bank || 0)) === 1000);
 
+  // pending inbox deliveries count toward lb (money won/given but not yet claimed is still theirs)
+  const pend = 'usr_pending';
+  db.addBalance(pend, 50);
+  db.createDelivery(pend, { sender: 'usr_rich', source: 'giveaway', amount: 500, label: 'giveaway prize', payload: { gw: 'lbtest' } });
+  db.createDelivery(pend, { sender: 'usr_rich', source: 'give', amount: 150, label: 'gift' });
+  db.createDelivery(pend, { sender: 'usr_rich', source: 'give', amount: 99999, label: 'declined one' });
+  const declined = db.getDelivery ? null : null;
+  // mark one as claimed -> should NOT count twice; and one cancelled -> must not count
+  const pendDeliveries = db.getPendingDeliveries(pend);
+  check('created 3 pending deliveries', pendDeliveries.length === 3);
+  const toCancel = pendDeliveries.find(d => d.amount === 99999);
+  const toClaim = pendDeliveries.find(d => d.amount === 500);
+  // directly set cancelled + claimed states
+  db.exec(`UPDATE inbox_deliveries SET status = 'cancelled' WHERE id = ${toCancel.id}`);
+  const claimRes = db.safeClaim(toClaim.id, pend);
+  check('safeClaim moves money to balance', claimRes.ok === true);
+  const t2 = db.getTop(20, owner);
+  const pRow = t2.find(u => u.user_id === pend);
+  // 50 wallet + 150 pending (claimed 500 moved to balance, cancelled 99999 ignored) => 50+500+150 = 700... wait claimed moves to balance
+  // after claim: wallet = 50 + 500 = 550, pending = 150 -> lb total = 700
+  check('lb counts pending inbox money (and claimed counts once)', pRow && pRow.balance === 700);
+
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

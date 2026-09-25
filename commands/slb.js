@@ -27,13 +27,14 @@ module.exports = {
 
     const allUsers = db.getAllUsers();
     const serverUsers = allUsers.filter(u => memberIds.includes(u.user_id));
+    const wealth = u => (u.balance || 0) + (u.bank || 0) + (u.pending_inbox || 0);
 
-    // Sort by total wealth (wallet + bank)
-    const sorted = serverUsers.sort((a, b) => ((b.balance + (b.bank || 0)) - (a.balance + (a.bank || 0)))).slice(0, limit);
+    // Sort by total wealth (wallet + bank + unclaimed inbox money)
+    const sorted = serverUsers.sort((a, b) => wealth(b) - wealth(a)).slice(0, limit);
 
     if (!sorted.length) return message.channel.send({ embeds: [embed('🏆 Server Leaderboard', [['info', 'no users yet']])] });
 
-    const lines = sorted.map((u, i) => `**#${i + 1}** <@${u.user_id}> — **${(u.balance + (u.bank || 0)).toLocaleString()}** ${config.currency}`);
+    const lines = sorted.map((u, i) => `**#${i + 1}** <@${u.user_id}> — **${wealth(u).toLocaleString()}** ${config.currency}`);
     const chunks = [];
     for (let i = 0; i < lines.length; i += 10) {
       chunks.push(lines.slice(i, i + 10).join('\n'));

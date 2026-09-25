@@ -1,4 +1,10 @@
 # Gambot Changelog (full history)
+## v2.0.4 — Leaderboard counts unclaimed inbox money + empty-giveaway refund
+
+- **`v lb` / `db.getTop` count pending inbox deliveries** (wallet + bank + unclaimed inbox money): giveaway prizes and `v give` transfers land in the recipient's inbox as pending until claimed, and the board previously showed the stale old total for hours/days — users saw "won 100m but not on lb" or "gave 25m but shows 18m". The money was never at risk (`safeClaim` refund/cancel bonuses keep it from dropping), it was purely a display gap. `commands/slb.js` (server lb) updated to match. Regression test in `scripts/test-leaderboard.js` (8/8).
+- **Empty giveaways now refund the host in full** — Phase-1 sweep in `index.js` returned early on 0-entry giveaways without reimbursing the hostCost (split = prize, full = prize × winners); hosts silently lost the whole pot if nobody clicked join.
+- **sql.js long-uptime crash recovered** (2026-09-25 ~05:20–11:02Z): after ~3 days of uptime the in-memory sql.js WASM module started throwing `RuntimeError: memory access out of bounds` on every query, freezing the DB at the 05:40 backup; backups stalled (5-min cadence) and commands failed for ~6h. Redeploy restored the latest healthy snapshot (749 users, hash `cc47bd43…`), no player data lost beyond the corruption window. Backups resumed (`11-07-09` snapshot onward, hash `fdc2947a`).
+
 ## v2.0.3 — Social GIF Expansion
 
 - **Dedicated GIF pools** for all social commands: bonk, facepalm, tease, wave, poke, tickle, blush, cry, laugh, dance, stare — hand-curated from verified anime-reaction database

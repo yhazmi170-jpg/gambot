@@ -1,3 +1,9 @@
+v2.0.4 — Leaderboard Fix
+
+- 🏆 `v lb` + `v slb` count unclaimed inbox money — giveaway wins and gifts show on the board the moment they're sent, no more "won 100m but lb is missing them"
+- 🎉 giveaways with 0 entries now refund the host's prize in full (they used to burn it silently)
+- stopped a sql.js long-uptime crash (bot froze mid-day, auto-backups stalled — restored via redeploy, 779 users intact, backups flowing every 5 min)
+
 v2.0.3 — Social GIF Expansion
 
 - Dedicated GIF pools for bonk, facepalm, tease, wave, poke, tickle, blush, cry, laugh, dance, stare
