@@ -212,7 +212,7 @@ heist: {
         name: 'Weapon Crates',
         aliases: 'wcrate, wepcrate, wc',
         desc: 'Buy or open a crate that gives a random weapon for your battle team.',
-        play: `\`${prefix} weaponcrate\` — status\n\`${prefix} weaponcrate buy\` — buy one\n\`${prefix} weaponcrate open\` — open one`,
+        play: `\`${prefix} weaponcrate\` — status\n\`${prefix} weaponcrate buy\` — buy one\n\`${prefix} weaponcrate open\` — open one\n\`${prefix} weaponcrate open <count>\` — open that many\n\`${prefix} weaponcrate open all\` — open every crate you own`,
         tips: 'Crates also drop from `v battle` wins and `v hunt` (about 8%). Rarity: common → uncommon → rare → epic → mythical → legendary → fabled.',
       },
       freebet: {

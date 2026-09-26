@@ -4381,17 +4381,36 @@ function getWeaponCrates(userId) {
 }
 
 function openWeaponCrate(userId) {
+  const r = openWeaponCrates(userId, 1);
+  if (!r.ok) return r;
+  return { ok: true, ...r.opened[0], cratesLeft: r.cratesLeft };
+}
+
+// Open N crates atomically: rolls are computed BEFORE any write, then a single
+// consume UPDATE + batch INERTs run, and save() happens exactly once — so a
+// crash/retry can never double-reward or partially duplicate. Each crate gets
+// its own independent RNG roll (openWeaponCrate delegates here for n=1).
+function openWeaponCrates(userId, n) {
   const crates = getWeaponCrates(userId);
-  if (crates <= 0) return { ok: false, reason: 'nocrates' };
-  db.run(`UPDATE weapon_crates SET qty = qty - 1 WHERE user_id = '${userId}'`);
-  const rarity = rollWeaponRarity();
-  const type = rollWeaponTypeWeighted();
-  const w = makeWeapon(type, rarity);
-  db.run(`INSERT INTO weapons_inv (user_id, type, rarity, quality) VALUES ('${userId}', '${type}', '${rarity}', ${w.quality})`);
-  const rows = db.exec('SELECT last_insert_rowid() AS id');
-  w.id = rows[0].values[0][0];
+  if (crates <= 0) return { ok: false, reason: 'nocrates', cratesLeft: 0 };
+  let count = Math.floor(Number(n));
+  if (!Number.isFinite(count) || count <= 0) count = 1;
+  count = Math.min(count, crates);
+  const opened = [];
+  for (let k = 0; k < count; k++) {
+    const rarity = rollWeaponRarity();
+    const type = rollWeaponTypeWeighted();
+    const w = makeWeapon(type, rarity);
+    opened.push({ ...w, name: WEAPON_TYPES[type].name, emoji: WEAPON_TYPES[type].emoji, desc: WEAPON_TYPES[type].desc });
+  }
+  for (const w of opened) {
+    db.run(`INSERT INTO weapons_inv (user_id, type, rarity, quality) VALUES ('${userId}', '${w.type}', '${w.rarity}', ${w.quality})`);
+    const rows = db.exec('SELECT last_insert_rowid() AS id');
+    w.id = rows[0].values[0][0];
+  }
+  if (count > 0) db.run(`UPDATE weapon_crates SET qty = qty - ${count} WHERE user_id = '${userId}'`);
   save();
-  return { ok: true, ...w, name: WEAPON_TYPES[type].name, emoji: WEAPON_TYPES[type].emoji, desc: WEAPON_TYPES[type].desc };
+  return { ok: true, opened, cratesLeft: crates - count };
 }
 
 function buyWeaponCrate(userId) {
@@ -5505,7 +5524,7 @@ module.exports = {
   CRATES, getCratePity, setCratePity, rollCrateRarity, openCrate,
   WEAPON_TYPES, WEAPON_RARITY_DATA, WEAPON_RARITY_ORDER, WEAPON_RARITY_TAG,
   WEAPON_CRATE_PRICE, WEAPON_BATTLE_DROP_CHANCE,
-  addWeaponCrate, getWeaponCrates, openWeaponCrate, buyWeaponCrate,
+  addWeaponCrate, getWeaponCrates, openWeaponCrate, openWeaponCrates, buyWeaponCrate,
   getWeaponInv, getWeapon, equipWeapon, getAnimalWeapon, upgradeWeapon, weaponUpgradeCost,
   weaponBattleMods, makeWeapon, rollWeaponType, rollWeaponRarity,
    isMarried, marriedMult,

@@ -8,7 +8,10 @@
 - **Version**: **2.1.0** — anti-farm check PASSED (garden-anti-farm 39/39, garden 67/67, balance sim PASS, full suite at baseline) → deploying via `deploy-gambot.sh` now.
 - **Version**: `2.0.5` live. **Host migrated to NEW Render account** — gambot live at `https://gambot-hle3.onrender.com/health`, sentinel live at `https://sentinel-wqrw.onrender.com/` ("Sentinel is running"). Old account suspended / keys dead — do NOT use old URLs. Keepalive + docs repointed. **v2.0.5 adds `v activity`** usage analytics. **v2.0.4 lb fix:** `v lb`/`v slb` now count unclaimed inbox money (giveaway prizes + gifts were invisible until claimed — user-reported). **0-entry giveaways refund the host in full** (previously host's prize was destroyed). **sql.js long-uptime crash on 2026-09-25 (05:20–11:02Z)** frozen DB — see CHANGELOG; recovered via redeploy, 779 users intact.
 
-## Done today (2026-09-26) — v2.1.0 snail garden progression (BUILT + TESTED, NOT DEPLOYED)
+## Done today (2026-09-26) — post-deploy small patch: v wc open <count|all>
+- [x] **FIX (user-reported):** `v wc open all` / `open <count>` ignored the argument and opened exactly 1 crate. Now `open`=1, `open N`=N, `open all`=every owned crate (case-insensitive), resolved from the crate count before any consume, one weapon per crate with independent rolls, atomic single consume+insert (~one save), compact single-embed multi-drop result; 0 / invalid / >owned are clean errors. `db.openWeaponCrate` still returns its old flat shape (battle-weapons regression unaffected). New `scripts/test-weaponcrate.js` **41/41**. Version stays **2.1.0** (small patch → pending_updates.txt).
+
+## Done today (2026-09-26) — v2.1.0 snail garden progression (DEPLOYED + LIVE)
 - [x] **Garden runners** (`v garden pet`): 9 runners (snail→dragon), unlock levels 1/2/2/3/3/5/5/7/9, every runner satisfies `(1−failBase/100)·mult ≤ 1`.
 - [x] **Garden shop** (`v gardenshop` / `v gardenbuy <upgrade>`): soil/seeds/net/boots/can permanent upgrades, all deep-gated rows 5+ (`GARDEN_DEEP_DEPTH`=5), so the one-row EV stays exactly 1.0.
 - [x] **XP/levels**: 300/day cap, `floor(40·L^1.5)` curve, level-up coins `L·5000`; `v garden` = combined profile (runner/level bar/upgrades) + breeding preserved.

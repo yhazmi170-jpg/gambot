@@ -45,3 +45,6 @@ Format: one line per change, terse, no AI fluff.
 - FIX: snailgarden stored a dead lucky field (never read) — dropped.
 - Disabled commands: when a server/channel has `all` disabled, EVERY member command is blocked (incl. `v help`/`v enable`/`v disable`, which were previously always-allowed) with "Commands aren't allowed in this server/chat"; per-command disables keep the specific "`cmd` is disabled" messages. Owner bypass unchanged.
 - HOST MIGRATION: old Render account suspended (trial out) — re-created gambot + sentinel 1:1 on the new account. New URLs: gambot `https://gambot-hle3.onrender.com` (health ok), sentinel `https://sentinel-wqrw.onrender.com` (report "Sentinel is running"). gambot data is safe in `gambot-data-v3` (749 users, restore-on-boot); sentinel env vars (15) re-applied. Internal, no player-facing change.
+
+(queued after v2.1.0)
+- FIX: `v wc open` ignored its argument — `v wc open all` / `open <count>` opened exactly 1 crate. Now: `open` = 1, `open N` = N, `open all` = every crate owned (case-insensitive), resolved before any consume, one weapon per crate with independent rolls, atomic single consume+insert (no partial duplication), compact single-embed multi-drop result, 0/invalid/>owned are clean errors. Regression: scripts/test-weaponcrate.js 41/41.

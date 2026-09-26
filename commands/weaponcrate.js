@@ -4,7 +4,7 @@ const { embed, error } = require('../utils/embed');
 module.exports = {
   name: 'weaponcrate',
   helpCategory: 'Pets',
-  helpArgs: '[buy|open]',
+  helpArgs: '[buy|open [count|all]]',
   description: 'buy or open a weapon crate — weapons you can equip on your team',
   aliases: ['wcrate', 'wepcrate', 'wc'],
   execute(message, args) {
@@ -25,15 +25,38 @@ module.exports = {
           ['', `you have **0** weapon crates — buy one with \`v weaponcrate buy\` (**${db.WEAPON_CRATE_PRICE.toLocaleString()}** coins)\nwin them from \`v battle\` and \`v hunt\` drops too!`],
         ], 0x5865f2)] });
       }
-      const res = db.openWeaponCrate(userId);
+      let qty = 1;
+      const qArg = (args[1] || '').toLowerCase();
+      if (qArg === 'all') qty = crates;
+      else if (qArg !== '') {
+        const parsed = Number(args[1]);
+        if (!Number.isInteger(parsed) || parsed < 1) {
+          return message.channel.send({ embeds: [error('invalid crate count — use `v weaponcrate open`, `v weaponcrate open <count>`, or `v weaponcrate open all`')] });
+        }
+        if (parsed > crates) {
+          return message.channel.send({ embeds: [error(`you only have **${crates}** weapon crate${crates === 1 ? '' : 's'} — can't open ${parsed}`)] });
+        }
+        qty = parsed;
+      }
+      const res = db.openWeaponCrates(userId, qty);
       if (!res.ok) return message.channel.send({ embeds: [error('you have no weapon crates — buy one with `v weaponcrate buy`')] });
-      const tag = db.WEAPON_RARITY_TAG[res.rarity] || '⬜';
-      return message.channel.send({ embeds: [embed(`${tag} ${res.rarity.toUpperCase()} WEAPON`, [
-        ['You got', `${res.emoji} **${res.name}** (${res.rarity})\nquality **${res.quality}%** · ATK **+${res.atk}** · DEF **+${res.def}**\nID \`#${res.id}\``],
-        ['Effect', res.desc],
-        ['Equip', 'it only works on your battle team — `v team add` a pet, then `v weapon equip #<weaponId> #<animalId>`'],
-        ['', `\`${crates - 1}\` crate${crates - 1 === 1 ? '' : 's'} left`],
-      ], res.rarity === 'fabled' || res.rarity === 'legendary' ? 0xffd700 : 0x5865f2)] });
+      if (res.opened.length === 1) {
+        const w = res.opened[0];
+        const tag = db.WEAPON_RARITY_TAG[w.rarity] || '⬜';
+        return message.channel.send({ embeds: [embed(`${tag} ${w.rarity.toUpperCase()} WEAPON`, [
+          ['You got', `${w.emoji} **${w.name}** (${w.rarity})\nquality **${w.quality}%** · ATK **+${w.atk}** · DEF **+${w.def}**\nID \`#${w.id}\``],
+          ['Effect', w.desc],
+          ['Equip', 'it only works on your battle team — `v team add` a pet, then `v weapon equip #<weaponId> #<animalId>`'],
+          ['', `\`${res.cratesLeft}\` crate${res.cratesLeft === 1 ? '' : 's'} left`],
+        ], w.rarity === 'fabled' || w.rarity === 'legendary' ? 0xffd700 : 0x5865f2)] });
+      }
+      const lines = res.opened.map(w => `#${w.id} ${w.emoji} **${w.name}** — ${w.rarity} · ${w.quality}%`);
+      const anyLegendary = res.opened.some(w => w.rarity === 'fabled' || w.rarity === 'legendary');
+      return message.channel.send({ embeds: [embed(`📦 Opened ${res.opened.length} Weapon Crate${res.opened.length > 1 ? 's' : ''}`, [
+        ['Drops', lines.join('\n')],
+        ['Crates left', `**${res.cratesLeft}**`],
+        ['Effects/Equip', 'see each weapon\u2019s effect with `v weapon list` · equip on a battle team pet with `v weapon equip #<weaponId> #<animalId>`'],
+      ], anyLegendary ? 0xffd700 : 0x5865f2)] });
     }
 
     // default: show status
@@ -42,7 +65,7 @@ module.exports = {
     return message.channel.send({ embeds: [embed('🏴‍☠️ Weapon Crates', [
       ['Crates', `you have **${crates}** weapon crate${crates === 1 ? '' : 's'}`],
       ['Buy', `\`v weaponcrate buy\` — **${db.WEAPON_CRATE_PRICE.toLocaleString()}** coins`],
-      ['Open', `\`v weaponcrate open\` — open one for a random weapon`],
+      ['Open', `\`v weaponcrate open\` — open [count|all] — one, a few, or all`],
       ['Your weapons', list.length ? `you own **${list.length}** weapon${list.length === 1 ? '' : 's'} — see them with \`v weapon list\`` : 'none yet — buy a crate!'],
     ], 0x2b2d31)] });
   },
