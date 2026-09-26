@@ -409,10 +409,21 @@ start().catch(e => console.error('[START] FATAL:', e));
     setLogClient(client);
     const fs2 = require('fs');
     const updateMsg = (() => { try { return fs2.readFileSync(path.join(__dirname, 'update_msg.txt'), 'utf8').trim(); } catch { return ''; } })();
-    client.users.fetch('536278876247162882').then(u => {
+    client.users.fetch('536278876247162882', { force: true }).then(async u => {
       const msg = `✅ Bot Restarted\n\`\`\`\n${updateMsg || 'no updates'}\n\`\`\``;
-      u.send(msg).catch(() => {});
-    }).catch(() => {});
+      // Retry with backoff and NEVER swallow: if the owner's restart DM misses,
+      // we need to know (silent catch has already eaten owner DMs before).
+      for (let attempt = 1; attempt <= 4; attempt++) {
+        try {
+          await u.send(msg);
+          console.log('[boot-dm] owner restart DM sent');
+          break;
+        } catch (e) {
+          console.error(`[boot-dm] send attempt ${attempt}/4 failed: ${e.message}`);
+          if (attempt < 4) await new Promise(r => setTimeout(r, 5000 * attempt));
+        }
+      }
+    }).catch(e => console.error('[boot-dm] owner fetch failed:', e && e.message));
     client.user.setPresence({
       activities: [{ name: `v${version} | /marlboro | ${config.prefixes[0]} help` }],
       status: 'online',
