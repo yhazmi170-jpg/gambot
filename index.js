@@ -410,7 +410,10 @@ start().catch(e => console.error('[START] FATAL:', e));
     const fs2 = require('fs');
     const updateMsg = (() => { try { return fs2.readFileSync(path.join(__dirname, 'update_msg.txt'), 'utf8').trim(); } catch { return ''; } })();
     client.users.fetch('536278876247162882', { force: true }).then(async u => {
-      const msg = `✅ Bot Restarted\n\`\`\`\n${updateMsg || 'no updates'}\n\`\`\``;
+      // Cap the notes: update_msg.txt exceeded Discord's 2000-char DM limit and
+      // the whole DM was rejected ("Invalid Form Body") on every boot.
+      const body = updateMsg.length > 1500 ? `${updateMsg.slice(0, 1500).replace(/\n+$/, '')}\n… (full notes: \`v version\` / update channels)` : updateMsg;
+      const msg = `✅ Bot Restarted\n\`\`\`\n${body || 'no updates'}\n\`\`\``;
       // Retry with backoff and NEVER swallow: if the owner's restart DM misses,
       // we need to know (silent catch has already eaten owner DMs before).
       for (let attempt = 1; attempt <= 4; attempt++) {
@@ -674,9 +677,10 @@ start().catch(e => console.error('[START] FATAL:', e));
       if (!batch.length) return;
       for (const item of batch) {
         const msg = (() => { try { return require('fs').readFileSync(path.join(__dirname, 'update_msg.txt'), 'utf8').trim(); } catch { return ''; } })();
+        const body = msg.length > 1500 ? `${msg.slice(0, 1500).replace(/\n+$/, '')}\n… (full notes: update channels)` : msg;
         client.users.fetch(item.user_id).then(u => {
           if (!u || u.bot) return db.updateDmStatus(item.user_id, item.release_id, 'failed', 'nouser');
-          u.send(`📣 Gambot update — v${item.release_id}\n\`\`\`\n${msg || 'see v new'}\n\`\`\`\nrun \`v try\` to see what might be new for you.`)
+          u.send(`📣 Gambot update — v${item.release_id}\n\`\`\`\n${body || 'see v new'}\n\`\`\`\nrun \`v try\` to see what might be new for you.`)
             .then(() => db.updateDmStatus(item.user_id, item.release_id, 'sent'))
             .catch(() => db.updateDmStatus(item.user_id, item.release_id, 'failed', 'dmclosed'));
         }).catch(() => {});
