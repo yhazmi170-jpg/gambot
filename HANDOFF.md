@@ -5,7 +5,13 @@
 
 ## Status
 - **Branch**: `master`
-- **Version**: `2.0.4` live. **Host migrated to NEW Render account** — gambot live at `https://gambot-hle3.onrender.com/health`, sentinel live at `https://sentinel-wqrw.onrender.com/` ("Sentinel is running"). Old account suspended / keys dead — do NOT use old URLs. Keepalive + docs repointed. **v2.0.4 lb fix:** `v lb`/`v slb` now count unclaimed inbox money (giveaway prizes + gifts were invisible until claimed — user-reported). **0-entry giveaways refund the host in full** (previously host's prize was destroyed). **sql.js long-uptime crash on 2026-09-25 (05:20–11:02Z)** frozen DB — see CHANGELOG; recovered via redeploy, 779 users intact.
+- **Version**: `2.0.5` live. **Host migrated to NEW Render account** — gambot live at `https://gambot-hle3.onrender.com/health`, sentinel live at `https://sentinel-wqrw.onrender.com/` ("Sentinel is running"). Old account suspended / keys dead — do NOT use old URLs. Keepalive + docs repointed. **v2.0.5 adds `v activity`** usage analytics. **v2.0.4 lb fix:** `v lb`/`v slb` now count unclaimed inbox money (giveaway prizes + gifts were invisible until claimed — user-reported). **0-entry giveaways refund the host in full** (previously host's prize was destroyed). **sql.js long-uptime crash on 2026-09-25 (05:20–11:02Z)** frozen DB — see CHANGELOG; recovered via redeploy, 779 users intact.
+
+## Done today (2026-09-26) — v2.0.5 activity analytics (LIVE)
+- [x] **NEW `v activity`** (`aliases: usage, analytics`): read-only aggregate over existing `user_feature_usage` tracking. Subcommands → `v activity` overview (active today/week + top users/gamblers/winners), `users|active`, `gamble|gambled`, `wins|won`, `commands|cmd|used`. Owner excluded from boards (mirrors `v lb`).
+- [x] **New DB helpers** (`db/index.js`): `getTopCommandUsers`, `getMostUsedCommands`, `getTopWinners`, `getActivitySummary`, `capLimit` (1..20); all exported.
+- [x] Tests: `scripts/test-activity.js` 16/16, `scripts/test-activity-cmd.js` 18/18 (e2e stub render — all subcommands + alias registration). Suite re-run matches baseline (5 pre-existing Node-26 failures: test-2.0/8ball/owner-give/social-commands/social — unchanged).
+- [x] Version 2.0.4→2.0.5, `update_msg.txt`, `CHANGELOG.md`, `AGENTS.md` synced, deployed via deploy-gambot.sh.
 
 ## Done today (2026-09-25) — lb pending-inbox fix + 0-entry refund + sql.js crash recovery
 - [x] **sql.js memory crash recovered:** after ~3d uptime every query threw `RuntimeError: memory access out of bounds` (wasm refs: db/index.js getUserPerks:1480, cleanupExpiredAuctions:3966, ensureUser:463). Backups stalled/froze at 05:40Z. Redeploy restored `gambot-2026-09-25T05-40-09-720Z.db` (749 users), 0 new errors since, backups flowing (hash `fdc2947a`). Suspect long-uptime wasm heap corruption; if it recurs consider daily auto-restart.

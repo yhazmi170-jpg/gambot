@@ -1,3 +1,9 @@
+v2.0.5 — Bot Usage Analytics
+- 📈 NEW `v activity` (+ `v usage`/`v analytics`) — see who uses the bot the most, who gambles the most, who wins the most, and the most-used commands
+  - `v activity` — overview panel (active today/this week + top users, gamblers, winners)
+  - `v activity users` / `gamble` / `wins` / `commands` — full boards per stat
+  - owner stays hidden from usage boards, same as `v lb`
+
 v2.0.4 — Leaderboard Fix
 
 - 🏆 `v lb` + `v slb` count unclaimed inbox money — giveaway wins and gifts show on the board the moment they're sent, no more "won 100m but lb is missing them"

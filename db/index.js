@@ -4887,6 +4887,61 @@ function unseenFeatures(userId, features) {
   return out;
 }
 
+// ---------------- ACTIVITY / USAGE ANALYTICS (v activity) ----------------
+// Cross-user aggregates over user_feature_usage + users counters.
+
+function capLimit(limit) {
+  const n = parseInt(limit, 10);
+  if (!n || isNaN(n) || n < 1) return 10;
+  return Math.min(n, 20);
+}
+
+function getTopCommandUsers(limit, excludeUserId) {
+  const where = excludeUserId ? `AND user_id != '${safeStr(excludeUserId)}'` : '';
+  const cap = capLimit(limit);
+  const rows = db.exec(`SELECT user_id, SUM(use_count) as total, COUNT(feature) as features
+                        FROM user_feature_usage
+                        WHERE 1 = 1 ${where}
+                        GROUP BY user_id
+                        ORDER BY total DESC, features DESC
+                        LIMIT ${cap}`);
+  if (!rows.length) return [];
+  return rows[0].values.map(v => ({ user_id: v[0], total: v[1], features: v[2] }));
+}
+
+function getMostUsedCommands(limit) {
+  const cap = capLimit(limit);
+  const rows = db.exec(`SELECT feature, SUM(use_count) as total, COUNT(DISTINCT user_id) as users
+                        FROM user_feature_usage
+                        GROUP BY feature
+                        ORDER BY total DESC
+                        LIMIT ${cap}`);
+  if (!rows.length) return [];
+  return rows[0].values.map(v => ({ feature: v[0], total: v[1], users: v[2] }));
+}
+
+function getTopWinners(limit, excludeUserId) {
+  const where = excludeUserId ? `AND user_id != '${safeStr(excludeUserId)}'` : '';
+  const cap = capLimit(limit);
+  const rows = db.exec(`SELECT user_id, total_won FROM users WHERE total_won > 0 ${where} ORDER BY total_won DESC LIMIT ${cap}`);
+  if (!rows.length) return [];
+  return rows[0].values.map(v => ({ user_id: v[0], total_won: v[1] }));
+}
+
+function getActivitySummary() {
+  const now = Math.floor(Date.now() / 1000);
+  const day = now - 86400;
+  const week = now - 604800;
+  const rows = db.exec(`SELECT
+      (SELECT COUNT(*) FROM users) AS total_users,
+      (SELECT COALESCE(SUM(use_count), 0) FROM user_feature_usage) AS total_commands,
+      (SELECT COUNT(DISTINCT user_id) FROM user_feature_usage WHERE last_used_at >= ${day}) AS active_day,
+      (SELECT COUNT(DISTINCT user_id) FROM user_feature_usage WHERE last_used_at >= ${week}) AS active_week`);
+  if (!rows.length || !rows[0].values.length) return null;
+  const [total_users, total_commands, active_day, active_week] = rows[0].values[0];
+  return { total_users, total_commands, active_day, active_week };
+}
+
 // ---------------- UPDATE DM ROLLOUT ----------------
 
 function queueUpdateDm(userIds, releaseId) {
@@ -5197,6 +5252,7 @@ module.exports = {
    TITLES, TITLES_BY_KEY, TITLE_RARITY_COLOR, getTitles, getEquippedTitle, unlockTitle, equipTitle, clearTitle, checkTitles,
    addIncident, getIncidents,
    getActivity, recordActivity, bumpSocial, bumpCounter, setSummonTime, setSummonOptOut, getSummonOptOut, setLastDmOk, recordFeatureUse, getFeatureUse, unseenFeatures, CLAIM_ONLY_COMMANDS,
+   getTopCommandUsers, getMostUsedCommands, getTopWinners, getActivitySummary,
   SOCIAL_PAIR_MILESTONES, bumpSocialPair, getSocialPair,
    recordDiscoveries,
    queueUpdateDm, getUpdateDmBatch, updateDmStatus, countUpdateDm,

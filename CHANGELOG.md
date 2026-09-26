@@ -1,4 +1,11 @@
 # Gambot Changelog (full history)
+## v2.0.5 — Bot usage analytics (`v activity`)
+
+- **NEW `v activity`** (`aliases: usage, analytics`) — cross-user usage boards built on the existing `user_feature_usage` tracking (every command already records its name per user). Subcommands: `v activity` (overview with active-today/week + top users/gamblers/winners), `v activity users|active|mostactive` (users by total commands + distinct features), `v activity gamble|gambled` (total wagered), `v activity wins|won` (total won), `v activity commands|cmd|used` (most-used commands bot-wide). Owner excluded from all boards (mirrors `v lb`).
+- **New DB helpers** in `db/index.js`: `getTopCommandUsers(limit, exclude)`, `getMostUsedCommands(limit)`, `getTopWinners(limit, exclude)`, `getActivitySummary()` (active today / this week / total commands / total users), shared `capLimit(1..20)`.
+- **Tests**: `scripts/test-activity.js` (16/16 — ranking, owner exclusion, caps, summary) and `scripts/test-activity-cmd.js` (18/18 end-to-end render via stub). Verified no regression: full suite matches baseline (5 pre-existing Node-26 failures untouched).
+- **No data risk**: purely read-only aggregation over usage counters; no migration, no schema change.
+
 ## v2.0.4 — Leaderboard counts unclaimed inbox money + empty-giveaway refund
 
 - **`v lb` / `db.getTop` count pending inbox deliveries** (wallet + bank + unclaimed inbox money): giveaway prizes and `v give` transfers land in the recipient's inbox as pending until claimed, and the board previously showed the stale old total for hours/days — users saw "won 100m but not on lb" or "gave 25m but shows 18m". The money was never at risk (`safeClaim` refund/cancel bonuses keep it from dropping), it was purely a display gap. `commands/slb.js` (server lb) updated to match. Regression test in `scripts/test-leaderboard.js` (8/8).
