@@ -1,3 +1,14 @@
+v2.1.0 — Snail Garden Progression
+
+- 🐌 Snail garden got a real progression system
+  - `v garden pet` — pick a 🐌 snail, 🐸 frog, 🪱 worm, 🐱 cat, 🐰 bunny, 🦔 hedgehog, 🦊 fox, 🦉 owl or 🐉 dragon to run your garden (dragon is the hardest + juiciest)
+  - `v gardenshop` — 5 permanent upgrades, unlocked by garden level: better 🌱 soil (+growth on rows 5+), ripe 🧬 seeds (+profit on rows 5+), a 🕸 safety net (survive a failed deep row), comfy 👢 boots (+1 row cap up to 13 rows), the golden 🚿 can (+2% profit on rows 5+, forever)
+  - Garden XP + levels — every run earns XP (`v garden` shows your level bar), levels unlock pets + upgrades, level-ups pay bonus coins
+  - Events on deep rows (12%) — Light Rain (+growth), Sunshine (+profit), Bugs (+fail) and the silent Bedrock
+  - survivability is strictly better than profit: your deep-row chance of dying stays safe, and the math is audited so NO runner or upgrade combo is ever a guaranteed win — the house keeps its edge
+  - `v garden pet` / `v garden shop` / `v gardenbuy <upgrade>` aliases work too
+  - untouch a garden before it grows and it's a full refund — xp/levels/achievements only start when you actually plant a row
+
 v2.0.5 — Bot Usage Analytics
 - 📈 NEW `v activity` (+ `v usage`/`v analytics`) — see who uses the bot the most, who gambles the most, who wins the most, and the most-used commands
   - `v activity` — overview panel (active today/this week + top users, gamblers, winners)

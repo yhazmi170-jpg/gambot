@@ -5,7 +5,18 @@
 
 ## Status
 - **Branch**: `master`
+- **Version**: **2.1.0** — anti-farm check PASSED (garden-anti-farm 39/39, garden 67/67, balance sim PASS, full suite at baseline) → deploying via `deploy-gambot.sh` now.
 - **Version**: `2.0.5` live. **Host migrated to NEW Render account** — gambot live at `https://gambot-hle3.onrender.com/health`, sentinel live at `https://sentinel-wqrw.onrender.com/` ("Sentinel is running"). Old account suspended / keys dead — do NOT use old URLs. Keepalive + docs repointed. **v2.0.5 adds `v activity`** usage analytics. **v2.0.4 lb fix:** `v lb`/`v slb` now count unclaimed inbox money (giveaway prizes + gifts were invisible until claimed — user-reported). **0-entry giveaways refund the host in full** (previously host's prize was destroyed). **sql.js long-uptime crash on 2026-09-25 (05:20–11:02Z)** frozen DB — see CHANGELOG; recovered via redeploy, 779 users intact.
+
+## Done today (2026-09-26) — v2.1.0 snail garden progression (BUILT + TESTED, NOT DEPLOYED)
+- [x] **Garden runners** (`v garden pet`): 9 runners (snail→dragon), unlock levels 1/2/2/3/3/5/5/7/9, every runner satisfies `(1−failBase/100)·mult ≤ 1`.
+- [x] **Garden shop** (`v gardenshop` / `v gardenbuy <upgrade>`): soil/seeds/net/boots/can permanent upgrades, all deep-gated rows 5+ (`GARDEN_DEEP_DEPTH`=5), so the one-row EV stays exactly 1.0.
+- [x] **XP/levels**: 300/day cap, `floor(40·L^1.5)` curve, level-up coins `L·5000`; `v garden` = combined profile (runner/level bar/upgrades) + breeding preserved.
+- [x] **Events (12%, rows 5+):** rain/sunshine/bugs/bedrock. **Achievements** (6, incl. garden_million 750k) + **titles** garden_keeper/master_gardener.
+- [x] DB layer done (`garden_meta`/`garden_unlocks` + helpers in `db/index.js`); `recordGardenResult` auto-runs checkAchievements; `gardenStatsFor` is SELECT-only.
+- [x] Tests: `scripts/test-garden.js` **67/67**, `scripts/test-garden-balance.js` Monte Carlo **PASS** (no runner/upgrade combo +EV; max-EV strategy = sell-immediately @ 1.0000). Full suite matches baseline (5 known Node-26 failures).
+- [x] **Pre-deploy anti-farm pass (2026-09-26):** 0-row sell/timeout = pure refund (no run/XP/stats/achievements/wager); XP staked-gated (`GARDEN_PROG_MIN_BET` 10k); run-count achievements require lifetime `total_staked` (10k/100k/1M); `addGambled` now fires on first `sg_next`, not game start. New deterministic `scripts/test-garden-anti-farm.js` **39/39**: min-bet + 100k zero-risk sell-loops move ZERO counters; lucky flag has no effect; daily cap survives a simulated restart (module re-require from disk); breeding preserved; runner/upgrade gating intact.
+- [x] Version 2.0.5→**2.1.0**, `update_msg.txt`, `CHANGELOG.md`, `AGENTS.md` synced. Deploy approved by user after anti-farm pass.
 
 ## Done today (2026-09-26) — v2.0.5 activity analytics (LIVE)
 - [x] **NEW `v activity`** (`aliases: usage, analytics`): read-only aggregate over existing `user_feature_usage` tracking. Subcommands → `v activity` overview (active today/week + top users/gamblers/winners), `users|active`, `gamble|gambled`, `wins|won`, `commands|cmd|used`. Owner excluded from boards (mirrors `v lb`).

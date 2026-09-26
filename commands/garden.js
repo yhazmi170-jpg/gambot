@@ -6,7 +6,7 @@ module.exports = {
   helpCategory: 'Pets',
   helpArgs: '[buy|sell] [count]',
   aliases: ['snails', 'snail'],
-  description: 'snail garden — buy snails and they breed over time (sell them for profit)',
+  description: 'your garden — snail breeding stats + snail garden progression',
   execute(message, args) {
     const userId = message.author.id;
     const action = (args[0] || '').toLowerCase();
@@ -37,6 +37,19 @@ module.exports = {
 
     const bred = db.breedSnails(userId);
     const info = db.getSnailInfo(userId);
+    const g = db.getGardenProfile(userId);
+    const runner = db.GARDEN_RUNNERS[g.runner] || db.GARDEN_RUNNERS.snail;
+
+    const winRate = g.total_runs > 0 ? Math.round((g.won_runs / g.total_runs) * 100) : 0;
+    const barLen = 14;
+    const baseXp = db.gardenXpForLevel(g.level);
+    const filled = Math.round((g.xp - baseXp) / Math.max(1, g.xpToNext - baseXp) * barLen);
+    const bar = '🟩'.repeat(Math.max(0, Math.min(barLen, filled))) + '⬛'.repeat(Math.max(0, barLen - Math.min(barLen, filled)));
+    const ownedUpgrades = Object.entries(g.unlocks)
+      .filter(([k]) => db.GARDEN_UPGRADES[k])
+      .map(([k, l]) => `${db.GARDEN_UPGRADES[k].emoji}${l}`)
+      .join(' ');
+    const upgradeLine = ownedUpgrades || 'none yet — `v gardenshop`';
 
     let nextIn = '—';
     if (info.snails < info.capacity && info.snails > 0) {
@@ -46,13 +59,18 @@ module.exports = {
     }
 
     const fields = [
-      ['Snails', `**${info.snails}** / ${info.capacity}`],
-      ['Breeding', `1 baby per snail per 24h, up to capacity\nnext baby in: ${nextIn}`],
-      ['Today', `bought **${info.boughtToday}** — **${info.buyLimitToday}** more available at **${db.SNAIL_PRICE}** coins each`],
-      ['Sell value', `**${info.snails * db.SNAIL_SELL_PRICE}** coins (${db.SNAIL_SELL_PRICE} each)`],
+      ['Gardener', `${runner.emoji} **${runner.name}** — switch with \`v gardenpet\``],
+      ['Garden level', `**${g.level}** · ${g.xp.toLocaleString()} xp\n${bar} \`${g.xpRemaining.toLocaleString()} to level ${g.level + 1}\``],
+      ['Runs', `**${g.total_runs}** total · **${g.won_runs}** sold (${winRate}%)\nbest **${g.best_run}** rows · biggest sell **${g.biggest_cashout.toLocaleString()}** coins`],
+      ['Won / Lost', `**${g.total_won.toLocaleString()}** / **${g.total_lost.toLocaleString()}** coins (staked **${g.total_staked.toLocaleString()}**)`],
+      ['Safety net', `saved **${g.safety_catches}** failed row(s)`],
+      ['Upgrades', upgradeLine],
+      ['Daily garden xp', `${g.xpUsedToday.toLocaleString()} / ${db.GARDEN_XP_DAY_CAP}`],
+      ['Snails', `**${info.snails}** / ${info.capacity} — breeding 1 baby per snail per 24h, next in: ${nextIn}`],
+      ['Snail value', `**${info.snails * db.SNAIL_SELL_PRICE}** coins (${db.SNAIL_SELL_PRICE} each) — buy **${info.buyLimitToday}** more today at **${db.SNAIL_PRICE}** each`],
     ];
     if (bred.bred > 0) fields.unshift(['', `🐣 **${bred.bred}** baby snail(s) hatched!`]);
 
-    message.channel.send({ embeds: [embed('Snail Garden', fields, 0x2b2d31)] });
+    message.channel.send({ embeds: [embed(`🌻 ${message.author.username}'s Garden`, fields, 0x2b2d31)] });
   },
 };

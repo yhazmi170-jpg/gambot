@@ -413,6 +413,30 @@ async function init() {
     PRIMARY KEY (actor_id, target_id, action)
   )`);
 
+  // Snail Garden progression (v2.1.0): runner, XP/level, run stats, safety net
+  db.run(`CREATE TABLE IF NOT EXISTS garden_meta (
+    user_id TEXT PRIMARY KEY,
+    runner TEXT NOT NULL DEFAULT 'snail',
+    xp INTEGER NOT NULL DEFAULT 0,
+    xp_day INTEGER NOT NULL DEFAULT 0,
+    xp_day_ts INTEGER NOT NULL DEFAULT 0,
+    total_runs INTEGER NOT NULL DEFAULT 0,
+    won_runs INTEGER NOT NULL DEFAULT 0,
+    best_run INTEGER NOT NULL DEFAULT 0,
+    biggest_cashout INTEGER NOT NULL DEFAULT 0,
+    total_won INTEGER NOT NULL DEFAULT 0,
+    total_lost INTEGER NOT NULL DEFAULT 0,
+    total_staked INTEGER NOT NULL DEFAULT 0,
+    safety_catches INTEGER NOT NULL DEFAULT 0
+  )`);
+  try { db.run(`ALTER TABLE garden_meta ADD COLUMN total_staked INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  db.run(`CREATE TABLE IF NOT EXISTS garden_unlocks (
+    user_id TEXT NOT NULL,
+    item TEXT NOT NULL,
+    level INTEGER NOT NULL DEFAULT 1,
+    PRIMARY KEY (user_id, item)
+  )`);
+
   db.run(`CREATE TABLE IF NOT EXISTS user_activity (
     user_id TEXT PRIMARY KEY,
     first_seen INTEGER NOT NULL DEFAULT 0,
@@ -2389,6 +2413,229 @@ function sellSnails(userId, count) {
   return { ok: true, sold: actual, coins };
 }
 
+// ---------- Snail Garden progression (v2.1.0) ----------
+
+// Upgrades/events only affect deep rows (this many rows in), so the first-row
+// sprint keeps its exact historical fairness (0.80 * 1.25 = 1.00 at step 0).
+const GARDEN_DEEP_DEPTH = 5;
+const GARDEN_XP_DAY_CAP = 300;      // anti-farm: hard daily cap on garden xp
+const GARDEN_XP_PER_BET = 10000;    // +1 xp per 10k bet per successful row
+const GARDEN_PROG_MIN_BET = 10000;  // anti-farm: runs below this stake earn NO xp and never unlock garden achievements
+const GARDEN_EVENT_CHANCE = 0.12;
+const GARDEN_MAX_EXTRA_ROWS = 3;    // Garden Boots extends the garden by this many rows max
+
+// Each runner keeps (1 - failBase/100) * mult <= 1.0, so step 0 is never +EV.
+const GARDEN_RUNNERS = {
+  snail:    { emoji: '🐌', name: 'Snail',    mult: 1.25, failBase: 20, failStep: 7, unlockLevel: 1, desc: 'the classic planter — balanced risk and reward' },
+  frog:     { emoji: '🐸', name: 'Frog',     mult: 1.24, failBase: 20, failStep: 7, unlockLevel: 2, desc: 'a gentle hopper — slightly safer growth' },
+  worm:     { emoji: '🪱', name: 'Worm',     mult: 1.26, failBase: 21, failStep: 7, unlockLevel: 2, desc: 'squirms through the dirt — faster but riskier' },
+  cat:      { emoji: '🐱', name: 'Cat',      mult: 1.20, failBase: 17, failStep: 6, unlockLevel: 3, desc: 'nine lives — steadier as rows climb' },
+  bunny:    { emoji: '🐇', name: 'Bunny',    mult: 1.27, failBase: 22, failStep: 7, unlockLevel: 3, desc: 'jumpy and quick — way more risk for growth' },
+  hedgehog: { emoji: '🦔', name: 'Hedgehog', mult: 1.22, failBase: 19, failStep: 7, unlockLevel: 5, desc: 'picky but cozy — a calm deep planter' },
+  fox:      { emoji: '🦊', name: 'Fox',      mult: 1.28, failBase: 23, failStep: 7, unlockLevel: 5, desc: 'clever and bold — high growth, high risk' },
+  owl:      { emoji: '🦉', name: 'Owl',      mult: 1.23, failBase: 19, failStep: 6, unlockLevel: 7, desc: 'wise — stays steady through the deep rows' },
+  dragon:   { emoji: '🐉', name: 'Dragon',   mult: 1.30, failBase: 24, failStep: 7, unlockLevel: 9, desc: 'the gamble — the most growth for the boldest' },
+};
+
+const GARDEN_UPGRADES = {
+  soil:  { emoji: '🌱', name: 'Lucky Soil',          maxLevel: 5, unlockLevel: 1, costPerLevel: l => 250000 * l,  desc: 'rows 5+ are 1% safer per level' },
+  seeds: { emoji: '🌿', name: 'Better Seeds',        maxLevel: 5, unlockLevel: 1, costPerLevel: l => 300000 * l,  desc: 'rows 5+ grow 1.5% faster per level' },
+  net:   { emoji: '🕸️', name: 'Safety Net',         maxLevel: 5, unlockLevel: 3, costPerLevel: l => 500000 * l,  desc: '4% per level that a failed row 5+ sells at its value instead' },
+  boots: { emoji: '🥾', name: 'Garden Boots',        maxLevel: 3, unlockLevel: 1, costPerLevel: l => 200000 * l,  desc: 'the garden can grow 1 more row per level' },
+  can:   { emoji: '🔱', name: 'Golden Watering Can', maxLevel: 1, unlockLevel: 6, costPerLevel: () => 5000000,   desc: 'rows 5+ grow an extra 2% forever' },
+};
+
+function gardenLevelFor(xp) {
+  let L = 1;
+  while (L < 30 && xp >= Math.floor(40 * Math.pow(L + 1, 1.5))) L++;
+  return L;
+}
+
+// Cumulative xp needed to reach a level (level 2 = 113, level 5 = 447, ...).
+function gardenXpForLevel(L) {
+  if (L <= 1) return 0;
+  return Math.floor(40 * Math.pow(L, 1.5));
+}
+
+function getGardenProfile(userId) {
+  db.run(`INSERT OR IGNORE INTO garden_meta (user_id) VALUES ('${safeStr(userId)}')`);
+  const rows = db.exec(`SELECT * FROM garden_meta WHERE user_id = '${safeStr(userId)}'`);
+  const v = rows[0].values[0]; const c = rows[0].columns;
+  const get = (n, d = 0) => { const i = c.indexOf(n); return i === -1 ? d : v[i]; };
+  const profile = {
+    user_id: get('user_id'),
+    runner: get('runner', 'snail'),
+    xp: get('xp'), xp_day: get('xp_day'), xp_day_ts: get('xp_day_ts'),
+    total_runs: get('total_runs'), won_runs: get('won_runs'), best_run: get('best_run'),
+    biggest_cashout: get('biggest_cashout'), total_won: get('total_won'),
+    total_lost: get('total_lost'), total_staked: get('total_staked'), safety_catches: get('safety_catches'),
+  };
+  profile.level = gardenLevelFor(profile.xp);
+  const today = dayNumber();
+  profile.xpUsedToday = profile.xp_day_ts === today ? profile.xp_day : 0;
+  profile.xpToNext = gardenXpForLevel(profile.level + 1);
+  profile.xpRemaining = Math.max(0, profile.xpToNext - profile.xp);
+  profile.unlocks = {};
+  const u = db.exec(`SELECT item, level FROM garden_unlocks WHERE user_id = '${safeStr(userId)}'`);
+  if (u[0]) u[0].values.forEach(r => { profile.unlocks[r[0]] = r[1]; });
+  return profile;
+}
+
+// Lightweight stats-only read (no row insert) for achievement/title scanners.
+function gardenStatsFor(userId) {
+  const rows = db.exec(`SELECT xp, total_runs, won_runs, best_run, safety_catches, total_won, total_staked FROM garden_meta WHERE user_id = '${safeStr(userId)}'`);
+  if (!rows.length || !rows[0].values.length) return { xp: 0, total_runs: 0, won_runs: 0, best_run: 0, safety_catches: 0, total_won: 0, total_staked: 0, level: 1 };
+  const v = rows[0].values[0];
+  return { xp: v[0] || 0, total_runs: v[1] || 0, won_runs: v[2] || 0, best_run: v[3] || 0, safety_catches: v[4] || 0, total_won: v[5] || 0, total_staked: v[6] || 0, level: gardenLevelFor(v[0] || 0) };
+}
+
+// Anti-farm xp: scales with bet, hard-capped daily. Awards level-up coins.
+function addGardenXp(userId, baseXp) {
+  const g = getGardenProfile(userId);
+  const today = dayNumber();
+  const used = g.xp_day_ts === today ? g.xp_day : 0;
+  let added = Math.max(0, Math.floor(baseXp));
+  const capLeft = Math.max(0, GARDEN_XP_DAY_CAP - used);
+  if (added > capLeft) added = capLeft;
+  if (added === 0) return { added: 0, level: g.level, leveledUp: false, capped: used >= GARDEN_XP_DAY_CAP };
+  db.run(`UPDATE garden_meta SET xp = xp + ${added}, xp_day = ${used + added}, xp_day_ts = ${today} WHERE user_id = '${safeStr(userId)}'`);
+  save();
+  const after = getGardenProfile(userId);
+  const leveledUp = after.level > g.level;
+  if (leveledUp) addBalance(userId, after.level * 5000);
+  return { added, level: after.level, leveledUp, capped: used + added >= GARDEN_XP_DAY_CAP };
+}
+
+function unlockGardenRunner(userId, runnerKey) {
+  const g = getGardenProfile(userId);
+  const def = GARDEN_RUNNERS[runnerKey];
+  if (!def) return { ok: false, reason: 'unknown' };
+  if (g.level < def.unlockLevel) return { ok: false, reason: 'level', level: g.level, needed: def.unlockLevel };
+  db.run(`INSERT OR IGNORE INTO garden_unlocks (user_id, item, level) VALUES ('${safeStr(userId)}', 'runner_${runnerKey}', 1)`);
+  save();
+  return { ok: true, runner: def };
+}
+
+function isGardenRunnerUnlocked(userId, runnerKey) {
+  const g = getGardenProfile(userId);
+  if (runnerKey === 'snail') return true;
+  return (g.unlocks['runner_' + runnerKey] || 0) >= 1;
+}
+
+function equipGardenRunner(userId, runnerKey) {
+  const g = getGardenProfile(userId);
+  const def = GARDEN_RUNNERS[runnerKey];
+  if (!def) return { ok: false, reason: 'unknown' };
+  if (runnerKey !== 'snail' && !isGardenRunnerUnlocked(userId, runnerKey)) {
+    if (g.level >= def.unlockLevel) unlockGardenRunner(userId, runnerKey);
+    else return { ok: false, reason: 'locked', level: g.level, needed: def.unlockLevel };
+  }
+  db.run(`UPDATE garden_meta SET runner = '${runnerKey}' WHERE user_id = '${safeStr(userId)}'`);
+  save();
+  return { ok: true, runner: def };
+}
+
+function buyGardenUpgrade(userId, item) {
+  const g = getGardenProfile(userId);
+  const def = GARDEN_UPGRADES[item];
+  if (!def) return { ok: false, reason: 'unknown' };
+  if (g.level < def.unlockLevel) return { ok: false, reason: 'level', level: g.level, needed: def.unlockLevel };
+  const cur = g.unlocks[item] || 0;
+  if (cur >= def.maxLevel) return { ok: false, reason: 'max', maxLevel: def.maxLevel };
+  const cost = def.costPerLevel(cur + 1);
+  const u = ensureUser(userId);
+  if (!u || u.balance < cost) return { ok: false, reason: 'coins', cost, balance: u ? u.balance : 0 };
+  addBalance(userId, -cost);
+  db.run(`INSERT OR IGNORE INTO garden_unlocks (user_id, item, level) VALUES ('${safeStr(userId)}', '${item}', 0)`);
+  db.run(`UPDATE garden_unlocks SET level = level + 1 WHERE user_id = '${safeStr(userId)}' AND item = '${item}'`);
+  save();
+  return { ok: true, item, level: cur + 1, maxLevel: def.maxLevel, cost };
+}
+
+// Effective parameters for a live run. Read from the DB, never stored on games.
+function gardenMods(userId) {
+  const g = getGardenProfile(userId);
+  const run = GARDEN_RUNNERS[g.runner] || GARDEN_RUNNERS.snail;
+  const u = g.unlocks;
+  return {
+    userId,
+    runnerKey: g.runner,
+    runnerEmoji: run.emoji,
+    runnerName: run.name,
+    mult: run.mult,
+    failBase: run.failBase,
+    failStep: run.failStep,
+    deepDepth: GARDEN_DEEP_DEPTH,
+    maxSteps: Math.min(10 + GARDEN_MAX_EXTRA_ROWS, 10 + (u.boots || 0)),
+    soil: u.soil || 0,
+    seeds: u.seeds || 0,
+    net: u.net || 0,
+    can: u.can || 0,
+    level: g.level,
+  };
+}
+
+// Multiplier factor applied when planting the row after `completedRows`.
+function gardenRowGrowth(mod, completedRows) {
+  let grow = mod.mult;
+  if (completedRows >= mod.deepDepth) grow *= (1 + (mod.seeds || 0) * 0.015 + (mod.can ? 0.02 : 0));
+  return Math.round(grow * 1000) / 1000;
+}
+
+// Cumulative multiplier after n planted rows.
+function gardenMultAt(mod, n) {
+  let m = 1;
+  for (let k = 0; k < n; k++) m *= gardenRowGrowth(mod, k);
+  return Math.round(m * 100) / 100;
+}
+
+// Failure chance when planting the row after `completedRows`.
+function gardenFailAt(mod, completedRows) {
+  let f = mod.failBase + mod.failStep * completedRows;
+  if (completedRows >= mod.deepDepth) f -= (mod.soil || 0);
+  return Math.min(95, Math.max(1, f));
+}
+
+// Rare flavour events — deep rows only so they can never touch the fair first row.
+function gardenEvent(completedRows) {
+  if (completedRows < GARDEN_DEEP_DEPTH || Math.random() > GARDEN_EVENT_CHANCE) return null;
+  const pick = Math.floor(Math.random() * 4);
+  const evs = {
+    0: { key: 'rain', emoji: '🌧️', name: 'Light Rain', fail: -6, grow: 0.08, desc: 'the soil softens — easier, faster row' },
+    1: { key: 'sun',  emoji: '☀️', name: 'Sunshine',   fail: 0,  grow: 0.10, desc: 'the plants drink the sun — faster row' },
+    2: { key: 'bugs', emoji: '🐛', name: 'Bugs',       fail: 8,  grow: 0,    desc: 'bugs chew the leaves — risky row' },
+    3: { key: 'rock', emoji: '🪨', name: 'Bedrock',    fail: 0,  grow: 0,    desc: 'the garden is stubborn' },
+  };
+  return evs[pick];
+}
+
+// Store a finished run and hand out xp/level rewards + achievement checks.
+function recordGardenResult(userId, { bet, rows, cashed, won, catches = 0 }) {
+  getGardenProfile(userId); // ensure the meta row exists so a first-ever run is never silently dropped
+  db.run(
+    `UPDATE garden_meta SET total_runs = total_runs + 1,
+       won_runs = won_runs + ${won ? 1 : 0},
+       best_run = MAX(best_run, ${Math.max(0, Math.floor(rows || 0))}),
+       biggest_cashout = MAX(biggest_cashout, ${Math.max(0, Math.floor(cashed || 0))}),
+       total_won = total_won + ${won ? Math.max(0, Math.floor(cashed || 0)) : 0},
+       total_lost = total_lost + ${won ? 0 : Math.max(0, Math.floor(bet || 0))},
+       total_staked = total_staked + ${Math.max(0, Math.floor(bet || 0))},
+       safety_catches = safety_catches + ${Math.max(0, Math.floor(catches || 0))}
+     WHERE user_id = '${safeStr(userId)}'`);
+  save();
+  // XP is gated behind a meaningful stake — a 1-coin sell-spam run earns 0 xp,
+  // so levels/level-up coins/titles can't be farmed with no money at risk.
+  const progOk = (bet || 0) >= GARDEN_PROG_MIN_BET;
+  let rowsXp = 0, bonusXp = 0;
+  if (progOk) {
+    rowsXp = Math.max(0, Math.floor(rows || 0)) * (1 + Math.floor((bet || 0) / GARDEN_XP_PER_BET));
+    bonusXp = won ? Math.floor(Math.floor(cashed || 0) / 50000) : 0;
+  }
+  const xpRes = addGardenXp(userId, rowsXp + bonusXp);
+  const newAch = checkAchievements(userId);
+  return { ...xpRes, rowsXp, bonusXp, achievements: newAch.map(a => a.key) };
+}
+
 // ---------- Quests (daily) + Bounties (weekly) ----------
 
 // Human-readable labels for every objective a quest/bounty can ask for.
@@ -2948,6 +3195,14 @@ const ACHIEVEMENTS = [
   { key: 'bonded', name: '🤝 Bonded', desc: 'reach 150 bond with a pet', reward: 75000, test: u => (u.best_bond || 0) >= 150 },
   { key: 'soulbound', name: '🪢 Soulbound', desc: 'reach 2500 bond with a single pet', reward: 750000, test: u => (u.best_bond || 0) >= 2500 },
   { key: 'event_hero', name: '🏹 Event Hero', desc: 'complete a server community event', reward: 150000, test: u => (u.event_wins || 0) >= 1 },
+  // garden (snail garden progression, v2.1.0) — run-count rewards require a
+  // meaningful lifetime stake so 1-coin sell-spam can never farm them
+  { key: 'garden_first', name: '🌻 First Bloom', desc: 'finish your first garden run', reward: 15000, test: u => (u.garden_won || 0) >= 1 && (u.garden_staked || 0) >= 10000 },
+  { key: 'garden_10', name: '🌼 Green Thumb', desc: 'finish 10 garden runs', reward: 100000, test: u => (u.garden_won || 0) >= 10 && (u.garden_staked || 0) >= 100000 },
+  { key: 'garden_100', name: '🌺 Garden Veteran', desc: 'finish 100 garden runs', reward: 300000, test: u => (u.garden_won || 0) >= 100 && (u.garden_staked || 0) >= 1000000 },
+  { key: 'garden_perfect', name: '🥇 Perfect Garden', desc: 'fully plant the garden in one run', reward: 500000, test: u => (u.garden_best || 0) >= 10 },
+  { key: 'garden_safety', name: '🕸️ Nine Lives', desc: 'the safety net saves a failed row', reward: 50000, test: u => (u.garden_catches || 0) >= 1 },
+  { key: 'garden_million', name: '💰 Green Millionaire', desc: 'win 1M total from garden runs', reward: 750000, test: u => (u.garden_won_total || 0) >= 1000000 },
 ];
 
 function getAchievements(userId) {
@@ -3003,6 +3258,11 @@ function checkAchievements(userId) {
     wanted_marked: u.wanted_marked || 0,
     best_bond: animals.reduce((m, a) => Math.max(m, a.bond || 0), 0),
     event_wins: u.event_wins || 0,
+    garden_won: gardenStatsFor(userId).won_runs,
+    garden_best: gardenStatsFor(userId).best_run,
+    garden_catches: gardenStatsFor(userId).safety_catches,
+    garden_won_total: gardenStatsFor(userId).total_won,
+    garden_staked: gardenStatsFor(userId).total_staked,
   };
   const owned = new Set(getAchievements(userId));
   const unlocked = [];
@@ -4626,6 +4886,9 @@ const TITLES = {
   the_button_order: { name: 'the button',       rarity: 'hidden',  desc: 'pressed the button', award: u => u.button_pressed >= 1 },
   rollcall_veteran: { name: 'roll call veteran',rarity: 'hidden',  desc: 'showed up for roll call', award: u => u.rollcalls >= 1 },
   council_member:   { name: 'council member',   rarity: 'hidden',  desc: 'was judged by common sense', award: u => u.judged >= 1 },
+  // garden (snail garden progression, v2.1.0)
+  garden_keeper:    { name: 'garden keeper',    rarity: 'rare',    desc: 'reached garden level 5', award: u => (u.garden_level || 0) >= 5 },
+  master_gardener:  { name: 'master gardener',  rarity: 'legendary', desc: 'reached garden level 10', award: u => (u.garden_level || 0) >= 10 },
 };
 const TITLES_BY_KEY = Object.keys(TITLES);
 const TITLE_RARITY_COLOR = { common: '0x9b59b6', rare: '0x3498db', legendary: '0xf1c40f', hidden: '0x95a5a6' };
@@ -4708,6 +4971,9 @@ function titleStateFor(userId) {
     event_wins: u.event_wins || 0,
     account_days: days,
     best_bond: animals.reduce((m, a) => Math.max(m, a.bond || 0), 0),
+    garden_level: gardenStatsFor(userId).level,
+    garden_runs: gardenStatsFor(userId).total_runs,
+    garden_won_total: gardenStatsFor(userId).total_won,
   };
 }
 
@@ -5253,6 +5519,11 @@ module.exports = {
    addIncident, getIncidents,
    getActivity, recordActivity, bumpSocial, bumpCounter, setSummonTime, setSummonOptOut, getSummonOptOut, setLastDmOk, recordFeatureUse, getFeatureUse, unseenFeatures, CLAIM_ONLY_COMMANDS,
    getTopCommandUsers, getMostUsedCommands, getTopWinners, getActivitySummary,
+  // snail garden progression (v2.1.0)
+  GARDEN_RUNNERS, GARDEN_UPGRADES, GARDEN_DEEP_DEPTH, GARDEN_XP_DAY_CAP, GARDEN_PROG_MIN_BET, GARDEN_EVENT_CHANCE,
+  getGardenProfile, gardenStatsFor, addGardenXp, gardenLevelFor, gardenXpForLevel,
+  unlockGardenRunner, isGardenRunnerUnlocked, equipGardenRunner,
+  buyGardenUpgrade, gardenMods, gardenRowGrowth, gardenMultAt, gardenFailAt, gardenEvent, recordGardenResult,
   SOCIAL_PAIR_MILESTONES, bumpSocialPair, getSocialPair,
    recordDiscoveries,
    queueUpdateDm, getUpdateDmBatch, updateDmStatus, countUpdateDm,
