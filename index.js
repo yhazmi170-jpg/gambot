@@ -668,6 +668,21 @@ start().catch(e => console.error('[START] FATAL:', e));
     } catch (e) { console.error('[summon] error:', e); }
   }, 900000);
 
+  // ---- 2.1.x: proactive re-engagement sweep (tips / inactivity / return + surprise gifts) ----
+  // Idempotent, DB-backed, survives restarts/sleep. Every 15 min; budgets in DB.
+  let reengageRunning = false;
+  setInterval(() => {
+    if (reengageRunning || !client.isReady()) return;
+    reengageRunning = true;
+    const { runReEngagementSweep } = require('./utils/reEngagement');
+    runReEngagementSweep({ client }).then(st => {
+      if (st.tips || st.inactivityDms || st.returnGifts || st.surprises) {
+        console.log(`[re-engage] tips:${st.tips} inact:${st.inactivityDms} returns:${st.returnGifts} surprises:${st.surprises}`);
+      }
+    }).catch(e => console.error('[re-engage] error:', (e && e.message) || e))
+      .then(() => { reengageRunning = false; });
+  }, 900000);
+
   // ---- 2.0: one-time major-update update DMs (batched slowly) ----
   const SEND_UPDATE_DM_BATCH = 5;
   setInterval(() => {
@@ -809,7 +824,11 @@ setInterval(() => {
 
 client.on('messageCreate', (message) => {
   try {
-    Promise.resolve(handleMessage(message)).catch(e => {
+    Promise.resolve(handleMessage(message)).then(() => {
+      if (!message.author.bot) {
+        try { const { maybeWelcomeBack } = require('./utils/reEngagement'); maybeWelcomeBack(client, message.author.id, message.channel).catch(() => {}); } catch {}
+      }
+    }).catch(e => {
       if (e && e.cmdErrorLogged) return;
       console.error(`[COMMAND ERROR] command:${String(message.content || '').split(/\s+/)[1] || '?'} user:${message.author && message.author.id} guild:${(message.guild && message.guild.id) || 'DM'} stage:message_create error:${e && e.message} stack:${String(e && e.stack || '').split('\n').slice(0, 3).join(' | ')}`);
     });

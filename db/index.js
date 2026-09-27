@@ -344,6 +344,44 @@ async function init() {
   )`);
   db.run(`CREATE INDEX IF NOT EXISTS inbox_recipient_idx ON inbox_deliveries (recipient_id, status)`);
 
+  // 2026-09 proactive re-engagement: v notifications prefs, per-user tip/return state,
+  // exactly-once reward grants, and a single global daily-budget row.
+  db.run(`CREATE TABLE IF NOT EXISTS notify_prefs (
+    user_id TEXT PRIMARY KEY,
+    tips INTEGER NOT NULL DEFAULT 1,
+    inactivity INTEGER NOT NULL DEFAULT 1,
+    rewards INTEGER NOT NULL DEFAULT 1
+  )`);
+  db.run(`CREATE TABLE IF NOT EXISTS reengage_state (
+    user_id TEXT PRIMARY KEY,
+    last_tip_at INTEGER NOT NULL DEFAULT 0,
+    last_tip_type TEXT NOT NULL DEFAULT '',
+    tip_count INTEGER NOT NULL DEFAULT 0,
+    last_inactivity_dm_at INTEGER NOT NULL DEFAULT 0,
+    last_inactivity_tier INTEGER NOT NULL DEFAULT 0,
+    last_return_gift_at INTEGER NOT NULL DEFAULT 0,
+    last_return_gift_kind TEXT NOT NULL DEFAULT '',
+    last_surprise_gift_at INTEGER NOT NULL DEFAULT 0,
+    surprise_count INTEGER NOT NULL DEFAULT 0,
+    welcome_token TEXT NOT NULL DEFAULT ''
+  )`);
+  db.run(`CREATE TABLE IF NOT EXISTS reward_grants (
+    token TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    amount INTEGER NOT NULL DEFAULT 0,
+    payload TEXT NOT NULL DEFAULT '{}',
+    created_at INTEGER NOT NULL DEFAULT 0
+  )`);
+  db.run(`CREATE TABLE IF NOT EXISTS reengage_global (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    day TEXT NOT NULL DEFAULT '',
+    dm_count INTEGER NOT NULL DEFAULT 0,
+    gift_count INTEGER NOT NULL DEFAULT 0,
+    fail_count INTEGER NOT NULL DEFAULT 0,
+    last_sweep_at INTEGER NOT NULL DEFAULT 0
+  )`);
+
   db.run(`CREATE TABLE IF NOT EXISTS contracts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     creator_id TEXT NOT NULL,
@@ -4661,7 +4699,7 @@ function distributeBossPot(guildId, contrib, pot) {
 //  2.0 systems — inbox / contracts / titles / incidents / activity / discovery / events
 // =====================================================================================
 
-const INBOX_SOURCES = ['give', 'contract', 'event', 'achievement', 'gift', 'quest_bonus', 'title', 'giveaway', 'system'];
+const INBOX_SOURCES = ['give', 'contract', 'event', 'achievement', 'gift', 'quest_bonus', 'title', 'giveaway', 'comeback', 'system'];
 const CONTRACT_TTL_PENDING = 24 * 3600;   // undoable proposal window
 const CONTRACT_TTL_ACTIVE = 72 * 3600;    // window to actually finish
 const INCIDENT_LIMIT_PER_GUILD = 60;
@@ -4722,6 +4760,7 @@ function creditPayload(userId, payload) {
   if (payload.gems) { addGems(userId, Number(payload.gems)); out.push('gems'); }
   if (payload.essence) { db.run(`UPDATE users SET essence = essence + ${Number(payload.essence)} WHERE user_id = '${safeStr(userId)}'`); out.push('essence'); }
   if (payload.xp) { grantXp(userId, Number(payload.xp)); out.push('xp'); }
+  if (payload.crates) { addWeaponCrate(userId, Number(payload.crates)); out.push('weapon crates'); }
   if (payload.pet) {
     try {
       const a = getAnimal(Number(payload.pet));
@@ -5219,6 +5258,130 @@ function setLastDmOk(userId, ok) {
   save();
 }
 
+// ---------------- PROACTIVE RE-ENGAGEMENT (tips / inactivity / return gifts) ----------------
+
+const REENGAGE_STATE_FIELDS = ['last_tip_at', 'last_tip_type', 'tip_count', 'last_inactivity_dm_at', 'last_inactivity_tier', 'last_return_gift_at', 'last_return_gift_kind', 'last_surprise_gift_at', 'surprise_count', 'welcome_token'];
+
+function getReengageState(userId) {
+  const rows = db.exec(`SELECT * FROM reengage_state WHERE user_id = '${safeStr(userId)}'`);
+  if (!rows.length || !rows[0].values.length) return null;
+  const v = rows[0].values[0]; const c = rows[0].columns;
+  const get = (n, d = 0) => { const i = c.indexOf(n); return i === -1 ? d : v[i]; };
+  return {
+    user_id: get('user_id'), last_tip_at: get('last_tip_at'), last_tip_type: get('last_tip_type', ''),
+    tip_count: get('tip_count'), last_inactivity_dm_at: get('last_inactivity_dm_at'), last_inactivity_tier: get('last_inactivity_tier'),
+    last_return_gift_at: get('last_return_gift_at'), last_return_gift_kind: get('last_return_gift_kind', ''),
+    last_surprise_gift_at: get('last_surprise_gift_at'), surprise_count: get('surprise_count'), welcome_token: get('welcome_token', ''),
+  };
+}
+
+function touchReengage(userId, patch) {
+  const fields = Object.keys(patch).filter(f => REENGAGE_STATE_FIELDS.includes(f));
+  if (!fields.length) return;
+  const sets = fields.map(f => `${f} = ${typeof patch[f] === 'string' ? `'${safeStr(patch[f])}'` : (Number.isFinite(patch[f]) ? patch[f] : 0)}`).join(', ');
+  db.run(`INSERT INTO reengage_state (user_id, ${fields.join(', ')}) VALUES ('${safeStr(userId)}', ${fields.map(f => typeof patch[f] === 'string' ? `'${safeStr(patch[f])}'` : (Number.isFinite(patch[f]) ? patch[f] : 0)).join(', ')})
+          ON CONFLICT(user_id) DO UPDATE SET ${sets}`);
+  save();
+}
+
+function getNotifyPrefs(userId) {
+  const rows = db.exec(`SELECT tips, inactivity, rewards FROM notify_prefs WHERE user_id = '${safeStr(userId)}'`);
+  if (!rows.length || !rows[0].values.length) return { tips: 1, inactivity: 1, rewards: 1, rowPresent: false };
+  const v = rows[0].values[0];
+  return { tips: v[0] === 1, inactivity: v[1] === 1, rewards: v[2] === 1, rowPresent: true };
+}
+
+function setNotifyPrefs(userId, prefs) {
+  const tips = prefs.tips === undefined ? 1 : (prefs.tips ? 1 : 0);
+  const inactivity = prefs.inactivity === undefined ? 1 : (prefs.inactivity ? 1 : 0);
+  const rewards = prefs.rewards === undefined ? 1 : (prefs.rewards ? 1 : 0);
+  db.run(`INSERT INTO notify_prefs (user_id, tips, inactivity, rewards) VALUES ('${safeStr(userId)}', ${tips}, ${inactivity}, ${rewards})
+          ON CONFLICT(user_id) DO UPDATE SET tips = ${tips}, inactivity = ${inactivity}, rewards = ${rewards}`);
+  save();
+}
+
+// Daily global budget + counters (single id=1 row).
+function getReengageGlobal(nowSec) {
+  const day = new Date(nowSec * 1000).toISOString().slice(0, 10);
+  const rows = db.exec(`SELECT day, dm_count, gift_count, fail_count, last_sweep_at FROM reengage_global WHERE id = 1`);
+  if (!rows.length || !rows[0].values.length) {
+    db.run(`INSERT INTO reengage_global (id, day, dm_count, gift_count, fail_count, last_sweep_at) VALUES (1, '${day}', 0, 0, 0, 0)`);
+    save();
+    return { day, dmCount: 0, giftCount: 0, failCount: 0, lastSweepAt: 0 };
+  }
+  const [d, dm, gf, f, ls] = rows[0].values[0];
+  if (d !== day) {
+    db.run(`UPDATE reengage_global SET day = '${day}', dm_count = 0, gift_count = 0, fail_count = 0 WHERE id = 1`);
+    save();
+    return { day, dmCount: 0, giftCount: 0, failCount: 0, lastSweepAt: ls };
+  }
+  return { day, dmCount: dm, giftCount: gf, failCount: f, lastSweepAt: ls };
+}
+
+function bumpReengageCounters(dm = 0, gifts = 0, fails = 0) {
+  db.run(`INSERT INTO reengage_global (id, day, dm_count, gift_count, fail_count)
+          VALUES (1, ${0}, ${0}, ${0}, ${0}) ON CONFLICT(id) DO NOTHING`);
+  db.run(`UPDATE reengage_global
+          SET day = CASE WHEN day = '' OR day = '0' OR day IS NULL THEN strftime('%Y-%m-%d', 'now') ELSE day END,
+              dm_count = dm_count + ${Number(dm) || 0},
+              gift_count = gift_count + ${Number(gifts) || 0},
+              fail_count = fail_count + ${Number(fails) || 0}
+          WHERE id = 1`);
+  save();
+}
+
+function touchSweep(nowSec) {
+  getReengageGlobal(nowSec);
+  db.run(`UPDATE reengage_global SET last_sweep_at = ${Number(nowSec) || 0} WHERE id = 1`);
+  save();
+}
+
+// Exactly-once comeback / surprise reward grant keyed by a deterministic token.
+function getDeliveryByToken(token) {
+  if (!token) return null;
+  const rows = db.exec(`SELECT id, recipient_id, amount, payload, status, created_at, claimed_at FROM inbox_deliveries WHERE source IN ('comeback','gift') AND payload LIKE '%${String(token).replace(/[^A-Za-z0-9_.:-]/g, '')}%' ORDER BY id DESC LIMIT 1`);
+  if (!rows.length || !rows[0].values.length) return null;
+  const v = rows[0].values[0];
+  return { id: v[0], recipient_id: v[1], amount: v[2], payload: v[3], status: v[4], created_at: v[5], claimed_at: v[6] };
+}
+
+function grantRewardOnce(userId, kind, token, amount, payload = {}) {
+  if (!userId || !kind || !token) return { ok: false, reason: 'bad-args' };
+  const cleanToken = String(token).slice(0, 120);
+  const p = { ...payload, token: cleanToken };
+  // Deterministic re-run: if the token row already exists, the only acceptable state
+  // is a missing delivery that we can safely re-create (idempotent retry after a crash).
+  const existing = db.exec(`SELECT user_id FROM reward_grants WHERE token = '${safeStr(cleanToken)}'`);
+  if (existing.length && existing[0].values.length) {
+    const d = getDeliveryByToken(cleanToken);
+    if (d && d.status === 'pending') return { ok: false, reason: 'exists' };
+    if (d && d.status === 'claimed') return { ok: false, reason: 'claimed' };
+    const id = createDelivery(userId, { source: kind === 'surprise' ? 'gift' : 'comeback', label: payload.label || 'comeback gift', amount: Number(amount) || 0, payload: p });
+    return { ok: true, deliveryId: id, recreated: true };
+  }
+  db.run(`INSERT INTO reward_grants (token, user_id, kind, amount, payload, created_at)
+          VALUES ('${safeStr(cleanToken)}', '${safeStr(userId)}', '${safeStr(kind)}', ${Number(amount) || 0}, '${JSON.stringify(p).slice(0, 400).replace(/'/g, '')}', ${Math.floor(Date.now() / 1000)})`);
+  const changed = db.exec('SELECT changes() AS c')[0].values[0][0];
+  if (changed !== 1) return { ok: false, reason: 'dup' };
+  const id = createDelivery(userId, { source: kind === 'surprise' ? 'gift' : 'comeback', label: payload.label || 'comeback gift', amount: Number(amount) || 0, payload: p });
+  return { ok: true, deliveryId: id };
+}
+
+// Aggregate numbers for Aengagement stats (nothing personal).
+function getReengageStats() {
+  const q = (s) => db.exec(s);
+  const one = (s, d = 0) => { const r = q(s); return (r.length && r[0].values.length) ? r[0].values[0][0] : d; };
+  const tips = one('SELECT COALESCE(SUM(tip_count), 0) FROM reengage_state');
+  const returnDms = one(`SELECT COUNT(*) FROM reengage_state WHERE last_inactivity_dm_at > 0`);
+  const grants = one('SELECT COUNT(*) FROM reward_grants');
+  const comebackGrants = one(`SELECT COUNT(*) FROM reward_grants WHERE kind LIKE 'return%'`);
+  const surpriseGrants = one(`SELECT COUNT(*) FROM reward_grants WHERE kind = 'surprise'`);
+  const claimed = one(`SELECT COUNT(*) FROM reward_grants rg WHERE EXISTS (
+      SELECT 1 FROM inbox_deliveries d WHERE d.status = 'claimed' AND d.payload LIKE '%' || rg.token || '%')`);
+  const f = getReengageGlobal(Math.floor(Date.now() / 1000));
+  return { tipsGiven: tips, returnDms: returnDms, grantsTotal: grants, comebackGrants, surpriseGrants, claimedGifts: claimed, dmFailures: f.failCount };
+}
+
 const CLAIM_ONLY_COMMANDS = ['daily', 'weekly', 'streak', 'luckylist', 'bal', 'bank'];
 
 function recordFeatureUse(userId, feature) {
@@ -5624,4 +5787,6 @@ module.exports = {
    exec: (sql) => { strictSql(sql); return db ? db.exec(sql) : null; },
    run: (sql) => { strictSql(sql); return db ? db.run(sql) : null; },
    safeNum,
+   getNotifyPrefs, setNotifyPrefs, getReengageState, touchReengage, getReengageGlobal, bumpReengageCounters, touchSweep,
+   grantRewardOnce, getReengageStats, hasPendingComeback: (u) => hasPendingSource(u, 'comeback'),
 };
