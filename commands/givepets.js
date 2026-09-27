@@ -239,7 +239,7 @@ function rand(min, max) {
 module.exports = {
   name: 'givepets',
   helpCategory: 'Admin',
-  aliases: ['giveall', 'spawnpets', 'gp'],
+  aliases: ['giveall', 'spawnpets'],
   description: 'give a user every pet species (owner only)',
   execute(message, args) {
     if (message.author.id !== require('../config').ownerId) {

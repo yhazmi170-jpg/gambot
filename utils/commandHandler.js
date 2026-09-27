@@ -104,13 +104,19 @@ async function handleMessage(message) {
 
   const trace = step => dlog.log({ kind: 'step', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name, step });
 
+  const logCmdError = (stage, err) => {
+    const e = err || {};
+    const safeArgs = (args || []).map(String).slice(0, 8).join(' ');
+    console.error(`[COMMAND ERROR] command:${cmd.name} user:${message.author.id} guild:${(message.guild && message.guild.id) || 'DM'} args:[${safeArgs}] stage:${stage} error:${e.message || e} stack:${String(e.stack || '').split('\n').slice(0, 4).join(' | ')}`);
+  };
+
   try { db.catchUpAutohunt(message.author.id); } catch (err) { dlog.log({ kind: 'throw', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name, step: 'catchUpAutohunt', err: err && err.message }); }
   try { db.breedSnails(message.author.id); } catch (err) { dlog.log({ kind: 'throw', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name, step: 'breedSnails', err: err && err.message }); }
 
   if (prefix === 'A') {
     if (message.author.id !== config.ownerId) return;
     try { cmd.execute(message, args); } catch (err) {
-      console.error(`Admin error:`, err);
+      logCmdError('admin_execute', err);
       message.channel.send({ embeds: [require('./embed').error('admin error')] });
     }
     return;
@@ -139,7 +145,7 @@ async function handleMessage(message) {
     }
   }
   } catch (err) {
-    console.error('disabled-check error:', err);
+    logCmdError('disabled_check', err);
   }
 
   if (!COMMANDS_BEFORE_TOS.includes(cmd.name) && !COMMANDS_BEFORE_TOS.includes(cmdName)) {
@@ -165,8 +171,8 @@ async function handleMessage(message) {
   }
 
   // Guild summon rate limit: prevent repeated summons within 24h
-  const guild = db.getGuild(message.guild.id);
-  const guildSummonLast = guild.summon_last || 0;
+  const guild = message.guild ? db.getGuild(message.guild.id) : null;
+  const guildSummonLast = guild ? guild.summon_last || 0 : 0;
   const nowSec = Math.floor(Date.now() / 1000);
   const twentyFourHours = 24 * 86400;
   const summonBlocked = guildSummonLast && nowSec - guildSummonLast < twentyFourHours;
@@ -181,7 +187,7 @@ async function handleMessage(message) {
 
   try { u = db.ensureUser(message.author.id); } catch (err) {
     dlog.log({ kind: 'throw', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name, step: 'ensureUser', err: err && err.message });
-    console.error('ensureUser error:', err);
+    logCmdError('ensureUser', err);
     return message.channel.send({ embeds: [error('an error occurred')] }).catch(() => {});
   }
   // Inactivity-based summon eligibility
@@ -220,12 +226,12 @@ async function handleMessage(message) {
     dlog.log({ kind: 'executed', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name });
     if (result instanceof Promise) result.catch(err => {
       dlog.log({ kind: 'throw', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name, step: 'execute_promise', err: err && err.message });
-      console.error(`Error in command ${cmdName}:`, err);
-      message.channel.send({ embeds: [error(err.message.slice(0, 100))] }).catch(() => {});
+      logCmdError('execute_promise', err);
+      message.channel.send({ embeds: [error('an error occurred')] }).catch(() => {});
     });
     } catch (err) {
       dlog.log({ kind: 'throw', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name, step: 'execute_sync', err: err && err.message });
-      console.error(`Error in command ${cmdName}:`, err);
+      logCmdError('execute_sync', err);
       message.channel.send({ embeds: [require('./embed').error('an error occurred')] });
     }
 
@@ -235,7 +241,7 @@ async function handleMessage(message) {
       message.channel.send({ content: `<@${message.author.id}>`, embeds: [require('./embed').embed('⬆️ Level Up!', [['', `you hit **level ${lvl.newLevel}** and got **${lvl.reward.toLocaleString()}** money!`]], 0x57f287)] }).catch(() => {});
     }
   } catch (err) {
-    console.error('grantXp error:', err);
+    logCmdError('grantXp', err);
   }
 
   // lightweight feature usage + activity signal (powers v try, summons, tips).
@@ -244,7 +250,7 @@ async function handleMessage(message) {
     db.recordFeatureUse(message.author.id, cmd.name);
     db.recordActivity(message.author.id, db.CLAIM_ONLY_COMMANDS.includes(cmd.name) ? 'claim' : 'meaningful');
   } catch (err) {
-    console.error('usage tracking error:', err);
+    logCmdError('usage_tracking', err);
   }
 
   try {
@@ -259,11 +265,11 @@ async function handleMessage(message) {
       if (message.guild) {
         try {
           for (const ach of unlocked) db.addIncident(message.guild.id, 'achievement', `<@${message.author.id}> unlocked ${ach.name.replace(/[^\w ]+/g, '').trim() || 'an achievement'}`);
-        } catch (err) { console.error('incident achievement error:', err); }
+        } catch (err) { logCmdError('incident_achievement', err); }
       }
     }
   } catch (err) {
-    console.error('checkAchievements error:', err);
+    logCmdError('checkAchievements', err);
   }
 
   try {
@@ -274,11 +280,11 @@ async function handleMessage(message) {
       if (message.guild) {
         try {
           for (const key of unlockedTitles) db.addIncident(message.guild.id, 'title', `<@${message.author.id}> claimed the title "${db.TITLES[key].name}"`);
-        } catch (err) { console.error('incident title error:', err); }
+        } catch (err) { logCmdError('incident_title', err); }
       }
     }
   } catch (err) {
-    console.error('checkTitles error:', err);
+    logCmdError('checkTitles', err);
   }
 }
 

@@ -809,8 +809,13 @@ setInterval(() => {
 
 client.on('messageCreate', (message) => {
   try {
-    Promise.resolve(handleMessage(message)).catch(e => console.error('[MSG] handleMessage error:', (e && e.stack) || e));
-  } catch (e) { console.error('[MSG] handleMessage error:', e.message); }
+    Promise.resolve(handleMessage(message)).catch(e => {
+      if (e && e.cmdErrorLogged) return;
+      console.error(`[COMMAND ERROR] command:${String(message.content || '').split(/\s+/)[1] || '?'} user:${message.author && message.author.id} guild:${(message.guild && message.guild.id) || 'DM'} stage:message_create error:${e && e.message} stack:${String(e && e.stack || '').split('\n').slice(0, 3).join(' | ')}`);
+    });
+  } catch (e) {
+    console.error(`[COMMAND ERROR] command:${String(message.content || '').split(/\s+/)[1] || '?'} user:${message.author && message.author.id} stage:message_create_sync error:${e && e.message} stack:${String(e && e.stack || '').split('\n').slice(0, 3).join(' | ')}`);
+  }
   try { intel.recordMessage(message); } catch (e) {}
   if (message.author.bot) return;
   const perks = db.getUserPerks(message.author.id);

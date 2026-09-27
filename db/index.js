@@ -485,6 +485,25 @@ function save() {
 const START_BALANCE = 1000;
 const DAY = 86400;
 
+/**
+ * Shared numeric guard (reliability audit 2026-09): the (Aug 2026) balance
+ * corruption and the sacrifice NaN incident were both non-finite values
+ * reaching economy SQL. Throw loudly instead of silently writing garbage —
+ * the error surfaces as a [COMMAND ERROR] rather than corrupted data.
+ */
+function safeNum(v, def = 0) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : def;
+}
+
+const BAD_NUM = /(NaN|Infinity|undefined)(?=\s|[^A-Za-z0-9_]|$)/;
+function strictSql(sql) {
+  if (typeof sql === 'string' && BAD_NUM.test(sql)) {
+    throw new Error('DB guard: NaN/Infinity/undefined reached SQL: ' + String(sql).replace(/[^\x20-\x7E]/g, '?').slice(0, 140));
+  }
+  return sql;
+}
+
 function ensureUser(userId) {
   const row = db.exec(`SELECT * FROM users WHERE user_id = '${userId}'`);
   if (row.length && row[0].values.length) {
@@ -5602,5 +5621,7 @@ module.exports = {
    queueUpdateDm, getUpdateDmBatch, updateDmStatus, countUpdateDm,
    COMMUNITY_EVENTS, getActiveCommunityEvent, isCommunityEvent, canStartCommunityEvent, startCommunityEvent, endCommunityEvent,
    getCommunityProgress, addCommunityProgress, COMMUNITY_COOP_GOALS,
-   exec: (sql) => db ? db.exec(sql) : null,
+   exec: (sql) => { strictSql(sql); return db ? db.exec(sql) : null; },
+   run: (sql) => { strictSql(sql); return db ? db.run(sql) : null; },
+   safeNum,
 };

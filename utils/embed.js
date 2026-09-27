@@ -1,10 +1,19 @@
 const { EmbedBuilder } = require('discord.js');
 
+const FIELD_VALUE_LIMIT = 1024;
+
 function embed(title, fields = [], color = 0x2b2d31) {
   const e = new EmbedBuilder().setColor(color);
   if (title) e.setTitle(title);
   for (const [name, value, inline = false] of fields) {
-    if (value !== undefined && value !== null) e.addFields({ name, value: String(value), inline });
+    if (value === undefined || value === null) continue;
+    const str = String(value);
+    if (str.length <= FIELD_VALUE_LIMIT) {
+      e.addFields({ name, value: str, inline });
+    } else {
+      chunkText(str).forEach((c, i) =>
+        e.addFields({ name: i === 0 ? name : `${name} (cont.)`, value: c, inline: false }));
+    }
   }
   return e;
 }
@@ -17,7 +26,6 @@ function success(msg) {
   return embed('Success', [['message', msg]], 0x57f287);
 }
 
-const FIELD_VALUE_LIMIT = 1024;
 function chunkText(text, limit = FIELD_VALUE_LIMIT) {
   const str = String(text || '');
   if (!str) return [''];

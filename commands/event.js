@@ -27,6 +27,9 @@ module.exports = {
       return message.channel.send({ embeds: [embed('📣 Community Event', [['', 'no event is running right now — v event later when one pops, or catch the boots announcement']], 0x2b2d31)] });
     }
     const cfg = db.COMMUNITY_EVENTS[ev.key];
+    if (!cfg) {
+      return message.channel.send({ embeds: [embed('📣 Community Event', [['', 'the current event is unknown — it may have ended while the server slept']], 0x2b2d31)] });
+    }
     const entry = ENTRY[ev.key] || { cmd: '', line: '' };
     const secLeft = Math.max(0, ev.endsAt - Math.floor(Date.now() / 1000));
     const mins = Math.floor(secLeft / 60);

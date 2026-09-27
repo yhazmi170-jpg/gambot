@@ -9,7 +9,8 @@
 - **DB**: SQLite via sql.js at `DB_PATH` (env, default `./data` on Render; ephemeral on free tier ? hourly GitHub backup + boot-restore is the data safety net). Backed up to GitHub every hour.
 - **Backups**: `backup.js` writes timestamped snapshots (`backups/gambot-<ts>.db`, never overwritten) + a mirror at `gambot.db`. Restore scans ALL snapshots newest?oldest and restores the first one with >0 users (`countUsers` via sql.js) � a bad/empty backup can never block recovery. Backup **refuses to upload** a 0-user DB (prevents an empty/corrupt instance from clobbering history). `index.js` logs backup failures loudly. Backups run **every 1 min** + on **SIGTERM/SIGINT shutdown** (Render free tier wipes `./data` on every deploy � shutdown backup caps loss at 1 min).
 - **Backup repo**: `gambot-data-v3` on GitHub (old repos `gambot-data` and `gambot-data-v2` were corrupt � do NOT use them). `detectCorruption` in backup.js rejects snapshots with absurd balances (>1T), negative balances, or known-wiped users.
-- **Balance corruption (Aug 2026)**: a bug drained multiple users' balances over time (@?? lost ~52M, @meimei lost ~28M). Root cause unknown � may be integer overflow in balance calculations. If balances look wrong again, check `db/index.js` `addBalance`/`payWin`/`getBalanceFactor` for overflow bugs.
+- **Balance corruption (Aug 2026)**: a bug drained multiple users' balances over time (@?? lost ~52M, @meimei lost ~28M). Root cause unknown � may be integer overflow in balance calculations. If balances look wrong again, check `db/index.js` `addBalance`/`payWin`/`getBalanceFactor` for overflow bugs. **2026-09 audit hardening:** `db.exec`/`db.run` now throw a `DB guard` error if `NaN`/`Infinity`/`undefined` ever reaches SQL (economy writes can't silently corrupt), and every command failure is logged as `[COMMAND ERROR] command: user: guild: args: stage: error:` (greppable in `/logs` too) instead of reaching players half-applied.
+- **There is no `db.run`** (db exports `exec`, plus a `run` alias that just delegates). Getting "TypeError: db.run is not a function" = a command used `db.run` � change it to `db.exec`. This exact bug made `v rob` crash full-time in Sep 2026 (and it moved the victim's money BEFORE the crash).
 - **Current version**: **2.1.0** (Snail garden progression — runners/upgrades/XP/levels; 2.0.5 added `v activity` analytics; 2.0.4 added lb counting unclaimed inbox money + 0-entry giveaway refund — see `CHANGELOG.md`)
 - **Change log**: every update ever shipped is documented in `CHANGELOG.md` (newest first) � update it whenever you release, right alongside the version bump + `update_msg.txt`
 
@@ -122,6 +123,8 @@
 - `commands/poker.js` / `blackjack.js` � card games
 - `utils/commandHandler.js` � routing, TOS, cooldowns
 - `utils/logger.js` � Discord logging
+- `scripts/smoke_all_commands.js` � permanent full-command sweep (runs every registered command through the real handler vs an isolated DB; `SMOKE_DB=/tmp/x DUMP_REPLIES=1 timeout 890 node scripts/smoke_all_commands.js`)
+- `scripts/test-audit-fixes.js` � regression for the 2026-09 audit fixes (rob/db.run, embed chunking, event guard, DM null-guild, DB numeric guard) � 16/16
 - `update.sh` � pull + kill for deploy
 - `HANDOFF.md` � cross-tool session state (keep current)
 - `keepalive.ps1` + `keepalive.vbs` � uptime pinger
