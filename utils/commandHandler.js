@@ -73,10 +73,6 @@ async function handleMessage(message) {
             cmdName = tokens2[0];
             args = tokens2.slice(1);
           }
-        } else if (raw.startsWith('lucky') || raw.startsWith('luck')) {
-          const tokens = raw.split(/\s+/);
-          cmdName = 'ovo';
-          args = ['lucky', ...tokens.slice(1)];
         } else if (raw.startsWith('cmds')) {
           cmdName = 'ovo';
           args = ['cmds'];

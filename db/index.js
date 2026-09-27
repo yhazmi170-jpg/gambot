@@ -27,6 +27,7 @@ async function init() {
       total_gambled INTEGER NOT NULL DEFAULT 0,
       total_won INTEGER NOT NULL DEFAULT 0,
       lucky INTEGER NOT NULL DEFAULT 0,
+      god_luck INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
     );
     CREATE TABLE IF NOT EXISTS owner_give_mutes (
@@ -51,6 +52,7 @@ async function init() {
   `);
   try { db.run(`ALTER TABLE users ADD COLUMN daily_streak INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   try { db.run(`ALTER TABLE users ADD COLUMN lucky INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
+  try { db.run(`ALTER TABLE users ADD COLUMN god_luck INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   try { db.run(`ALTER TABLE users ADD COLUMN insurance INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   try { db.run(`ALTER TABLE users ADD COLUMN reputation INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
   try { db.run(`ALTER TABLE users ADD COLUMN rep_time INTEGER NOT NULL DEFAULT 0`); } catch (e) {}
@@ -505,6 +507,7 @@ function ensureUser(userId) {
       total_gambled: get('total_gambled', 0),
       total_won: get('total_won', 0),
       lucky: get('lucky', 0),
+      god_luck: get('god_luck', 0),
       created_at: get('created_at', 0),
       insurance: get('insurance', 0) || 0,
       reputation: get('reputation', 0) || 0,
@@ -883,7 +886,10 @@ function getBalanceFactor(userId) {
 /** Credit a gambling win: scales profit by balance factor. Optional stakeReturn (e.g. mines prepaid bet). Returns adjusted profit paid. */
 function payWin(userId, profit, stakeReturn = 0) {
   const rushMult = eventMult('winMult');
-  const paid = profit > 0 ? Math.floor(profit * getBalanceFactor(userId) * rushMult) : 0;
+  // Owner-granted godlike luck: 5x wins, no balance-factor cut.
+  const godMult = getGodLuck(userId) ? LUCKY_WIN_MULT : null;
+  const factor = godMult || getBalanceFactor(userId);
+  const paid = profit > 0 ? Math.floor(profit * factor * rushMult) : 0;
   let credit = stakeReturn;
   if (paid > 0) {
     const u = ensureUser(userId);
@@ -1075,6 +1081,28 @@ function toggleLucky(userId) {
   db.run(`UPDATE users SET lucky = ${newVal} WHERE user_id = '${userId}'`);
   save();
   return newVal === 1;
+}
+
+// Owner-granted godlike luck: 5x on every gambling win via payWin, no balance cut.
+const LUCKY_WIN_MULT = 5;
+function toggleGodLuck(userId) {
+  let u = ensureUser(userId);
+  if (!u) { db.run(`INSERT INTO users (user_id, balance) VALUES ('${userId}', 0)`); save(); u = ensureUser(userId); }
+  const newVal = u.god_luck ? 0 : 1;
+  db.run(`UPDATE users SET god_luck = ${newVal} WHERE user_id = '${userId}'`);
+  save();
+  return newVal === 1;
+}
+function getGodLuck(userId) {
+  try {
+    const u = ensureUser(userId);
+    return u ? (u.god_luck || 0) : 0;
+  } catch (e) { return 0; }
+}
+function getLuckyUsers() {
+  const r = db.exec(`SELECT user_id FROM users WHERE god_luck = 1 ORDER BY user_id`);
+  if (!r.length || !r[0].values.length) return [];
+  return r[0].values.map(v => v[0]);
 }
 
 function getGuild(guildId) {
@@ -5444,6 +5472,7 @@ module.exports = {
   repairNaNBalances,
   createGiveaway, getGiveaway, getGiveawayWinners, getExpiredGiveaways, addGiveawayEntry, finishGiveaway, getGiveawaysToAnnounce, markGiveawayAnnounced, hasGiveawayDelivery,
   toggleLucky,
+  toggleGodLuck, getGodLuck, getLuckyUsers, LUCKY_WIN_MULT,
   toggleInsurance,
   setLogChannel,
   getLogChannel,
