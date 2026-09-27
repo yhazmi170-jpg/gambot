@@ -197,6 +197,9 @@ async function seed() {
            VALUES ('${TESTUSER}', '_test_', 'giveaway', 'Smoke gift', 123456, '{"gw":"smoke1"}', 'pending', 1700000000)`);
   db.exec(`INSERT INTO purchases (user_id, perk, expires_at) VALUES ('${TESTUSER}', 'rob', 0)`);
   db.exec(`INSERT INTO guilds (guild_id, disabled_commands) VALUES ('g_smoke', '[]')`);
+  // server gate: pre-approve the smoke fixture guild (new guilds start locked)
+  db.exec(`INSERT OR REPLACE INTO server_access (guild_id, status, guild_name, first_seen_at, activated_at, activated_by)
+           VALUES ('g_smoke', 'active', 'Smoke Guild', 0, 0, 'test')`);
   // checklist/pass/quest tables for rich user
   db.exec(`INSERT INTO battlepass (user_id, season, xp, premium, free_claimed, prem_claimed) VALUES ('${TESTUSER}', 1, 50, 0, '', '')`);
   // contracts / events / black market

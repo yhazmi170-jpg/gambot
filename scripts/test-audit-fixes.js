@@ -87,6 +87,9 @@ let seq = 0;
 (async () => {
   await db.init();
   handler.loadCommands();
+  // the server gate locks unknown guilds; this suite's fixture guild is pre-approved
+  db.exec(`INSERT OR REPLACE INTO server_access (guild_id, status, guild_name, first_seen_at, activated_at, activated_by)
+           VALUES ('guild_it', 'active', 'Audit Guild', 0, 0, 'test')`);
 
   // 5. numeric guard
   {

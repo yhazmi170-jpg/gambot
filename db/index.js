@@ -4,6 +4,15 @@ const path = require('path');
 const { parseAmount } = require('../utils/embed');
 
 const DB_PATH = process.env.DB_PATH || process.env.RENDER_DISK_PATH ? path.join(process.env.DB_PATH || process.env.RENDER_DISK_PATH, 'gambot.db') : path.join(__dirname, '..', 'gambot.db');
+// servers Gambot was already running in when the server gate shipped — these stay
+// usable forever. Any OTHER server the bot joins is locked until the owner runs
+// `v psu` there. Do not add a guild here to approve it; use `v psu`.
+const SEED_ACTIVE_GUILDS = [
+  '1437555920019132589',
+  '1534144339448692868',
+  '1536125380438663259',
+  '1553506232113959164',
+];
 let db = null;
 let SQL = null;
 
@@ -381,6 +390,25 @@ async function init() {
     fail_count INTEGER NOT NULL DEFAULT 0,
     last_sweep_at INTEGER NOT NULL DEFAULT 0
   )`);
+
+  // server gate: a server Gambot is IN is not a server it may be USED in.
+  // Every guild the bot joins starts 'pending' (commands locked) until the owner
+  // runs `v psu` in it. The 4 servers it was already in are seeded as 'active'
+  // so this can never lock an existing server. Add a guild here only if it is
+  // genuinely already in use; new ones are activated with `v psu` instead.
+  db.run(`CREATE TABLE IF NOT EXISTS server_access (
+    guild_id TEXT PRIMARY KEY,
+    status TEXT NOT NULL DEFAULT 'pending',
+    guild_name TEXT NOT NULL DEFAULT '',
+    first_seen_at INTEGER NOT NULL DEFAULT 0,
+    activated_at INTEGER NOT NULL DEFAULT 0,
+    activated_by TEXT NOT NULL DEFAULT '',
+    notified_at INTEGER NOT NULL DEFAULT 0
+  )`);
+  for (const gid of SEED_ACTIVE_GUILDS) {
+    db.run(`INSERT OR IGNORE INTO server_access (guild_id, status, guild_name, first_seen_at, activated_at, activated_by)
+            VALUES ('${gid}', 'active', '', 0, ${Math.floor(Date.now() / 1000)}, 'seed')`);
+  }
 
   db.run(`CREATE TABLE IF NOT EXISTS contracts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -5391,6 +5419,119 @@ function getReengageStats() {
 
 const CLAIM_ONLY_COMMANDS = ['daily', 'weekly', 'streak', 'luckylist', 'bal', 'bank'];
 
+// ---- server gate ------------------------------------------------------------
+// Gambot being IN a server is not permission to be USED there. Every guild it is
+// invited to is 'pending' (member commands locked) until the owner runs `v psu`
+// in it. DMs are never gated, and the owner is never gated (so they can always
+// activate + debug). Never trust client input: ids go through safeStr.
+
+function getServerAccess(guildId) {
+  const rows = db.exec(`SELECT guild_id, status, guild_name, first_seen_at, activated_at, activated_by, notified_at
+                        FROM server_access WHERE guild_id = '${safeStr(guildId)}'`);
+  if (!rows.length || !rows[0].values.length) return null;
+  const v = rows[0].values[0];
+  return {
+    guildId: v[0],
+    status: v[1] === 'active' ? 'active' : v[1] === 'locked' ? 'locked' : 'pending',
+    guildName: v[2] || '',
+    firstSeenAt: v[3] || 0,
+    activatedAt: v[4] || 0,
+    activatedBy: v[5] || '',
+    notifiedAt: v[6] || 0,
+  };
+}
+
+function isServerActive(guildId) {
+  if (!guildId) return true; // DM / no guild context is never gated
+  const rec = getServerAccess(guildId);
+  return !!rec && rec.status === 'active';
+}
+
+// Records a pending server the first time we see it. isNew=true means "notify the
+// owner now" (first sighting), which is what keeps the owner DM to exactly one per
+// server no matter how many members spam commands at the lock.
+function noteServerPending(guildId, name) {
+  const gid = safeStr(guildId);
+  const existing = getServerAccess(gid);
+  const now = Math.floor(Date.now() / 1000);
+  if (existing) {
+    if (existing.status === 'pending' && name && !existing.guildName) {
+      db.run(`UPDATE server_access SET guild_name = '${safeStr(name)}' WHERE guild_id = '${gid}'`);
+      save();
+    }
+    return { isNew: false, record: getServerAccess(gid) };
+  }
+  db.run(`INSERT INTO server_access (guild_id, status, guild_name, first_seen_at, activated_at, activated_by, notified_at)
+          VALUES ('${gid}', 'pending', '${safeStr(name || '')}', ${now}, 0, '', 0)`);
+  save();
+  console.log(`[server-gate] pending server recorded: ${gid} (${name || 'unknown'}) — LOCKED until the owner runs 'v psu' there`);
+  return { isNew: true, record: getServerAccess(gid) };
+}
+
+// marks the lock as explained so we only nag the members once per 30 min
+function markServerNoticeSent(guildId) {
+  const now = Math.floor(Date.now() / 1000);
+  db.run(`UPDATE server_access SET notified_at = ${now}, guild_name = COALESCE(NULLIF(guild_name, ''), guild_name) WHERE guild_id = '${safeStr(guildId)}'`);
+  save();
+}
+
+function activateServer(guildId, byUserId, name) {
+  const gid = safeStr(guildId);
+  if (!gid) return { ok: false, already: false, error: 'no_guild' };
+  const existing = getServerAccess(gid);
+  if (existing && existing.status === 'active') return { ok: true, already: true, record: existing };
+  const now = Math.floor(Date.now() / 1000);
+  const label = safeStr(name || (existing && existing.guildName) || '');
+  if (existing) {
+    db.run(`UPDATE server_access SET status = 'active', activated_at = ${now}, activated_by = '${safeStr(byUserId)}',
+            guild_name = CASE WHEN '${label}' = '' THEN guild_name ELSE '${label}' END
+            WHERE guild_id = '${gid}'`);
+  } else {
+    db.run(`INSERT INTO server_access (guild_id, status, guild_name, first_seen_at, activated_at, activated_by, notified_at)
+            VALUES ('${gid}', 'active', '${label}', ${now}, ${now}, '${safeStr(byUserId)}', 0)`);
+  }
+  save();
+  console.log(`[server-gate] ACTIVATED ${gid} (${label || 'unknown'}) by ${byUserId}`);
+  return { ok: true, already: false, record: getServerAccess(gid) };
+}
+
+function listServerAccess() {
+  const rows = db.exec(`SELECT guild_id, status, guild_name, first_seen_at, activated_at, activated_by
+                        FROM server_access ORDER BY status ASC, first_seen_at ASC`);
+  const out = { active: [], locked: [], pending: [] };
+  if (!rows.length || !rows[0].values.length) return out;
+  for (const v of rows[0].values) {
+    const rec = { guildId: v[0], status: v[1], guildName: v[2] || '', firstSeenAt: v[3] || 0, activatedAt: v[4] || 0, activatedBy: v[5] || '' };
+    if (rec.status === 'active') out.active.push(rec);
+    else if (rec.status === 'locked') out.locked.push(rec);
+    else out.pending.push(rec);
+  }
+  return out;
+}
+
+// Owner-side lock ("usp"). Works on a server we're not in yet, so an id can be
+// blocked before the bot is even invited. Re-locking an already locked server is
+// a no-op (no false "changed" claim).
+function lockServer(guildId, byUserId, name) {
+  const gid = safeStr(guildId);
+  if (!gid) return { ok: false, already: false, error: 'no_guild' };
+  const existing = getServerAccess(gid);
+  if (existing && existing.status === 'locked') return { ok: true, already: true, wasActive: false, record: existing };
+  const now = Math.floor(Date.now() / 1000);
+  const label = safeStr(name || (existing && existing.guildName) || '');
+  if (existing) {
+    db.run(`UPDATE server_access SET status = 'locked', activated_at = ${now}, activated_by = '${safeStr(byUserId)}',
+            guild_name = CASE WHEN '${label}' = '' THEN guild_name ELSE '${label}' END
+            WHERE guild_id = '${gid}'`);
+  } else {
+    db.run(`INSERT INTO server_access (guild_id, status, guild_name, first_seen_at, activated_at, activated_by, notified_at)
+            VALUES ('${gid}', 'locked', '${label}', ${now}, ${now}, '${safeStr(byUserId)}', 0)`);
+  }
+  save();
+  console.log(`[server-gate] LOCKED ${gid} (${label || 'unknown'}) by ${byUserId}`);
+  return { ok: true, already: false, wasActive: !!(existing && existing.status === 'active'), record: getServerAccess(gid) };
+}
+
 function recordFeatureUse(userId, feature) {
   const now = Math.floor(Date.now() / 1000);
   db.run(`INSERT INTO user_feature_usage (user_id, feature, first_used_at, last_used_at, use_count)
@@ -5796,4 +5937,5 @@ module.exports = {
    safeNum,
    getNotifyPrefs, setNotifyPrefs, getReengageState, touchReengage, getReengageGlobal, bumpReengageCounters, touchSweep,
    grantRewardOnce, getReengageStats, hasPendingComeback: (u) => hasPendingSource(u, 'comeback'),
+   getServerAccess, isServerActive, noteServerPending, markServerNoticeSent, activateServer, lockServer, listServerAccess, SEED_ACTIVE_GUILDS,
 };

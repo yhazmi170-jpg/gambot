@@ -10,7 +10,7 @@ const logger = require('./logger');
 const commands = new Map();
 const aliases = new Map();
 
-const COMMANDS_BEFORE_TOS = ['help', 'agree', 'disable', 'enable'];
+const COMMANDS_BEFORE_TOS = ['help', 'agree', 'disable', 'enable', 'psu', 'usp'];
 
 // Last meaningful command timestamp (seconds) — drives the inactivity summon system.
 function getLastMeaningfulAt(userId) {
@@ -124,6 +124,25 @@ async function handleMessage(message) {
 
   const ALWAYS_ALLOWED = ['help', 'enable', 'disable'];
   try {
+  // server gate: Gambot is IN the server but it is not unlocked there yet. Owner
+  // always passes (so they can run `v psu`); DMs are never gated.
+  if (message.guild && message.author.id !== config.ownerId) {
+    if (!db.isServerActive(message.guild.id)) {
+      trace('server_gate_blocked');
+      try {
+        db.noteServerPending(message.guild.id, message.guild.name);
+        const rec = db.getServerAccess(message.guild.id);
+        const quietUntil = (rec && rec.notifiedAt || 0) + 30 * 60;
+        if (Date.now() / 1000 >= quietUntil) {
+          db.markServerNoticeSent(message.guild.id);
+          message.channel.send({ embeds: [require('./embed').error(
+            'Gambot is in this server but it is not unlocked yet. The owner has to run `v psu` in this server once — after that everyone here can use the bot.',
+          )] });
+        }
+      } catch (e) { trace(`server_gate_notice_failed:${e.message}`); }
+      return;
+    }
+  }
   if (message.guild && message.author.id !== config.ownerId) {
     const guild = db.getGuild(message.guild.id);
     const guildAll = guild.disabled_commands.includes('all');

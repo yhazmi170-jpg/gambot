@@ -14,12 +14,17 @@
 - **Current version**: **2.1.0** (Snail garden progression — runners/upgrades/XP/levels; 2.0.5 added `v activity` analytics; 2.0.4 added lb counting unclaimed inbox money + 0-entry giveaway refund — see `CHANGELOG.md`)
 - **Change log**: every update ever shipped is documented in `CHANGELOG.md` (newest first) � update it whenever you release, right alongside the version bump + `update_msg.txt`
 
-## Agent docs (mandatory)
-- **Always keep markdown in sync** after meaningful work:
-  - Update `AGENTS.md` when rules, economy, deploy, or key files change
-  - Update `HANDOFF.md` at end of a session / when switching tools (Cursor ? OpenCode)
-- Do not leave stale todos in `HANDOFF.md` � mark done or remove
-- Same repo is shared by Cursor and OpenCode � git is the source of truth
+## Agent docs (MANDATORY — every change, every session)
+**Standing rule (owner, 2026-09-27): every change ships with updated `.md` docs, so if the owner loses this session any other session can pick up exactly where it stopped. Markdown sync is part of the work, not a follow-up task — never finish a change with stale docs.**
+- Update **all** of these when the work touches them — not just the one that seems relevant:
+  - `AGENTS.md` — rules, economy, deploy, key files, new commands (Rule list + Key Files)
+  - `HANDOFF.md` — live session state: what is DEPLOYED vs built-but-not-deployed, the exact next step, the exact command to run
+  - `CHANGELOG.md` — every update that actually ships (newest first, at the top)
+  - `pending_updates.txt` — small-update notes + the deployed/pending marker lines
+  - `update_msg.txt` / `package.json` — only on a release bump (see Update announcement policy)
+- `HANDOFF.md` must answer three questions for a cold reader with zero context: **what is live right now (commit SHA)**, **what is built but not deployed**, **what is the very next action (copy-pasteable)**.
+- Do not leave stale todos in `HANDOFF.md` — mark done or remove. Never leave a "NOT DEPLOYED" marker on something already live (that happened to the re-engagement entry).
+- Same repo is shared by Cursor and OpenCode — git is the source of truth
 
 ## Two-agent workflow (Claude chai ? Claude Code CLI) � READ THIS FIRST
 - **Roles:** The **chat agent** (this Claude, in the user's claude.ai/sidebar session) is the *orchestrator + ops*: the user talks to it about updates, it assigns/approves coding tasks, and it owns deploys (push ? Render auto-deploy ? poll `https://gambot-hle3.onrender.com` until the new SHA is live), version bumps, `update_msg.txt`, `pending_updates.txt`, and this doc. The **CLI agent** (Claude Code, run via `claude -p "..."` with the repo's `AGENTS.md`/`HANDOFF.md` as context) is the *coder*: it writes the actual code changes.
@@ -40,6 +45,8 @@
 5. Shop purchase log only if log channel is set (`Aovo log #channel`) � do not flood with every command
 6. Admin: `Aovo add`, `Aovo remove`, `Aovo bal`, `Areward`, `Aremovereward`, `Arestart`, `Aovo shop add #channel`, `Aovo cmds`, `Aovo shutdown`, `v luckylist` (list lucky users). Lucky gambling was removed in 2.0.2/2.0.3 — coinflip/dice/roulette/mines are pure 50/50 fair games now (the `v lucky` toggle no longer affects any game; the old command exists only as owner-only `Alucky`).
 7. Disabled commands: non-admin users can't run disabled cmds in a channel/guild � but the **owner bypasses all disabled checks** on any prefix (`v`/`ovo`, not just `A`). The message says "disabled in this channel" or "disabled in this server" depending on scope.
+
+8. **Server gate (`v psu`, 2026-09-27):** being IN a server is not permission to be USED there. Every guild Gambot is invited to starts **locked** — members get an "owner has to run `v psu` here" notice (once per 30 min per guild) instead of commands. The 4 servers it was already in are seeded active in `db.SEED_ACTIVE_GUILDS` (INSERT OR IGNORE at `db.init`, idempotent, can never lock a live server). **`v psu` (owner only, aliases pendingserver/pserverunlock/unlockserver) UNLOCKS; `v usp` (owner only, aliases lockserver/disableserver/relock/revokepsu) LOCKS.** Both work from ANY server: no argument = the server you are in, or paste a snowflake id (backticks/spaces tolerated, `utils/serverAccess.js parseGuildId` rejects non-17-20-digit junk) to target a server you are not in — copy the id out of `v psu list` and you can flip any server from your hub. Three statuses in `server_access.status`: `active` / `locked` (owner) / `pending` (joined, never approved); `v psu list` prints all three with ids. Locking hides commands only — no balances, pets or settings are touched, and a locked server can be re-opened instantly. `usp` on an id we're not in yet pre-blocks it. Both are in `COMMANDS_BEFORE_TOS` so they can never be stuck behind a TOS prompt. Owner + DMs are never gated. **Never gate DMs or the owner** (owner always passes so they can always unlock/debug). Gate lives in `utils/commandHandler.js` right before the disabled-command check, and `psu` is in `COMMANDS_BEFORE_TOS` so it can never be stuck behind a TOS prompt. A new server records itself on first sighting (one owner DM via the `guildCreate` hook in `index.js`, exactly once per server) — `db.noteServerPending` logs `[server-gate] pending server recorded: <id>` and `db.activateServer` logs `[server-gate] ACTIVATED <id>`. Regression: `scripts/test-server-gate.js` (25/25) — test fixtures that run commands in a guild must pre-approve their guild (`g_smoke`, `guild_it`) or every command will read as blocked.
 
 ## Economy � progressive balance factor
 - `getBalanceFactor(userId)` in `db/index.js`
@@ -119,6 +126,7 @@
 - `backup.js` � GitHub backup/restore
 - `db/index.js` � schema, CRUD, `getBalanceFactor`, `payWin`, essence/traits/autohunt/snail-garden functions
 - `commands/shop.js` � shop prices + purchase flow
+- `commands/psu.js` — `v psu [list | server id]` owner-only server UNLOCK (no id = this server) · `commands/usp.js` — `v usp [server id]` owner-only server LOCK (works from any server) · `utils/serverAccess.js` — shared id parser + list embed · `scripts/test-server-gate.js` — gate regression (40/40)
 - `commands/hunt.js` / `sacrifice.js` / `upgrade.js` / `autohunt.js` / `autohuntbot.js` / `huntbot.js` / `garden.js` � hunting + OwO-style upgrades
 - `commands/snailgarden.js` / `gardenpet.js` / `gardenshop.js` / `gardenbuy.js` � snail garden + progression (runners/upgrades/XP)
 - `commands/poker.js` / `blackjack.js` � card games

@@ -809,6 +809,20 @@ client.on('interactionCreate', (i) => {
   i._ackFallback = fallback;
 });
 
+// Server gate: a new server is locked until the owner runs `v psu` in it.
+client.on('guildCreate', (g) => {
+  try {
+    if (db.isServerActive(g.id)) return;
+    const res = db.noteServerPending(g.id, g.name);
+    if (res && res.isNew) {
+      console.log(`[server-gate] joined ${g.name} (${g.id}) — locked, owner must run 'v psu' there`);
+      client.users.fetch(config.ownerId).then((u) => u.send(
+        `Added to **${g.name}** (\`${g.id}\`). That server is locked — run \`v psu\` in it to turn the bot on.`,
+      )).catch(() => {});
+    }
+  } catch (e) { console.error('[server-gate] guildCreate failed:', e && e.message); }
+});
+
 client.on('disconnect', (e) => { console.log('[DC] disconnected:', e.code, e.reason); });
 client.on('reconnecting', () => console.log('[DC] reconnecting...'));
 client.on('resume', () => console.log('[DC] reconnected'));
