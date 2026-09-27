@@ -44,7 +44,8 @@ function showStats(message) {
 
 function showUser(message, uid) {
   const now = Math.floor(Date.now() / 1000);
-  const u = db.ensureUser(uid);
+  const u = db.ensureUser(uid) || { balance: 0, bank: 0, gems: 0, eggs: 0 };
+  const noAccount = !db.ensureUser(uid);
   const act = db.getActivity(uid) || {};
   const st = db.getReengageState(uid) || {};
   const prefs = db.getNotifyPrefs(uid);
@@ -80,7 +81,7 @@ function showUser(message, uid) {
     ['Last return/ surprise gift', `return ${fmt(st.last_return_gift_at || 0, now)} · surprise ${fmt(st.last_surprise_gift_at || 0, now)} (${st.surprise_count || 0})`, true],
     ['Notifications', `tips ${prefs.tips ? 'on' : 'off'} · inactivity ${prefs.inactivity ? 'on' : 'off'} · rewards ${prefs.rewards ? 'on' : 'off'}`, true],
     ['Pending comeback gift', pending ? `yes (${pending.amount.toLocaleString()}, ${fmt(pending.created_at, now)})` : 'none', true],
-    ['Reason', row.reason ? row.reason.slice(0, -1) : (idleDays === null ? 'no activity history — nothing to reach out about yet.' : 'active — no re-engagement needed right now.')],
+    ['Reason', row.reason ? row.reason.slice(0, -1) : (noAccount ? 'no account yet — no activity or re-engagement state to show.' : (idleDays === null ? 'no activity history — nothing to reach out about yet.' : 'active — no re-engagement needed right now.'))],
     ['Next eligibility', row.next || '—'],
   ], 0x2b2d31)] });
 }

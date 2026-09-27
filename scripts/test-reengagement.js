@@ -143,6 +143,21 @@ async function runSuite(db, eng, H) {
     check('all notifications off -> no DM, no gift', pendingCount('u-off') === 0 && dmsFor('u-off').length === 0);
   }
 
+  // ---- 6b. per-category toggles must NOT clobber the sibling categories ----
+  {
+    db.setNotifyPrefs('u-mix', { tips: false });
+    db.setNotifyPrefs('u-mix', { rewards: false });
+    const p = db.getNotifyPrefs('u-mix');
+    check('per-category toggle keeps siblings', p.tips === false && p.rewards === false && p.inactivity === true,
+      `tips=${p.tips} inactivity=${p.inactivity} rewards=${p.rewards}`);
+    db.setNotifyPrefs('u-mix', { inactivity: false });
+    const p2 = db.getNotifyPrefs('u-mix');
+    check('third toggle keeps the first two off', p2.tips === false && p2.rewards === false && p2.inactivity === false);
+    db.setNotifyPrefs('u-mix', {});
+    const p3 = db.getNotifyPrefs('u-mix');
+    check('empty patch changes nothing', p3.tips === false && p3.rewards === false && p3.inactivity === false);
+  }
+
   // ---- 7. tips-only off -> inactivity still works ----
   {
     const c = makeClient();

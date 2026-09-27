@@ -5291,10 +5291,17 @@ function getNotifyPrefs(userId) {
   return { tips: v[0] === 1, inactivity: v[1] === 1, rewards: v[2] === 1, rowPresent: true };
 }
 
+// Merge semantics: unspecified categories keep their CURRENT value (a per-category
+// toggle must never silently re-enable the others).
 function setNotifyPrefs(userId, prefs) {
-  const tips = prefs.tips === undefined ? 1 : (prefs.tips ? 1 : 0);
-  const inactivity = prefs.inactivity === undefined ? 1 : (prefs.inactivity ? 1 : 0);
-  const rewards = prefs.rewards === undefined ? 1 : (prefs.rewards ? 1 : 0);
+  const cur = getNotifyPrefs(userId);
+  const val = (key, def) => {
+    if (prefs[key] === undefined) return def ? 1 : 0;
+    return prefs[key] ? 1 : 0;
+  };
+  const tips = val('tips', cur.tips);
+  const inactivity = val('inactivity', cur.inactivity);
+  const rewards = val('rewards', cur.rewards);
   db.run(`INSERT INTO notify_prefs (user_id, tips, inactivity, rewards) VALUES ('${safeStr(userId)}', ${tips}, ${inactivity}, ${rewards})
           ON CONFLICT(user_id) DO UPDATE SET tips = ${tips}, inactivity = ${inactivity}, rewards = ${rewards}`);
   save();
