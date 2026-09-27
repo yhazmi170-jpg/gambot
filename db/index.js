@@ -2232,33 +2232,58 @@ function sacrificeAnimals(userId, query, count) {
   const COLOR_TO_RARITY = { gray: 'common', grey: 'common', white: 'common', green: 'uncommon', blue: 'rare', purple: 'epic', yellow: 'legendary', gold: 'legendary' };
   const team = getTeam(userId);
   const teamIds = team ? new Set([team.slot1, team.slot2, team.slot3].filter(Boolean)) : new Set();
-  
+
+  // Data may contain non-lowercase rarity strings (import artifact, e.g. 'COMMON' or 'SECRET').
+  const rq = (r) => String(r || '').toLowerCase();
+
   // Check if query is a numeric ID
   const isNumericId = /^\d+$/.test(q);
-  
+
   const matches = animals.filter(a => {
     if (q === 'all') return true;
-    const rarityMatch = RARITY_ORDER.includes(q) ? a.rarity === q : COLOR_TO_RARITY[q] ? a.rarity === COLOR_TO_RARITY[q] : null;
+    const ar = rq(a.rarity);
+    const rarityMatch = RARITY_ORDER.includes(q) ? ar === q : COLOR_TO_RARITY[q] ? ar === COLOR_TO_RARITY[q] : null;
     if (rarityMatch !== null) return rarityMatch;
     // Check for exact ID match if query is numeric
     if (isNumericId) return a.id === parseInt(q, 10);
-    return a.species.toLowerCase() === q || a.species.toLowerCase().startsWith(q);
+    const sp = String(a.species || '').toLowerCase();
+    return sp === q || sp.startsWith(q);
   });
   const targets = count ? matches.slice(0, count) : matches;
+
+  // PHASE 1 — price EVERYTHING first, with zero writes. Unpriced rarities (e.g. SECRET)
+  // are never destroyed. Any failure here aborts with NO mutation.
   let essence = 0;
-  let sacrificed = 0;
+  let unknown = 0;
   let skipped = 0;
-  const surgeMult = eventMult('essenceMult');
+  const unknownRarities = [];
+  const pricedIds = [];
+  const mult = eventMult('essenceMult');
   for (const a of targets) {
     if (teamIds.has(a.id)) { skipped++; continue; }
-    let val = ESSENCE_VALUES[a.rarity];
-    if (a.shiny) val *= 2;
-    essence += Math.floor(val * eventMult('essenceMult'));
-    removeAnimal(a.id);
-    sacrificed++;
+    const val = ESSENCE_VALUES[rq(a.rarity)];
+    if (val === undefined) { unknown++; if (!unknownRarities.includes(rq(a.rarity))) unknownRarities.push(rq(a.rarity)); continue; }
+    pricedIds.push(a.id);
+    essence += Math.floor((a.shiny ? val * 2 : val) * mult);
   }
-  if (sacrificed > 0) addEssence(userId, essence);
-  return { essence, sacrificed, skipped, surgeMult, shinyCount: targets.filter(a => a.shiny && !teamIds.has(a.id)).length };
+  if (!Number.isFinite(essence) || essence < 0) essence = 0; // belt & braces — never persist NaN
+
+  const shinyCount = targets.filter(a => a.shiny && !teamIds.has(a.id) && ESSENCE_VALUES[rq(a.rarity)] !== undefined).length;
+  if (!pricedIds.length) return { essence: 0, sacrificed: 0, skipped, unknown, unknownRarities, surgeMult: mult, shinyCount };
+
+  // PHASE 2 — apply removal + essence credit in ONE transaction. Failure rolls back
+  // to BEFORE any mutation: pets remain + essence unchanged, never pets-removed-no-essence.
+  db.run('BEGIN');
+  try {
+    db.run(`DELETE FROM animals WHERE id IN (${pricedIds.join(',')}) AND user_id = '${userId}'`);
+    db.run(`UPDATE users SET essence = essence + ${essence} WHERE user_id = '${userId}'`);
+    db.run('COMMIT');
+  } catch (err) {
+    try { db.run('ROLLBACK'); } catch (e) { /* transaction already closed */ }
+    throw err;
+  }
+  save();
+  return { essence, sacrificed: pricedIds.length, skipped, unknown, unknownRarities, surgeMult: mult, shinyCount };
 }
 
 function addXpRaw(userId, amount) {
