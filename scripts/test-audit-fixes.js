@@ -158,6 +158,19 @@ let seq = 0;
     check('v perkhelp did not throw', !t2, t2 ? t2.message : '');
   }
 
+  // 6. message dedupe: the same message id must never execute a command twice
+  {
+    db.exec(`INSERT INTO users (user_id, balance, terms_accepted) VALUES ('dupuser', 5000, 1)`);
+    const msg = makeMessage('v bal', 'dupuser', { guild: null });
+    await handler.handleMessage(msg);
+    const firstSends = msg._sends.length;
+    await handler.handleMessage(msg);
+    check('same message id executes once', msg._sends.length === firstSends, `sends=${msg._sends.length}`);
+    const msg2 = makeMessage('v bal', 'dupuser', { guild: null });
+    await handler.handleMessage(msg2);
+    check('different message id still executes', msg2._sends.length >= 1, 'sends=' + msg2._sends.length);
+  }
+
   const extra = (fail === 0) ? '' : ` (${fail} FAILED)`;
   console.log(`\n${pass} passed, ${fail} failed${extra}`);
   process.exit(fail === 0 ? 0 : 1);

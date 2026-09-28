@@ -6,8 +6,16 @@ const db = require('../db');
 const { embed, error } = require('./embed');
 const { checkCooldown } = require('./cooldowns');
 const logger = require('./logger');
+const dlog = require('../debuglog');
+const runtime = require('./runtime');
 
 const commands = new Map();
+// Message dedupe: prevent the same Discord message from executing a command twice.
+// Bounded TTL cache — entries expire after 5 minutes, and the map is pruned
+// when it exceeds 1000 entries so memory stays constant.
+const processedMessages = new Map();
+const MESSAGE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const MAX_PROCESSED = 1000;
 const aliases = new Map();
 
 const COMMANDS_BEFORE_TOS = ['help', 'agree', 'disable', 'enable', 'psu', 'usp'];
@@ -47,6 +55,27 @@ function getCommand(name) {
 
 async function handleMessage(message) {
   if (message.author.bot) return;
+  // Message dedupe: block re-execution of the same message ID.
+  // This runs before any command parsing/mutation so a duplicated gateway
+  // event or reconnect spike cannot cause double-command execution.
+  const already = processedMessages.get(message.id);
+  if (already !== undefined) {
+    const age = Date.now() - already;
+    if (age < MESSAGE_TTL_MS) {
+      console.log(`[DUPLICATE_DROP] ${runtime.tag()} message_id=${message.id} first_seen=${already} dropped_at=${Date.now()} age_ms=${age}`);
+      dlog.log({ kind: 'dup_message_blocked', id: message.id, age_ms: age });
+      return; // silently ignore — the original execution already sent a response
+    }
+    // expired entry — purge and allow re-processing
+    processedMessages.delete(message.id);
+  }
+  // Keep the map bounded: evict oldest entries once we exceed the cap.
+  if (processedMessages.size >= MAX_PROCESSED) {
+    const keys = Array.from(processedMessages.keys());
+    const oldest = keys.sort((a, b) => processedMessages.get(a) - processedMessages.get(b));
+    oldest.slice(0, MAX_PROCESSED / 2).forEach(k => processedMessages.delete(k));
+  }
+  processedMessages.set(message.id, Date.now());
   const content = message.content.trim();
   let prefix = null;
   let cmdName = null;
@@ -99,8 +128,8 @@ async function handleMessage(message) {
   const cmd = getCommand(cmdName);
   if (!cmd) return;
 
-  const dlog = require('../debuglog');
   dlog.log({ kind: 'parsed', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name, raw: message.content.slice(0, 40) });
+  console.log(`[COMMAND] ${runtime.tag()} message_id=${message.id} user=${message.author.id} guild=${(message.guild && message.guild.id) || 'DM'} channel=${message.channel.id} cmd=${cmd.name} ts=${Date.now()}`);
 
   const trace = step => dlog.log({ kind: 'step', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name, step });
 

@@ -9,6 +9,9 @@ const { embed, updateEmbed } = require('./utils/embed');
 const http = require('http');
 const path = require('path');
 const dlog = require('./debuglog');
+const runtime = require('./utils/runtime');
+const startupNotifier = require('./utils/startupNotifier');
+const sendLog = require('./utils/sendLog');
 const { version } = require('./package.json');
 const logger = require('./utils/logger');
 const { setClient: setLogClient } = logger;
@@ -91,8 +94,14 @@ if (!process.env.RENDER) {
 const _logs = [];
 const _origLog = console.log;
 const _origErr = console.error;
-console.log = (...a) => { _logs.push({ t: Date.now(), l: 'INFO', m: a.join(' ') }); if (_logs.length > 200) _logs.shift(); _origLog.apply(console, a); };
-console.error = (...a) => { _logs.push({ t: Date.now(), l: 'ERR', m: a.join(' ') }); if (_logs.length > 200) _logs.shift(); _origErr.apply(console, a); };
+console.log = (...a) => { _logs.push({ t: Date.now(), l: 'INFO', m: a.join(' ') }); if (_logs.length > 300) _logs.shift(); _origLog.apply(console, a); };
+console.error = (...a) => { _logs.push({ t: Date.now(), l: 'ERR', m: a.join(' ') }); if (_logs.length > 300) _logs.shift(); _origErr.apply(console, a); };
+
+// Boot identity — every log line in this process traces back to this ID.
+runtime.printBoot();
+
+// Instrument outgoing sends so a double-response episode is provable.
+sendLog.instrument();
 
 // atomic single-instance lock — exit if another gambot is already running
 const fs = require('fs');
@@ -190,7 +199,10 @@ const server = http.createServer((req, res) => {
       const all = db2.getAllUsers ? db2.getAllUsers() : [];
       res.writeHead(200, { 'Content-Type': 'text/plain' });
       const guilds = Array.from(client.guilds.cache.values()).map(g => `${g.id}:${g.name}:${g.memberCount}`);
-      res.end(`users=${all.length} top=${JSON.stringify(top)} discord=${client.isReady()} token_len=${(config.token||'').length} node=${process.version} guilds=${guilds.length} list=[${guilds.join(' | ')}]`);
+      const listenerCount = (typeof client.listenerCount === 'function') ? client.listenerCount('messageCreate') : '?';
+      let listenerOrigins = '';
+      try { listenerOrigins = '[' + ((client.rawListeners && client.rawListeners('messageCreate')) || []).map(l => String(l.name || 'anon')).filter(Boolean).join(',') + ']'; } catch (e) {}
+      res.end(`users=${all.length} top=${JSON.stringify(top)} discord=${client.isReady()} token_len=${(config.token||'').length} node=${process.version} guilds=${guilds.length} list=[${guilds.join(' | ')}] boot_id=${runtime.shortId()} pid=${process.pid} started=${runtime.startedIso} uptime_s=${Math.floor(runtime.uptimeMs() / 1000)} msg_listeners=${listenerCount} msg_listener_origins=${listenerOrigins} commit=${runtime.commit}`);
     } catch (e) {
       res.writeHead(500, { 'Content-Type': 'text/plain' });
       res.end(`status error: ${e.message}`);
@@ -403,30 +415,30 @@ function attemptLogin(label) {
 
 start().catch(e => console.error('[START] FATAL:', e));
 
-  // Use once instead of on to prevent duplicate ready events
-  client.once('ready', () => {
-    console.log(`logged in as ${client.user.tag}`);
+  let readyHandled = false;
+  // Use on() + an explicit one-shot flag (NOT once()): a second READY inside the
+  // same process (login retry / destroy-then-relogin watchdog path) must be
+  // logged as a duplicate boot-handling event, never re-send the startup DM or
+  // re-run announcements. resume/reconnecting are logged separately and are NOT
+  // restarts — they never DM the owner.
+  client.on('ready', () => {
+    if (readyHandled) {
+      console.log(`[GATEWAY] ready fired AGAIN in this boot — skipping duplicate boot work (${runtime.tag()})`);
+      return;
+    }
+    readyHandled = true;
+    const mcListeners = (typeof client.listenerCount === 'function') ? client.listenerCount('messageCreate') : '?';
+    let mcOrigins = '?';
+    try {
+      mcOrigins = '[' + ((client.rawListeners && client.rawListeners('messageCreate')) || []).map(l => String(l.name || 'anon')).filter(Boolean).join(',') + ']';
+    } catch (e) {}
+    console.log(`[GATEWAY_READY] logged in as ${client.user.tag} ${runtime.tag()} guilds=${client.guilds.cache.size} messageCreate_listeners=${mcListeners} origins=${mcOrigins}`);
     setLogClient(client);
-    const fs2 = require('fs');
-    const updateMsg = (() => { try { return fs2.readFileSync(path.join(__dirname, 'update_msg.txt'), 'utf8').trim(); } catch { return ''; } })();
-    client.users.fetch('536278876247162882', { force: true }).then(async u => {
-      // Cap the notes: update_msg.txt exceeded Discord's 2000-char DM limit and
-      // the whole DM was rejected ("Invalid Form Body") on every boot.
-      const body = updateMsg.length > 1500 ? `${updateMsg.slice(0, 1500).replace(/\n+$/, '')}\n… (full notes: \`v version\` / update channels)` : updateMsg;
-      const msg = `✅ Bot Restarted\n\`\`\`\n${body || 'no updates'}\n\`\`\``;
-      // Retry with backoff and NEVER swallow: if the owner's restart DM misses,
-      // we need to know (silent catch has already eaten owner DMs before).
-      for (let attempt = 1; attempt <= 4; attempt++) {
-        try {
-          await u.send(msg);
-          console.log('[boot-dm] owner restart DM sent');
-          break;
-        } catch (e) {
-          console.error(`[boot-dm] send attempt ${attempt}/4 failed: ${e.message}`);
-          if (attempt < 4) await new Promise(r => setTimeout(r, 5000 * attempt));
-        }
-      }
-    }).catch(e => console.error('[boot-dm] owner fetch failed:', e && e.message));
+
+    // Startup DM: ONE short DM per bot boot (boot_id displayed publicly —
+    // safe by design, no secrets), retried once, failures logged loudly, never crashes.
+    startupNotifier.onGatewayReady(client, config.ownerId);
+
     client.user.setPresence({
       activities: [{ name: `v${version} | /marlboro | ${config.prefixes[0]} help` }],
       status: 'online',
@@ -436,6 +448,7 @@ start().catch(e => console.error('[START] FATAL:', e));
 
     // Update announcement check (after db is ready)
     const ver2 = version || '1.0.0';
+    const updateMsg = (() => { try { return require('fs').readFileSync(path.join(__dirname, 'update_msg.txt'), 'utf8').trim(); } catch { return ''; } })();
     if (!db.wasNotified(`v${ver2}`)) {
       if (updateMsg) {
         postUpdateAnnouncement(client, updateMsg, `v${ver2}`).then(sent => {
@@ -824,8 +837,8 @@ client.on('guildCreate', (g) => {
 });
 
 client.on('disconnect', (e) => { console.log('[DC] disconnected:', e.code, e.reason); });
-client.on('reconnecting', () => console.log('[DC] reconnecting...'));
-client.on('resume', () => console.log('[DC] reconnected'));
+client.on('reconnecting', () => { startupNotifier.gatewayReconnecting(); });
+client.on('resume', () => { startupNotifier.gatewayResumed(); });
 client.on('error', (e) => console.error('[DC] error:', e.message));
 
 // Watchdog: if not connected, re-login every 2 minutes
@@ -836,7 +849,7 @@ setInterval(() => {
   }
 }, 120000);
 
-client.on('messageCreate', (message) => {
+client.on('messageCreate', function handleMessageEvent(message) {
   try {
     Promise.resolve(handleMessage(message)).then(() => {
       if (!message.author.bot) {

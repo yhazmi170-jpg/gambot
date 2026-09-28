@@ -117,6 +117,7 @@ async function init() {
   db.run(`CREATE TABLE IF NOT EXISTS marriages (user_id TEXT PRIMARY KEY, partner_id TEXT NOT NULL, married_at INTEGER NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS adoption (parent_id TEXT, child_id TEXT, PRIMARY KEY (parent_id, child_id))`);
   db.run(`CREATE TABLE IF NOT EXISTS purchases (user_id TEXT, perk TEXT, expires_at INTEGER, PRIMARY KEY (user_id, perk))`);
+  db.run(`CREATE TABLE IF NOT EXISTS purchase_transactions (purchase_id TEXT PRIMARY KEY, user_id TEXT NOT NULL, item_id TEXT NOT NULL, price INTEGER NOT NULL, expires_at INTEGER NOT NULL, committed_at INTEGER NOT NULL DEFAULT (strftime('%s','now')))`);
   db.run(`CREATE TABLE IF NOT EXISTS log_channels (guild_id TEXT PRIMARY KEY, channel_id TEXT NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS cmd_log_channels (guild_id TEXT PRIMARY KEY, channel_id TEXT NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS update_channels (guild_id TEXT PRIMARY KEY, channel_id TEXT NOT NULL)`);
@@ -545,7 +546,15 @@ async function init() {
 function save() {
   const data = db.export();
   fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-  fs.writeFileSync(DB_PATH, Buffer.from(data));
+  const tmp = DB_PATH + '.tmp';
+  const fd = fs.openSync(tmp, 'w');
+  try {
+    fs.writeSync(fd, Buffer.from(data));
+    fs.fsyncSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
+  fs.renameSync(tmp, DB_PATH);
 }
 
 const START_BALANCE = 1000;
@@ -1549,6 +1558,90 @@ function hasPerk(userId, perk) {
 function addPerk(userId, perk, expiresAt) {
   const now = Math.floor(Date.now() / 1000);
   db.run(`INSERT OR REPLACE INTO purchases (user_id, perk, expires_at) VALUES ('${userId}', '${perk}', ${expiresAt || 0})`);
+  save();
+}
+
+function isPurchaseCommitted(purchaseId) {
+  if (!purchaseId) return false;
+  const rows = db.exec('SELECT 1 FROM purchase_transactions WHERE purchase_id = ?', [purchaseId]);
+  return !!(rows && rows.length && rows[0].values.length);
+}
+
+function purchasePerk(userId, perkId, price, expiresAt, purchaseId, hooks = {}) {
+  const cost = Number(price);
+  const exp = Number(expiresAt) || 0;
+  if (!purchaseId) return { success: false, error: 'missing purchase_id', balanceChanged: false, entitlementExists: false };
+  if (!userId || !perkId) return { success: false, error: 'missing user/perk', balanceChanged: false, entitlementExists: false };
+  if (!Number.isFinite(cost) || cost <= 0) return { success: false, error: 'invalid price', balanceChanged: false, entitlementExists: false };
+
+  const preState = db.export();
+  let txnOutcome = null;
+  try {
+    db.run('BEGIN IMMEDIATE');
+    try {
+      if (isPurchaseCommitted(purchaseId)) {
+        const rec = db.exec('SELECT item_id, price, expires_at FROM purchase_transactions WHERE purchase_id = ?', [purchaseId]);
+        const row = (rec && rec.length && rec[0].values.length) ? rec[0].values[0] : null;
+        db.run('ROLLBACK');
+        return {
+          success: true, replay: true, entitlementExists: true, balanceChanged: false,
+          committedItemId: row ? row[0] : perkId,
+          committedPrice: row ? row[1] : cost,
+          committedExpiresAt: row ? row[2] : exp,
+        };
+      }
+      const balRows = db.exec('SELECT balance FROM users WHERE user_id = ?', [userId]);
+      const hasUser = !!(balRows && balRows.length && balRows[0].values.length);
+      const balance = hasUser ? Number(balRows[0].values[0][0]) : 0;
+      if (!Number.isFinite(balance)) throw new Error('non-finite balance read for ' + userId);
+      if (balance < cost) {
+        db.run('ROLLBACK');
+        return { success: false, error: 'insufficient funds', balanceChanged: false, entitlementExists: false };
+      }
+      db.run('UPDATE users SET balance = balance - ? WHERE user_id = ? AND balance >= ?', [cost, userId, cost]);
+      if (db.getRowsModified() !== 1) throw new Error('conditional debit affected ' + db.getRowsModified() + ' rows');
+
+      if (typeof hooks.beforeGrant === 'function') hooks.beforeGrant();
+
+      db.run('INSERT OR REPLACE INTO purchases (user_id, perk, expires_at) VALUES (?, ?, ?)', [userId, perkId, exp]);
+
+      if (typeof hooks.afterGrant === 'function') hooks.afterGrant();
+
+      const vRows = db.exec('SELECT expires_at FROM purchases WHERE user_id = ? AND perk = ?', [userId, perkId]);
+      const verified = !!(vRows && vRows.length && vRows[0].values.length && Number(vRows[0].values[0][0]) === exp);
+      if (!verified) throw new Error('perk entitlement verification failed');
+
+      db.run('INSERT OR REPLACE INTO purchase_transactions (purchase_id, user_id, item_id, price, expires_at) VALUES (?, ?, ?, ?, ?)', [purchaseId, userId, perkId, cost, exp]);
+      if (!isPurchaseCommitted(purchaseId)) throw new Error('idempotency record failed');
+
+      txnOutcome = { committed: true };
+      db.run('COMMIT');
+    } catch (e) {
+      try { db.run('ROLLBACK'); } catch (rbErr) {}
+      throw e;
+    }
+  } catch (e) {
+    return { success: false, error: e && e.message, balanceChanged: false, entitlementExists: false };
+  }
+  if (!txnOutcome || !txnOutcome.committed) {
+    return { success: false, error: 'transaction did not commit', balanceChanged: false, entitlementExists: false };
+  }
+
+  try {
+    if (typeof hooks.beforePersist === 'function') hooks.beforePersist();
+    save();
+  } catch (e) {
+    db = new SQL.Database(preState);
+    return { success: false, persistError: true, error: e && e.message, balanceChanged: false, entitlementExists: false };
+  }
+
+  return { success: true, balance: getBalance(userId), entitlementExists: true, replay: false };
+}
+
+function recordCommittedPurchase(purchaseId, userId, itemId, price, expiresAt) {
+  if (!purchaseId) return;
+  const cost = Number(price) || 0;
+  db.run('INSERT OR REPLACE INTO purchase_transactions (purchase_id, user_id, item_id, price, expires_at) VALUES (?, ?, ?, ?, ?)', [purchaseId, userId, itemId, cost, Number(expiresAt) || 0]);
   save();
 }
 
@@ -5845,11 +5938,12 @@ module.exports = {
   getParents,
   adoptChild,
   unadoptChild,
-  hasPerk,
-  addPerk,
-  removePerk,
-  getExpiredSubs,
-  getUserPerks,
+hasPerk,
+   addPerk,
+   removePerk,
+   getExpiredSubs,
+   getUserPerks,
+   purchasePerk, isPurchaseCommitted, recordCommittedPurchase,
   getRep,
   addRep,
   getVipRole,
@@ -5932,8 +6026,8 @@ module.exports = {
    queueUpdateDm, getUpdateDmBatch, updateDmStatus, countUpdateDm,
    COMMUNITY_EVENTS, getActiveCommunityEvent, isCommunityEvent, canStartCommunityEvent, startCommunityEvent, endCommunityEvent,
    getCommunityProgress, addCommunityProgress, COMMUNITY_COOP_GOALS,
-   exec: (sql) => { strictSql(sql); return db ? db.exec(sql) : null; },
-   run: (sql) => { strictSql(sql); return db ? db.run(sql) : null; },
+   exec: (sql, params) => { strictSql(sql); return db ? db.exec(sql, params) : null; },
+   run: (sql, params) => { strictSql(sql); return db ? db.run(sql, params) : null; },
    safeNum,
    getNotifyPrefs, setNotifyPrefs, getReengageState, touchReengage, getReengageGlobal, bumpReengageCounters, touchSweep,
    grantRewardOnce, getReengageStats, hasPendingComeback: (u) => hasPendingSource(u, 'comeback'),

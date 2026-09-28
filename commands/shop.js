@@ -1,5 +1,7 @@
 const db = require('../db');
 const config = require('../config');
+const crypto = require('crypto');
+const { withPurchaseLock } = require('../utils/purchaseLock');
 const { ContainerBuilder, TextDisplayBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags, EmbedBuilder } = require('discord.js');
 
 const SHOP = [
@@ -199,7 +201,8 @@ async function handleInteraction(i) {
       new ButtonBuilder().setCustomId(`shop_no_${itemId}`).setLabel('Cancel').setStyle(ButtonStyle.Danger).setEmoji('❌'),
     );
 
-    pendingShops.set(i.user.id, { itemId, item, guild: i.guild, channel: i.channel });
+    const purchaseId = crypto.randomUUID();
+    pendingShops.set(i.user.id, { itemId, item, guild: i.guild, channel: i.channel, purchaseId });
     setTimeout(() => pendingShops.delete(i.user.id), 30000);
     await i.followUp({ embeds: [warnEmbed(`**${item.name}**\nPrice: \`${priceStr(price)}\` ${config.currency}${item.monthly ? '/mo' : ''}${saleMult < 1 ? ` ~~\`${priceStr(item.price)}\`~~ **-${Math.round((1 - saleMult) * 100)}% sale!**` : ''}\n\n${item.desc}\n\nConfirm purchase?`)], components: [confirm], ephemeral: true });
   } catch (e) { console.error('shop item err:', e); }
@@ -215,48 +218,72 @@ async function handleConfirm(j) {
       await j.update({ embeds: [errEmbed('Session expired — please click the shop item again.')], components: [] });
       return;
     }
-
     if (!isBuy) {
       await j.update({ embeds: [errEmbed('Purchase cancelled.')], components: [] });
       return;
     }
 
-    const userNow = db.ensureUser(j.user.id);
-    const saleMult = db.eventMult('priceMult');
-    const price = Math.floor(pending.item.price * saleMult);
-    if (!userNow || userNow.balance < price) {
-      j.user.send(`You tried to buy **${pending.item.name}** (\`${priceStr(price)}\` ${config.currency}) but you don't have enough money.`).catch(() => {});
-      await j.update({ embeds: [errEmbed('Not enough money.')], components: [] });
-      return;
-    }
-
-    db.addBalance(j.user.id, -price);
-    if (pending.item.gems) {
-      db.addGems(j.user.id, pending.item.gems);
-    } else if (pending.item.weaponCrates) {
-      db.addWeaponCrate(j.user.id, pending.item.weaponCrates);
-    } else if (pending.item.monthly) { db.addPerk(j.user.id, pending.itemId, Math.floor(Date.now() / 1000) + 30 * 86400); }
-    else { db.addPerk(j.user.id, pending.itemId, 0); }
-    if (pending.itemId === 'vip_role_sub' && pending.guild) {
-      const vipRoleId = db.getVipRole(pending.guild.id);
-      if (vipRoleId) {
-        pending.guild.members.fetch(j.user.id).then(m => m.roles.add(vipRoleId).catch(() => {})).catch(() => {});
+    const purchaseId = pending.purchaseId || `${j.user.id}:${pending.itemId}:${j.id}`;
+    await withPurchaseLock(purchaseId, async () => {
+      const saleMult = db.eventMult('priceMult');
+      const price = Math.floor(pending.item.price * saleMult);
+      if (price <= 0) {
+        await j.update({ embeds: [errEmbed('Payment failed — you were not charged. Contact support.')], components: [] });
+        return;
       }
-    }
 
-    const logChId = db.getLogChannel(pending.guild?.id || '');
-    if (logChId) {
-      const logCh = pending.guild?.channels.cache.get(logChId);
-      if (logCh) {
-        logCh.send(`<@${j.user.id}> bought **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency}`).catch(() => {});
+      let purchaseOk = false;
+      const isPerkItem = !pending.item.gems && !pending.item.weaponCrates;
+      if (isPerkItem) {
+        const expiresAt = pending.item.monthly ? Math.floor(Date.now() / 1000) + 30 * 86400 : 0;
+        const res = db.purchasePerk(j.user.id, pending.itemId, price, expiresAt, purchaseId);
+        if (res.success) {
+          purchaseOk = true;
+        } else {
+          console.error('shop purchase failed:', res && res.error, 'user:', j.user.id, 'item:', pending.itemId, 'purchase:', purchaseId);
+          await j.update({ embeds: [errEmbed('Your order was not charged. If your balance looks wrong, contact support.')], components: [] });
+          return;
+        }
       } else {
-        pending.guild?.channels.fetch(logChId).then(ch => ch.send(`<@${j.user.id}> bought **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency}`).catch(() => {})).catch(() => {});
+        if (db.isPurchaseCommitted(purchaseId)) {
+          purchaseOk = true;
+        } else {
+          const userNow = db.ensureUser(j.user.id);
+          if (!userNow || userNow.balance < price) {
+            j.user.send(`You tried to buy **${pending.item.name}** (\`${priceStr(price)}\` ${config.currency}) but you don't have enough money.`).catch(() => {});
+            await j.update({ embeds: [errEmbed('Not enough money.')], components: [] });
+            return;
+          }
+          db.addBalance(j.user.id, -price);
+          if (pending.item.gems) db.addGems(j.user.id, pending.item.gems);
+          else if (pending.item.weaponCrates) db.addWeaponCrate(j.user.id, pending.item.weaponCrates);
+          db.recordCommittedPurchase(purchaseId, j.user.id, pending.itemId, price, 0);
+          purchaseOk = true;
+        }
       }
-    }
-    pending.channel?.send(`<@${j.user.id}> bought **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency}!`).then(m => setTimeout(() => m.delete().catch(() => {}), 5000)).catch(() => {});
-    j.user.send(`**Purchase Confirmation**\nYou bought **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency} in **${pending.guild?.name || 'the server'}**\n\n**How to use:** ${pending.item.use}`).catch(() => {});
-    j.client.users.fetch(config.ownerId).then(o => o.send(`<@${j.user.id}> bought **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency}!`).catch(() => {})).catch(() => {});
-    await j.update({ embeds: [okEmbed(`Purchased **${pending.item.name}**!`)], components: [] });
+      if (!purchaseOk) return;
+
+      if (pending.itemId === 'vip_role_sub' && pending.guild) {
+        const vipRoleId = db.getVipRole(pending.guild.id);
+        if (vipRoleId) {
+          pending.guild.members.fetch(j.user.id).then(m => m.roles.add(vipRoleId).catch(() => {})).catch(() => {});
+        }
+      }
+
+      const logChId = db.getLogChannel(pending.guild?.id || '');
+      if (logChId) {
+        const logCh = pending.guild?.channels.cache.get(logChId);
+        if (logCh) {
+          logCh.send(`<@${j.user.id}> bought **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency}`).catch(() => {});
+        } else {
+          pending.guild?.channels.fetch(logChId).then(ch => ch.send(`<@${j.user.id}> bought **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency}`).catch(() => {})).catch(() => {});
+        }
+      }
+      pending.channel?.send(`<@${j.user.id}> bought **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency}!`).then(m => setTimeout(() => m.delete().catch(() => {}), 5000)).catch(() => {});
+      j.user.send(`**Purchase Confirmation**\nYou bought **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency} in **${pending.guild?.name || 'the server'}**\n\n**How to use:** ${pending.item.use}`).catch(() => {});
+      j.client.users.fetch(config.ownerId).then(o => o.send(`<@${j.user.id}> bought **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency}!`).catch(() => {})).catch(() => {});
+      await j.update({ embeds: [okEmbed(`Purchased **${pending.item.name}**!`)], components: [] });
+    });
   } catch (e) { console.error('shop confirm err:', e); }
 }
 
