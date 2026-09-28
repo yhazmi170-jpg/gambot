@@ -246,35 +246,6 @@ async function download(filePath) {
   return null;
 }
 
-function snapshotTimeStr(p) {
-  const m = /^backups\/gambot-(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z\.db$/.exec(p);
-  if (!m) return null;
-  return `${m[1]}T${m[2]}:${m[3]}:${m[4]}.${m[5]}Z`;
-}
-
-// One-shot polluted-window skip (2026-09-28 deploy incident).
-//
-// BACKGROUND: the deploy at 20:17Z restored a 28h-STALE snapshot (09-27T16:14) because
-// download() read >1MiB snapshots as "0 bytes" (GitHub contents API omits inline content
-// past 1 MiB — fixed above via the git blobs API fallback). That stale-data instance then
-// re-uploaded its stale DB every ~5min as the NEWEST snapshots (first one at ~20:22:32Z),
-// so a naive fix would restore the newest polluted snapshot forever.
-//
-// FIX: the last GOOD snapshot is the pre-deploy instance's shutdown backup (~20:17Z).
-// SKIP (do not delete) every snapshot whose filename timestamp falls in this window during
-// the newest→oldest scan, so restore lands on the newest good one and the polluted
-// re-uploads become permanently shadowed by newer good snapshots. Non-destructive — if this
-// window is bumped while a crash-restart happens, the fallback is the good 20:17 snapshot.
-// This is a one-shot incident window: after the fixed instance boots, ship the follow-up
-// cleanup commit to REMOVE this block (and restore the scan to the plain timestamp-skip).
-const POLLUTED_FROM = '2026-09-28T20:18:30.000Z';
-const POLLUTED_TO = '2026-09-28T21:30:00.000Z';
-
-function pollutedWindow(ts) {
-  const t = ts ? Date.parse(ts) : NaN;
-  return !isNaN(t) && t >= Date.parse(POLLUTED_FROM) && t <= Date.parse(POLLUTED_TO);
-}
-
 // All snapshot blobs in the latest commit touching backups/ (newest first), with their git blob sha.
 async function allSnapshots() {
   const commits = await request('GET', `/repos/${OWNER}/${REPO}/commits?path=backups&per_page=1`);
@@ -369,11 +340,6 @@ async function tryRemoteRestore(newest) {
     console.log(`restore: scanning ${all.length} snapshots (newest→oldest)`);
     for (const s of all) {
       const p = s.path;
-      const ts = snapshotTimeStr(p);
-      if (ts && pollutedWindow(ts)) {
-        console.log(`restore: SKIP ${p} — in polluted re-upload window [${POLLUTED_FROM}, ${POLLUTED_TO}] (deploy incident 2026-09-28)`);
-        continue;
-      }
       try {
         const buf = await download(p);
         const acc = await tryAccept(buf, `snapshot ${p}`);
