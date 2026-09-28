@@ -333,39 +333,18 @@ async function restore() {
   return info;
 }
 
-// One-shot restore pin (2026-09-28 incident). The stale instance at 20:17Z lost ~28h of
-// live data; the polluted instance kept re-uploading its stale DB as the newest snapshots AND
-// its SIGTERM shutdown backup (20-38-51) landed AFTER the fix boot's clean-scan, so a naive
-// newest→oldest scan keeps grabbing polluted data. The last GOOD snapshot is the pre-deploy
-// shutdown backup below. Pin the restore to it for exactly ONE boot (log which), then ship a
-// cleanup commit REMOVING this pin — the blobs-API fallback stays forever.
-const RESTORE_PIN = 'backups/gambot-2026-09-28T20-17-41-236Z.db';
-
 async function tryRemoteRestore(newest) {
   // Newest → oldest snapshots; accept the first VALID non-seed DB
   try {
     const all = await allSnapshots();
     console.log(`restore: scanning ${all.length} snapshots (newest→oldest)`);
-
-    // ONE-SHOT PIN: if present, force this exact snapshot first. The polluted instance's
-    // shutdown backup (20-38-51) is newer than the good 20-17-41 one, so a plain scan would
-    // restore polluted data. After a successful pinned restore, this pin MUST be removed in a
-    // cleanup commit (the newest GOOD snapshots then shadow the polluted ones permanently).
-    let pinned = null;
-    if (RESTORE_PIN) {
-      pinned = all.find(s => s.path === RESTORE_PIN);
-      if (!pinned) console.error(`restore: PIN ${RESTORE_PIN} not found in snapshot list`);
-    }
-
-    const order = pinned ? [pinned, ...all.filter(s => s.path !== RESTORE_PIN)] : all;
-    for (const s of order) {
+    for (const s of all) {
       const p = s.path;
       try {
         const buf = await download(p);
         const acc = await tryAccept(buf, `snapshot ${p}`);
         if (acc) {
-          const via = pinned && p === RESTORE_PIN ? ' [RESTORE_PIN]' : '';
-          console.log(`restored DB from cloud snapshot ${p} (users=${acc.users}, sha256=${acc.sha256.slice(0,16)})${via}`);
+          console.log(`restored DB from cloud snapshot ${p} (users=${acc.users}, sha256=${acc.sha256.slice(0,16)})`);
           return { ok: true, source: `snapshot:${path.basename(p)}`, seed: false, ...acc };
         }
       } catch (e) { console.error(`restore: skip ${p}: ${e.message}`); }
