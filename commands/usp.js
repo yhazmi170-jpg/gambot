@@ -38,6 +38,7 @@ module.exports = {
     if (!id) return message.reply({ embeds: [error('That is not a server id. Copy one from `v psu list`.')] });
 
     const res = db.lockServer(id, message.author.id, message.guild ? message.guild.name : '');
+    require('../utils/serverAccess').invalidateHiddenCache(); // a locked server stops hiding its members
     if (res.already) {
       return message.reply({ embeds: [success(`\`${id}\` is already locked. Members there can't use the bot.`)] });
     }

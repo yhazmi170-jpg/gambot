@@ -55,6 +55,7 @@ module.exports = {
 
     const mode = local ? 'offline' : 'active';
     const res = db.activateServer(id, message.author.id, label, mode);
+    require('../utils/serverAccess').invalidateHiddenCache(); // leaderboard visibility must update NOW
     if (res.already) {
       const what = local ? 'local-only' : 'global';
       return message.reply({ embeds: [success(`\`${id}\` is already unlocked ${what}${res.record.activatedBy ? ` by \`${res.record.activatedBy}\`` : ''}.`)] });

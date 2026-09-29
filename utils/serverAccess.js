@@ -40,6 +40,56 @@ function inLocalOnlyServer(message) {
   return !!(message.guild && db.isServerOffline(message.guild.id));
 }
 
+// Members of EVERY local-only ("offline") server, as one exclusion set. A local-only
+// server is completely hidden: in a global server, its players must not appear on the
+// global boards either. Returns a Set of user ids to HIDE, or null when nothing is
+// hidden (or we're already in a local-only server, where localMemberIds does the job).
+// Cached briefly — member lists change slowly and a board must never lag forever.
+let _hiddenCache = { at: 0, ids: null };
+const HIDDEN_TTL_MS = 120000;
+function invalidateHiddenCache() { _hiddenCache = { at: 0, ids: null }; }
+
+async function hiddenMemberIds(message) {
+  // inside a local-only server the board is already scoped to it — nothing extra
+  if (message.guild && db.isServerOffline(message.guild.id)) return null;
+  const client = message.client;
+  const guildCache = client && client.guilds && client.guilds.cache;
+  if (!guildCache) return null;
+
+  const now = Date.now();
+  if (_hiddenCache.ids && (now - _hiddenCache.at) < HIDDEN_TTL_MS) return _hiddenCache.ids;
+
+  const offline = (db.listServerAccess().offline) || [];
+  const ids = new Set();
+  for (const rec of offline) {
+    const g = guildCache.get(rec.guildId);
+    if (!g || !g.members) continue;
+    let members;
+    try {
+      members = await g.members.fetch();
+    } catch (err) {
+      console.error(`[local] member fetch failed for hidden server ${rec.guildId}:`, err && err.message);
+      members = g.members.cache;
+    }
+    const list = (members && members.values) ? [...members.values()] : (members || []);
+    for (const m of list) ids.add(m.user ? m.user.id : m.id);
+  }
+  _hiddenCache = { at: now, ids: offline.length ? ids : null };
+  return _hiddenCache.ids;
+}
+
+// One call for every leaderboard: decides WHO may appear.
+//   local mode  -> only this server's members
+//   global mode -> everyone EXCEPT members of any local-only server
+// Returns null when nothing needs filtering (fast path, no member fetch at all).
+async function visibleUserFilter(message) {
+  const local = await localMemberIds(message);
+  if (local) return { mode: 'local', ids: local, test: (id) => local.has(id) };
+  const hidden = await hiddenMemberIds(message);
+  if (hidden && hidden.size) return { mode: 'global', ids: hidden, test: (id) => !hidden.has(id) };
+  return null;
+}
+
 function formatRec(g) {
   const name = g.guildName ? ` — ${g.guildName}` : '';
   const who = g.activatedBy ? ` · by \`${g.activatedBy}\`` : '';
@@ -57,4 +107,4 @@ function listEmbed() {
   ], 0x57f287);
 }
 
-module.exports = { parseGuildId, listEmbed, formatRec, localMemberIds, inLocalOnlyServer };
+module.exports = { parseGuildId, listEmbed, formatRec, localMemberIds, inLocalOnlyServer, hiddenMemberIds, visibleUserFilter, invalidateHiddenCache };

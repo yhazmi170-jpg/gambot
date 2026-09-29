@@ -1,6 +1,6 @@
 const db = require('../db');
 const { embed } = require('../utils/embed');
-const { localMemberIds } = require('../utils/serverAccess');
+const { visibleUserFilter } = require('../utils/serverAccess');
 const config = require('../config');
 
 function rankLines(items, fmt, excludeId) {
@@ -26,8 +26,8 @@ module.exports = {
   async execute(message, args) {
     const sub = (args[0] || '').toLowerCase();
     const owner = config.ownerId;
-    const localIds = await localMemberIds(message);
-    const local = (rows) => (localIds ? rows.filter(u => u.user_id && localIds.has(u.user_id)) : rows);
+    const filter = await visibleUserFilter(message);
+    const local = (rows) => (filter ? rows.filter(u => u.user_id && filter.test(u.user_id)) : rows);
 
     if (sub === 'gamble' || sub === 'gambled' || sub === 'gamblers' || sub === 'gamblelb') {
       const top = local(db.getGamblers(40));

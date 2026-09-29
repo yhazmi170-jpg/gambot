@@ -341,6 +341,36 @@ const nap = () => new Promise((r) => setTimeout(r, 2200));
     check('usp locks an offline-server', db.getServerAccess(NEW_GUILD).status === 'locked');
   }
 
+  // 15. local-only servers are HIDDEN from other servers too (bidirectional)
+  {
+    const OFFLINE = '1540000000000000009';
+    await nap();
+    const set = makeMessage(`v psu offline ${OFFLINE}`, OWNER, { id: 'g_hub', name: 'Hub' });
+    await handler.handleMessage(set);
+    check('remote server can be set offline by id', db.getServerAccess(OFFLINE).status === 'offline', db.getServerAccess(OFFLINE).status);
+
+    // a GLOBAL server's board must hide members of the offline server
+    const sa = require('../utils/serverAccess');
+    sa.invalidateHiddenCache();
+    // the bot is in the offline server, so the client must know about it
+    const hubMsg = makeMessage('v lb', 'member', { id: 'g_hub', name: 'Hub' });
+    hubMsg.client.guilds.cache.set(OFFLINE, patchGuild(makeMessage('v lb', 'member', { id: OFFLINE, name: 'Hidden' })).guild);
+    const hidden = await sa.hiddenMemberIds(hubMsg);
+    check('offline server members are hidden globally', hidden instanceof Set && hidden.size > 0, `hidden=${hidden ? hidden.size : 'null'}`);
+
+    // inside the offline server itself, the board is scoped to it (not hidden)
+    const inside = await sa.visibleUserFilter(patchGuild(makeMessage('v lb', 'member', { id: OFFLINE, name: 'Hidden' })));
+    check('inside the offline server the filter is local-mode', inside && inside.mode === 'local');
+    // a locked server is no longer hidden
+    await nap();
+    sa.invalidateHiddenCache();
+    const unl = makeMessage(`v psu ${OFFLINE}`, OWNER, { id: 'g_hub', name: 'Hub' });
+    await handler.handleMessage(unl);
+    sa.invalidateHiddenCache();
+    const after = await sa.hiddenMemberIds(makeMessage('v lb', 'member', { id: 'g_hub', name: 'Hub' }));
+    check('flipping back to global stops hiding them', after === null, `hidden=${after ? after.size : 'null'}`);
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
 })().catch((e) => { console.error('FATAL', e); process.exit(1); });

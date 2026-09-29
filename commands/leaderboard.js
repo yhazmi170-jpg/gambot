@@ -1,24 +1,23 @@
 const db = require('../db');
 const { embed } = require('../utils/embed');
-const { localMemberIds } = require('../utils/serverAccess');
+const { visibleUserFilter } = require('../utils/serverAccess');
 const config = require('../config');
 
 module.exports = {
   name: 'lb',
   helpCategory: 'Economy',
   helpArgs: '',
-  description: 'leaderboard — richest players (wallet + bank + unclaimed inbox); in a local-only server shows only this server',
+  description: 'leaderboard — richest players (wallet + bank + unclaimed inbox); local-only servers show only their own, and their players never show on other servers',
   aliases: ['top', 'rich'],
   async execute(message, args) {
     const limit = Math.min(parseInt(args[0]) || 10, 20);
-    let top = db.getTop(limit * 4, config.ownerId); // over-fetch so local filtering can't starve the list
-    const localIds = await localMemberIds(message);
-    if (localIds) {
-      top = top.filter(u => localIds.has(u.user_id)).slice(0, limit);
-    } else {
-      top = top.slice(0, limit);
+    const filter = await visibleUserFilter(message);
+    let top = db.getTop(filter ? limit * 8 : limit, config.ownerId); // over-fetch so filtering can't starve the list
+    if (filter) {
+      top = top.filter(u => filter.test(u.user_id)).slice(0, limit);
     }
-    if (!top.length) return message.channel.send({ embeds: [embed('🏆 Global Leaderboard', [['info', 'no users yet']])] });
+    const isLocal = filter && filter.mode === 'local';
+    if (!top.length) return message.channel.send({ embeds: [embed(isLocal ? '🏆 Local Leaderboard' : '🏆 Global Leaderboard', [['info', 'no users yet']])] });
 
     const lines = top.map((u, i) => {
       const lb = db.hasPerk(u.user_id, 'colored_lb') ? db.getLbEmoji(u.user_id) + ' ' : '';
@@ -30,7 +29,7 @@ module.exports = {
       chunks.push(lines.slice(i, i + 10).join('\n'));
     }
 
-    const title = localIds ? `🏆 Local Leaderboard — ${message.guild.name}` : '🏆 Global Leaderboard';
+    const title = isLocal ? `🏆 Local Leaderboard — ${message.guild.name}` : '🏆 Global Leaderboard';
     message.channel.send({
       embeds: [embed(title, chunks.map(c => ['', c]))],
     });
