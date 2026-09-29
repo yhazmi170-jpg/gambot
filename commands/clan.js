@@ -1,5 +1,6 @@
 const db = require('../db');
 const { embed, error, success, parseAmount } = require('../utils/embed');
+const { inLocalOnlyServer } = require('../utils/serverAccess');
 const config = require('../config');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
@@ -10,6 +11,9 @@ module.exports = {
   description: 'player-owned clans — one clan per player, join anyone\u2019s clan across the server',
   aliases: ['guild'],
   async execute(message, args) {
+    if (inLocalOnlyServer(message)) {
+      return message.channel.send({ embeds: [error('clans are cross-server by design — they are not available in a local-only server. Use this in a globally-unlocked server instead.')] });
+    }
     const userId = message.author.id;
     const sub = (args[0] || '').toLowerCase();
     const usage = 'usage: `v clan create <name>` | `v clan invite @user` | `v clan join @user` | `v clan info` | `v clan deposit <amt>` | `v clan top`';

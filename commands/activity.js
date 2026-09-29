@@ -1,5 +1,6 @@
 const db = require('../db');
 const { embed } = require('../utils/embed');
+const { localMemberIds } = require('../utils/serverAccess');
 const config = require('../config');
 
 function rankLines(items, fmt, excludeId) {
@@ -20,21 +21,23 @@ module.exports = {
   name: 'activity',
   helpCategory: 'Economy',
   helpArgs: '[usage|gamble|wins|commands|summary]',
-  description: 'usage analytics — who uses the bot the most, who gambles/wins the most',
+  description: 'usage analytics — who uses the bot the most, who gambles/wins the most (local-only server shows only its members)',
   aliases: ['usage', 'analytics'],
-  execute(message, args) {
+  async execute(message, args) {
     const sub = (args[0] || '').toLowerCase();
     const owner = config.ownerId;
+    const localIds = await localMemberIds(message);
+    const local = (rows) => (localIds ? rows.filter(u => u.user_id && localIds.has(u.user_id)) : rows);
 
     if (sub === 'gamble' || sub === 'gambled' || sub === 'gamblers' || sub === 'gamblelb') {
-      const top = db.getGamblers(20);
+      const top = local(db.getGamblers(40));
       if (!top.length) return message.channel.send({ embeds: [embed('🎲 Most Gambled', [['info', 'no gambling recorded yet']])] });
       const lines = rankLines(top, (u, i) => `**#${i + 1}** <@${u.user_id}> — **${Number(u.total_gambled).toLocaleString()}** ${config.currency} wagered`, owner);
       return message.channel.send({ embeds: [embed('🎲 Most Gambled', chunkLines(lines))] });
     }
 
     if (sub === 'win' || sub === 'wins' || sub === 'won' || sub === 'winners') {
-      const top = db.getTopWinners(20, owner);
+      const top = local(db.getTopWinners(40, owner));
       if (!top.length) return message.channel.send({ embeds: [embed('💰 Most Won', [['info', 'no wins recorded yet']])] });
       const lines = top.map((u, i) => `**#${i + 1}** <@${u.user_id}> — won **${Number(u.total_won).toLocaleString()}** ${config.currency}`);
       return message.channel.send({ embeds: [embed('💰 Most Won', chunkLines(lines))] });
@@ -48,7 +51,7 @@ module.exports = {
     }
 
     if (sub === 'users' || sub === 'active' || sub === 'mostactive') {
-      const top = db.getTopCommandUsers(20, owner);
+      const top = local(db.getTopCommandUsers(40, owner));
       if (!top.length) return message.channel.send({ embeds: [embed('👥 Most Active Users', [['info', 'no usage recorded yet']])] });
       const lines = top.map((u, i) => `**#${i + 1}** <@${u.user_id}> — **${Number(u.total).toLocaleString()}** commands · **${u.features}** features`);
       return message.channel.send({ embeds: [embed('👥 Most Active Users', chunkLines(lines))] });
@@ -56,9 +59,9 @@ module.exports = {
 
     // default: overall summary
     const s = db.getActivitySummary();
-    const topUsers = db.getTopCommandUsers(6, owner);
-    const topGamblers = db.getGamblers(5).filter(u => u.user_id !== owner);
-    const topWinners = db.getTopWinners(5, owner);
+    const topUsers = local(db.getTopCommandUsers(10, owner));
+    const topGamblers = local(db.getGamblers(10).filter(u => u.user_id !== owner));
+    const topWinners = local(db.getTopWinners(10, owner));
 
     const fields = [];
     if (s) {

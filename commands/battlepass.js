@@ -134,16 +134,20 @@ function claim(message, userId) {
   return message.channel.send({ embeds: [success(`claimed **${claimed.length}** reward tier${claimed.length > 1 ? 's' : ''}: ${parts.join(' + ')}\n${detail}`)] });
 }
 
-function top(message, userId) {
+async function top(message, userId) {
   const prog = db.passProgress(message.author.id);
-  const top = db.passTop(10);
-  if (!top.length) return message.channel.send({ embeds: [error('no pass XP earned this season yet — be the first!')] });
+  const localIds = await require('../utils/serverAccess').localMemberIds(message);
+  let pool = db.passTop(40);
+  if (localIds) pool = pool.filter(p => localIds.has(p.userId));
+  const top = pool.slice(0, 10);
+  if (!top.length) return message.channel.send({ embeds: [error('no pass XP earned in this server yet — be the first!')] });
   const lines = top.map((p, i) => {
     const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
     return `${medal} <@${p.userId}> — Lvl **${p.level}** (${p.xp} XP)`;
   });
+  const title = localIds ? `🏆 Local Season ${prog.season} — Top Pass Levels` : `🏆 Season ${prog.season} — Top Pass Levels`;
   return message.channel.send({
-    embeds: [embed(`🏆 Season ${prog.season} — Top Pass Levels`, [
+    embeds: [embed(title, [
       ['Leaderboard', lines.join('\n')],
     ], 0xaa7bff).setFooter({ text: `Your level: ${prog.level} (${prog.xp} XP)` })],
   });

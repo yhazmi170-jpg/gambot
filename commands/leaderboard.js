@@ -1,16 +1,23 @@
 const db = require('../db');
 const { embed } = require('../utils/embed');
+const { localMemberIds } = require('../utils/serverAccess');
 const config = require('../config');
 
 module.exports = {
   name: 'lb',
   helpCategory: 'Economy',
   helpArgs: '',
-  description: 'global leaderboard — richest players (wallet + bank + unclaimed inbox)',
+  description: 'leaderboard — richest players (wallet + bank + unclaimed inbox); in a local-only server shows only this server',
   aliases: ['top', 'rich'],
-  execute(message, args) {
+  async execute(message, args) {
     const limit = Math.min(parseInt(args[0]) || 10, 20);
-    const top = db.getTop(limit, config.ownerId);
+    let top = db.getTop(limit * 4, config.ownerId); // over-fetch so local filtering can't starve the list
+    const localIds = await localMemberIds(message);
+    if (localIds) {
+      top = top.filter(u => localIds.has(u.user_id)).slice(0, limit);
+    } else {
+      top = top.slice(0, limit);
+    }
     if (!top.length) return message.channel.send({ embeds: [embed('🏆 Global Leaderboard', [['info', 'no users yet']])] });
 
     const lines = top.map((u, i) => {
@@ -23,8 +30,9 @@ module.exports = {
       chunks.push(lines.slice(i, i + 10).join('\n'));
     }
 
+    const title = localIds ? `🏆 Local Leaderboard — ${message.guild.name}` : '🏆 Global Leaderboard';
     message.channel.send({
-      embeds: [embed('🏆 Global Leaderboard', chunks.map(c => ['', c]))],
+      embeds: [embed(title, chunks.map(c => ['', c]))],
     });
   },
 };

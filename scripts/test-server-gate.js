@@ -74,7 +74,21 @@ function makeMessage(content, userId, guild) {
     reply: channel.send.bind(channel), react: () => Promise.resolve(),
     guildId: guild ? guild.id : undefined, channelId: 'chan_gate',
     client: { user: { id: 'bot' }, guilds: { cache: new Map() }, users: { cache: new Map() }, channels: { cache: new Map() } },
+    // members fetch so local-scoped leaderboards work in tests (slb-style)
+    guildMembers: ['member', 'member2', OWNER, 'other'].filter(id => id !== userId),
   };
+}
+// give every guild'd message a working members.fetch until a real member cache exists
+const origGuild = (g) => g;
+function patchGuild(m) {
+  if (!m.guild) return m;
+  const ids = m.guildMembers || ['member', 'member2', OWNER, 'other'];
+  m.guild.members = {
+    fetch: () => Promise.resolve(new Map(ids.map(id => [id, { id, user: { id } }]))),
+    cache: new Map(ids.map(id => [id, { id, user: { id } }])),
+    map: (fn) => ids.map(id => ({ id, user: { id } })).map(fn),
+  };
+  return m;
 }
 const txt = (msg) => msg._sends.map((s) => {
   if (s.content) return String(s.content);
@@ -189,11 +203,12 @@ const nap = () => new Promise((r) => setTimeout(r, 2200));
     const msg = makeMessage('v psu list', OWNER, null);
     await handler.handleMessage(msg);
     const out = txt(msg);
-    check('psu list renders all three sections', /unlocked \(\d+\)/.test(out) && /locked \(\d+\)/.test(out) && /waiting \(\d+\)/.test(out), out.slice(0, 100));
-    const { active, pending } = db.listServerAccess();
+    check('psu list renders all four sections', /unlocked — global \(\d+\)/.test(out) && /unlocked — local only/.test(out) && /locked \(\d+\)/.test(out) && /waiting \(\d+\)/.test(out), out.slice(0, 100));
+    const { active, pending, offline } = db.listServerAccess();
     check('list buckets the 4 seeds + the activated server as unlocked',
       active.length === 5 && db.SEED_ACTIVE_GUILDS.every((g) => active.some((a) => a.guildId === g)), `active=${active.length}`);
     check('list buckets the locked server as waiting', pending.length === 1 && pending[0].guildId === 'g_other', `pending=${pending.length}`);
+    check('no offline servers yet', offline.length === 0, `offline=${offline.length}`);
 
     const evil = `g_'; DROP TABLE server_access; --`;
     let threw = false;
@@ -275,6 +290,55 @@ const nap = () => new Promise((r) => setTimeout(r, 2200));
     const uspNoop2 = makeMessage('v usp', OWNER, { id: NEW_GUILD, name: 'New Server' });
     await handler.handleMessage(uspNoop2);
     check('usp twice in a row is a clean no-op', /already locked/.test(txt(uspNoop2)));
+  }
+
+  // 14. OFF-LINE / LOCAL-ONLY mode: `v psu offline`
+  {
+    // unlock a server in local-only (offline) mode
+    await nap();
+    const msg = makeMessage('v psu offline', OWNER, { id: NEW_GUILD, name: 'New Server' });
+    await handler.handleMessage(msg);
+    const rec = db.getServerAccess(NEW_GUILD);
+    check('psu offline sets status=offline', rec.status === 'offline' && /LOCAL ONLY/.test(txt(msg)), txt(msg).slice(0, 80));
+    check('offline server passes the gate (isServerActive)', db.isServerActive(NEW_GUILD) === true);
+    check('isServerOffline is true for it', db.isServerOffline(NEW_GUILD) === true);
+    const { offline } = db.listServerAccess();
+    check('list buckets it as offline', offline.length === 1 && offline[0].guildId === NEW_GUILD, `offline=${offline.length}`);
+
+    // members can run normal commands in an offline server (no gate, no notice)
+    await nap();
+    const balMsg = patchGuild(makeMessage('v lb', 'member', { id: NEW_GUILD, name: 'New Server' }));
+    await handler.handleMessage(balMsg);
+    await new Promise((r) => setTimeout(r, 50));
+    const balTxt = txt(balMsg);
+    check('members can use the bot in offline mode', /Leaderboard/i.test(balTxt) && !/v psu/.test(balTxt) && !/not unlocked/.test(balTxt), balTxt.slice(0, 80));
+    await nap();
+    const slots = makeMessage('v work', 'member', { id: NEW_GUILD, name: 'New Server' });
+    await handler.handleMessage(slots);
+    check('work still responds normally offline (no gate error)', !/v psu/.test(txt(slots)) && !/not unlocked/.test(txt(slots)), txt(slots).slice(0, 80));
+
+    // clan / clanwar are blocked (cross-server by design)
+    await nap();
+    const clan = makeMessage('v clan top', 'member', { id: NEW_GUILD, name: 'New Server' });
+    await handler.handleMessage(clan);
+    check('clan is blocked in offline mode', /cross-server/.test(txt(clan)));
+    await nap();
+    const war = makeMessage('v clanwar', 'member', { id: NEW_GUILD, name: 'New Server' });
+    await handler.handleMessage(war);
+    check('clanwar is blocked in offline mode', /cross-server/.test(txt(war)));
+
+    // v psu (global) on an offline server flips it back to global-active
+    await nap();
+    const globalMsg = makeMessage('v psu', OWNER, { id: NEW_GUILD, name: 'New Server' });
+    await handler.handleMessage(globalMsg);
+    const rec2 = db.getServerAccess(NEW_GUILD);
+    check('v psu flips offline -> global', rec2.status === 'active' && db.isServerOffline(NEW_GUILD) === false, rec2.status);
+
+    // v usp still locks it from offline/active
+    await nap();
+    const lock = makeMessage('v usp', OWNER, { id: NEW_GUILD, name: 'New Server' });
+    await handler.handleMessage(lock);
+    check('usp locks an offline-server', db.getServerAccess(NEW_GUILD).status === 'locked');
   }
 
   console.log(`\n${pass} passed, ${fail} failed`);

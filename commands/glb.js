@@ -1,16 +1,23 @@
 const db = require('../db');
 const { embed } = require('../utils/embed');
+const { localMemberIds } = require('../utils/serverAccess');
 const config = require('../config');
 
 module.exports = {
   name: 'glb',
   helpCategory: 'Economy',
   helpArgs: '',
-  description: 'best gamblers leaderboard — highest total gambled',
+  description: 'best gamblers leaderboard — highest total gambled (shows only this server in a local-only server)',
   aliases: ['gamblelb', 'gamblers'],
-  execute(message, args) {
+  async execute(message, args) {
     const limit = Math.min(parseInt(args[0]) || 10, 20);
-    const top = db.getGamblers(limit);
+    let top = db.getGamblers(limit * 4);
+    const localIds = await localMemberIds(message);
+    if (localIds) {
+      top = top.filter(u => localIds.has(u.user_id)).slice(0, limit);
+    } else {
+      top = top.slice(0, limit);
+    }
 
     if (!top.length) return message.channel.send({ embeds: [embed('🎲 Gamblers Leaderboard', [['info', 'no data yet']])] });
 
@@ -20,8 +27,9 @@ module.exports = {
       chunks.push(lines.slice(i, i + 10).join('\n'));
     }
 
+    const title = localIds ? `🎲 Local Gamblers — ${message.guild.name}` : '🎲 Gamblers Leaderboard';
     message.channel.send({
-      embeds: [embed('🎲 Gamblers Leaderboard', chunks.map(c => ['', c]))],
+      embeds: [embed(title, chunks.map(c => ['', c]))],
     });
   },
 };

@@ -51,6 +51,11 @@ module.exports = {
   aliases: ['war'],
   description: 'challenge another clan to a treasury war — members click Fight, the winning clan takes both stakes',
   execute(message, args) {
+    const { inLocalOnlyServer } = require('../utils/serverAccess');
+    const { error } = require('../utils/embed');
+    if (inLocalOnlyServer(message)) {
+      return message.channel.send({ embeds: [error('clan wars are cross-server by design — not available in a local-only server.')] });
+    }
     const userId = message.author.id;
     const sub = (args[0] || '').toLowerCase();
     const myClanId = db.getClanOf(userId);

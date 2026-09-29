@@ -440,7 +440,7 @@ start().catch(e => console.error('[START] FATAL:', e));
     startupNotifier.onGatewayReady(client, config.ownerId);
 
     client.user.setPresence({
-      activities: [{ name: `v${version} | /marlboro | ${config.prefixes[0]} help` }],
+      activities: [{ name: `v${version} | ${config.prefixes[0]} help` }],
       status: 'online',
     });
 

@@ -5525,7 +5525,7 @@ function getServerAccess(guildId) {
   const v = rows[0].values[0];
   return {
     guildId: v[0],
-    status: v[1] === 'active' ? 'active' : v[1] === 'locked' ? 'locked' : 'pending',
+    status: v[1] === 'active' ? 'active' : v[1] === 'offline' ? 'offline' : v[1] === 'locked' ? 'locked' : 'pending',
     guildName: v[2] || '',
     firstSeenAt: v[3] || 0,
     activatedAt: v[4] || 0,
@@ -5534,10 +5534,20 @@ function getServerAccess(guildId) {
   };
 }
 
+// Gate check: both 'active' (global) and 'offline' (local-only) servers are ENABLED —
+// members can run commands. 'offline' just scopes the global leaderboards to this server.
 function isServerActive(guildId) {
   if (!guildId) return true; // DM / no guild context is never gated
   const rec = getServerAccess(guildId);
-  return !!rec && rec.status === 'active';
+  return !!rec && (rec.status === 'active' || rec.status === 'offline');
+}
+
+// true only for servers enabled in local/offline mode: v lb / v glb / v slb show
+// ONLY this server's members, everything else behaves the same.
+function isServerOffline(guildId) {
+  if (!guildId) return false;
+  const rec = getServerAccess(guildId);
+  return !!rec && rec.status === 'offline';
 }
 
 // Records a pending server the first time we see it. isNew=true means "notify the
@@ -5568,34 +5578,38 @@ function markServerNoticeSent(guildId) {
   save();
 }
 
-function activateServer(guildId, byUserId, name) {
+// mode: 'active' (global, default) or 'offline' (local-only — enabled but isolated
+// leaderboards). v psu = active, v psu offline = offline.
+function activateServer(guildId, byUserId, name, mode) {
   const gid = safeStr(guildId);
   if (!gid) return { ok: false, already: false, error: 'no_guild' };
+  const target = mode === 'offline' ? 'offline' : 'active';
   const existing = getServerAccess(gid);
-  if (existing && existing.status === 'active') return { ok: true, already: true, record: existing };
+  if (existing && existing.status === target) return { ok: true, already: true, record: existing };
   const now = Math.floor(Date.now() / 1000);
   const label = safeStr(name || (existing && existing.guildName) || '');
   if (existing) {
-    db.run(`UPDATE server_access SET status = 'active', activated_at = ${now}, activated_by = '${safeStr(byUserId)}',
+    db.run(`UPDATE server_access SET status = '${target}', activated_at = ${now}, activated_by = '${safeStr(byUserId)}',
             guild_name = CASE WHEN '${label}' = '' THEN guild_name ELSE '${label}' END
             WHERE guild_id = '${gid}'`);
   } else {
     db.run(`INSERT INTO server_access (guild_id, status, guild_name, first_seen_at, activated_at, activated_by, notified_at)
-            VALUES ('${gid}', 'active', '${label}', ${now}, ${now}, '${safeStr(byUserId)}', 0)`);
+            VALUES ('${gid}', '${target}', '${label}', ${now}, ${now}, '${safeStr(byUserId)}', 0)`);
   }
   save();
-  console.log(`[server-gate] ACTIVATED ${gid} (${label || 'unknown'}) by ${byUserId}`);
+  console.log(`[server-gate] ${target === 'offline' ? 'OFFLINE' : 'ACTIVATED'} ${gid} (${label || 'unknown'}) by ${byUserId}`);
   return { ok: true, already: false, record: getServerAccess(gid) };
 }
 
 function listServerAccess() {
   const rows = db.exec(`SELECT guild_id, status, guild_name, first_seen_at, activated_at, activated_by
                         FROM server_access ORDER BY status ASC, first_seen_at ASC`);
-  const out = { active: [], locked: [], pending: [] };
+  const out = { active: [], offline: [], locked: [], pending: [] };
   if (!rows.length || !rows[0].values.length) return out;
   for (const v of rows[0].values) {
     const rec = { guildId: v[0], status: v[1], guildName: v[2] || '', firstSeenAt: v[3] || 0, activatedAt: v[4] || 0, activatedBy: v[5] || '' };
     if (rec.status === 'active') out.active.push(rec);
+    else if (rec.status === 'offline') out.offline.push(rec);
     else if (rec.status === 'locked') out.locked.push(rec);
     else out.pending.push(rec);
   }
@@ -6031,5 +6045,5 @@ hasPerk,
    safeNum,
    getNotifyPrefs, setNotifyPrefs, getReengageState, touchReengage, getReengageGlobal, bumpReengageCounters, touchSweep,
    grantRewardOnce, getReengageStats, hasPendingComeback: (u) => hasPendingSource(u, 'comeback'),
-   getServerAccess, isServerActive, noteServerPending, markServerNoticeSent, activateServer, lockServer, listServerAccess, SEED_ACTIVE_GUILDS,
+   getServerAccess, isServerActive, isServerOffline, noteServerPending, markServerNoticeSent, activateServer, lockServer, listServerAccess, SEED_ACTIVE_GUILDS,
 };
