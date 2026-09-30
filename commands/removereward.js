@@ -8,7 +8,7 @@ module.exports = {
   aliases: ['rmreward'],
   description: 'remove a perk from a user (owner only)',
   execute(message, args) {
-    if (message.author.id !== config.ownerId) return;
+    if (!config.isOwner(message.author.id)) return;
 
     const target = message.mentions.users.first();
     const perk = args[1];

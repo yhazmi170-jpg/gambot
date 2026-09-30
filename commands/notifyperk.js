@@ -7,7 +7,7 @@ module.exports = {
   aliases: ['np'],
   description: 'DM all holders of a perk (owner only)',
   execute(message, args) {
-    if (message.author.id !== config.ownerId) return;
+    if (!config.isOwner(message.author.id)) return;
 
     if (!args.length) return message.channel.send({ embeds: [error('usage: `Anotifyperk <perk_name> | <message>`')] });
 

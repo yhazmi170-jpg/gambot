@@ -143,7 +143,8 @@ async function handleMessage(message) {
   try { db.breedSnails(message.author.id); } catch (err) { dlog.log({ kind: 'throw', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name, step: 'breedSnails', err: err && err.message }); }
 
   if (prefix === 'A') {
-    if (message.author.id !== config.ownerId) return;
+    // full admin parity for every owner-equivalent account (owner + the owner's alt)
+    if (!config.isOwner(message.author.id)) return;
     try { cmd.execute(message, args); } catch (err) {
       logCmdError('admin_execute', err);
       message.channel.send({ embeds: [require('./embed').error('admin error')] });
@@ -153,9 +154,10 @@ async function handleMessage(message) {
 
   const ALWAYS_ALLOWED = ['help', 'enable', 'disable'];
   try {
-  // server gate: Gambot is IN the server but it is not unlocked there yet. Owner
-  // always passes (so they can run `v psu`); DMs are never gated.
-  if (message.guild && message.author.id !== config.ownerId) {
+  // server gate: Gambot is IN the server but it is not unlocked there yet. Server
+  // admins (owner + the owner's alt) always pass — so they can run `v psu` there;
+  // DMs are never gated.
+  if (message.guild && !config.isServerAdmin(message.author.id)) {
     if (!db.isServerActive(message.guild.id)) {
       trace('server_gate_blocked');
       try {
@@ -172,7 +174,7 @@ async function handleMessage(message) {
       return;
     }
   }
-  if (message.guild && message.author.id !== config.ownerId) {
+  if (message.guild && !config.isServerAdmin(message.author.id)) {
     const guild = db.getGuild(message.guild.id);
     const guildAll = guild.disabled_commands.includes('all');
     const channelRows = db.exec(`SELECT commands FROM channel_disabled WHERE guild_id = '${message.guild.id}' AND channel_id = '${message.channel.id}'`);

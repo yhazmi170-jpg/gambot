@@ -8,7 +8,7 @@ module.exports = {
   aliases: ['rwd'],
   description: 'give a perk to a user (owner only)',
   execute(message, args) {
-    if (message.author.id !== config.ownerId) return;
+    if (!config.isOwner(message.author.id)) return;
 
     const target = message.mentions.users.first();
     const perk = args[1];

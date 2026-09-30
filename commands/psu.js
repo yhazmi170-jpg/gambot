@@ -22,7 +22,7 @@ module.exports = {
   helpArgs: '[offline] [server id | list]',
 
   async execute(message, args) {
-    if (message.author.id !== config.ownerId) {
+    if (!config.isServerAdmin(message.author.id)) {
       return message.reply({ embeds: [error('This command is owner only.')] });
     }
 

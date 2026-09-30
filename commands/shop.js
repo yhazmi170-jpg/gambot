@@ -8,7 +8,6 @@ const SHOP = [
   {
     category: 'ONE-TIME PURCHASES',
     items: [
-      { id: 'custom_role', name: 'Custom Role (name + color)', price: 1500000, desc: 'create a custom-named role with your color', use: 'Use v customrole name <name> · v customrole color <#hex [>#hex]> · v customrole delete' },
       { id: 'rob', name: 'v rob @user ability', price: 15000000, desc: '30% chance to steal 20% of target\'s balance (max 3M) / 70% chance you lose 20% of your balance (max 3M) + 30m jail, insurance downgrade, -50 credit', use: 'Use v rob @user to attempt a robbery (requires rob perk)' },
       { id: 'double_work', name: 'Double work payout (perm)', price: 6000000, desc: 'permanently earn 2x from v work', use: 'Just use v work — it pays double automatically' },
       { id: 'bet_cap', name: 'Bet Cap (500k)', price: 2000000, desc: 'bet up to 500k in games (max)', use: 'Use v <game> all to bet up to 500k' },
@@ -24,7 +23,6 @@ const SHOP = [
   {
     category: 'MONTHLY SUB (auto-renew if you can afford it)',
     items: [
-      { id: 'vip_role_sub', name: 'VIP Role', price: 1000000, desc: 'keeps your VIP role while subscribed', monthly: true, use: 'The VIP role is kept while your sub is active' },
       { id: 'insurance', name: 'Insurance (10% loss refund)', price: 150000, desc: '10% of losses refunded', monthly: true, use: 'Losses are auto-refunded 10% — no command needed' },
       { id: 'insurance2', name: 'Insurance Upgrade II (15% refund)', price: 300000, desc: 'raises your loss refund to 15%', monthly: true, use: 'Overrides the base — losses auto-refund 15%' },
       { id: 'insurance3', name: 'Insurance Upgrade III (20% refund)', price: 500000, desc: 'raises your loss refund to 20%', monthly: true, use: 'Overrides lower tiers — losses auto-refund 20%' },
@@ -50,14 +48,7 @@ const SHOP = [
   },
 ];
 
-const CUSTOM_ROLE_BLOCKED_GUILDS = ['1420532695313813566'];
-
 function shopFor(guildId) {
-  if (CUSTOM_ROLE_BLOCKED_GUILDS.includes(guildId)) {
-    return SHOP
-      .map(cat => ({ ...cat, items: cat.items.filter(it => it.id !== 'custom_role') }))
-      .filter(cat => cat.items.length);
-  }
   return SHOP;
 }
 
@@ -263,13 +254,6 @@ async function handleConfirm(j) {
       }
       if (!purchaseOk) return;
 
-      if (pending.itemId === 'vip_role_sub' && pending.guild) {
-        const vipRoleId = db.getVipRole(pending.guild.id);
-        if (vipRoleId) {
-          pending.guild.members.fetch(j.user.id).then(m => m.roles.add(vipRoleId).catch(() => {})).catch(() => {});
-        }
-      }
-
       const logChId = db.getLogChannel(pending.guild?.id || '');
       if (logChId) {
         const logCh = pending.guild?.channels.cache.get(logChId);
@@ -281,7 +265,7 @@ async function handleConfirm(j) {
       }
       pending.channel?.send(`<@${j.user.id}> bought **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency}!`).then(m => setTimeout(() => m.delete().catch(() => {}), 5000)).catch(() => {});
       j.user.send(`**Purchase Confirmation**\nYou bought **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency} in **${pending.guild?.name || 'the server'}**\n\n**How to use:** ${pending.item.use}`).catch(() => {});
-      j.client.users.fetch(config.ownerId).then(o => o.send(`<@${j.user.id}> bought **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency}!`).catch(() => {})).catch(() => {});
+      for (const adminId of config.owners) j.client.users.fetch(adminId).then(o => o.send(`<@${j.user.id}> bought **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency}!`).catch(() => {})).catch(() => {});
       await j.update({ embeds: [okEmbed(`Purchased **${pending.item.name}**!`)], components: [] });
     });
   } catch (e) { console.error('shop confirm err:', e); }

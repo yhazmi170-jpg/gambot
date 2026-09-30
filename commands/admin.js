@@ -170,14 +170,14 @@ module.exports = {
       }
     } else if (sub === 'restart') {
       const { execSync, spawn } = require('child_process');
-      const ownerId = '536278876247162882';
+      const ownerId = config.ownerId;
       const path = require('path');
       const fs = require('fs');
       const root = path.join(__dirname, '..');
       const lockFile = path.join(root, '.gambot.lock');
       message.channel.send({ embeds: [success('pulling latest + restarting...')] }).then(() => {
         try { execSync('git pull origin master', { stdio: 'pipe', timeout: 15000 }); } catch {}
-        message.client.users.fetch(ownerId).then(u => u.send('restarting...').catch(() => {})).catch(() => {});
+        for (const a of config.owners) message.client.users.fetch(a).then(u => u.send('restarting...').catch(() => {})).catch(() => {});
         if (global._server) try { global._server.close(); } catch {}
         try { fs.unlinkSync(lockFile); } catch {}
         try { message.client.destroy(); } catch {}
@@ -236,16 +236,16 @@ module.exports = {
         }
     } else if (sub === 'shutdown' || sub === 'off' || sub === 'kill') {
         if (!message.guild) return message.channel.send({ embeds: [error('must be in a server')] });
-        const ownerId = '536278876247162882';
+        const ownerId = config.ownerId;
         message.channel.send({ embeds: [success('shutting down...')] }).then(() => {
-          message.client.users.fetch(ownerId).then(u => u.send('bot is shutting down').catch(() => {})).catch(() => {});
+          for (const a of config.owners) message.client.users.fetch(a).then(u => u.send('bot is shutting down').catch(() => {})).catch(() => {});
           if (global._server) try { global._server.close(); } catch {}
           try { message.client.destroy(); } catch {}
           process.exit(0);
         });
     } else if (sub === 'wipe') {
-      const ownerId = '536278876247162882';
-      if (message.author.id !== ownerId) return message.channel.send({ embeds: [error('only the owner can wipe accounts')] });
+      const ownerId = config.ownerId;
+      if (!config.isOwner(message.author.id)) return message.channel.send({ embeds: [error('only the owner can wipe accounts')] });
       const wipeTarget = target || message.mentions.users.first();
       if (!wipeTarget) return message.channel.send({ embeds: [error('usage: Aovo wipe @user')] });
       const selfNote = wipeTarget.id === ownerId ? ' (your owner powers are kept — they\'re tied to your Discord ID, not the DB)' : '';

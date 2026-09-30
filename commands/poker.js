@@ -65,7 +65,7 @@ module.exports = {
   execute(message, args) {
     const uid = message.author.id;
     const user = db.ensureUser(uid);
-    if (!db.hasPerk(uid, 'vip_games') && uid !== config.ownerId)
+    if (!db.hasPerk(uid, 'vip_games') && !config.isOwner(uid))
       return message.channel.send({ embeds: [error('this game requires the **VIP game modes access** perk — buy it in the shop')] });
 
     const { amount, error: betError } = db.parseBet(uid, args[0]);

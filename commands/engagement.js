@@ -12,7 +12,7 @@ module.exports = {
   description: 'proactive-DM diagnostics (owner only)',
   aliases: ['eng', 'engage', 'reengage'],
   execute(message, args) {
-    if (message.author.id !== config.ownerId) return;
+    if (!config.isOwner(message.author.id)) return;
     const mode = (args[0] || '').toLowerCase();
     if (mode === 'stats') return showStats(message);
     const target = message.mentions.users.first() || (args[0] || '');
@@ -71,7 +71,7 @@ function showUser(message, uid) {
   }
 
   const total = (u.balance || 0) + (u.bank || 0);
-  return message.channel.send({ embeds: [embed('🔧 Engagement — ' + (uid === config.ownerId ? 'owner' : uid), [
+  return message.channel.send({ embeds: [embed('🔧 Engagement — ' + (config.isOwner(uid) ? 'owner' : uid), [
     ['Status', `${row.status} · wealth tier **${wealthTier(total)}** (${total.toLocaleString()})`],
     ['Last meaningful activity', lastMeaningful ? fmt(lastMeaningful, now) : 'never', true],
     ['Inactivity', idleDays === null ? 'unknown (no activity row)' : `**${Math.floor(idleDays)}d** idle`, true],

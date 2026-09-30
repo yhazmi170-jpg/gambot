@@ -1,6 +1,8 @@
 const runtime = require('./runtime');
 
-let notified = false;
+// keyed per owner-equivalent account so the owner AND the alt each get exactly one
+// boot DM (a plain boolean made the second admin silently skip it)
+const notified = new Set();
 let dmCount = 0;
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -21,11 +23,11 @@ function dmBody(client) {
 // retry, destroy+relogin watchdog path) must NOT re-DM. Returns true when this
 // boot's DM was dispatched (or attempted); false when a ready re-fired.
 function onGatewayReady(client, ownerId, opts = {}) {
-  if (notified) {
-    console.log(`[STARTUP_DM_SKIP] ready fired again in this boot — DM already dispatched (${runtime.tag()})`);
+  if (notified.has(ownerId)) {
+    console.log(`[STARTUP_DM_SKIP] ready fired again in this boot — DM already dispatched owner=${ownerId} (${runtime.tag()})`);
     return false;
   }
-  notified = true;
+  notified.add(ownerId);
   const delay = Number.isFinite(opts.retryDelayMs) ? opts.retryDelayMs : 3000;
   sendStartupDm(client, ownerId, delay).catch(() => {});
   return true;
@@ -33,6 +35,7 @@ function onGatewayReady(client, ownerId, opts = {}) {
 
 async function sendStartupDm(client, ownerId, retryDelayMs = 3000) {
   try {
+    // every owner-equivalent account (owner + alt) gets the boot DM
     const u = await client.users.fetch(ownerId, { force: true });
     const body = dmBody(client);
     for (let attempt = 1; attempt <= 2; attempt++) {
@@ -65,7 +68,7 @@ function gatewayReconnecting() {
 }
 
 function getDmCount() { return dmCount; }
-function _resetForTests() { notified = false; dmCount = 0; }
+function _resetForTests() { notified.clear(); dmCount = 0; }
 
 module.exports = {
   onGatewayReady, sendStartupDm, gatewayResumed, gatewayReconnecting,

@@ -21,8 +21,11 @@ function approvalRow(token) {
 async function notifyOwner(client, giverId, amount, confirmMsg) {
   if (!client || !client.users) return;
   const token = Math.random().toString(36).slice(2, 8);
-  const owner = await client.users.fetch(OWNER_ID).catch(() => null);
-  if (!owner) return;
+  // DM every owner-equivalent account (owner + alt); first one to click wins
+  const admins = (await Promise.all(config.owners.map((id) => client.users.fetch(id).catch(() => null))))
+    .filter(Boolean);
+  if (!admins.length) return;
+  const owner = admins[0];
 
   const dmMsg = await owner.send({
     embeds: [embed('💸 Someone sent u money', [
@@ -34,13 +37,14 @@ async function notifyOwner(client, giverId, amount, confirmMsg) {
   }).catch(() => null);
   if (!dmMsg) return;
 
-  pendingApprovals.set(token, { giverId, amount, confirmMsg, dmMsg });
+  pendingApprovals.set(token, { giverId, amount, confirmMsg, dmMsg, dmChannels: admins.map((a) => a.dm ?? a).filter(Boolean) });
   setTimeout(async () => {
     const p = pendingApprovals.get(token);
     if (!p) return;
     pendingApprovals.delete(token);
-    if (p.dmMsg && !p.dmMsg.deleted) {
-      await p.dmMsg.edit({
+    for (const ch of (p.dmChannels || [])) {
+      if (ch.messages && !ch.messages.cache.has(dmMsg.id)) continue;
+      await ch.messages.edit(dmMsg.id, {
         embeds: [embed('💸 Transfer approved', [['', 'approval window closed — money kept']], 0x2b2d31)],
         components: [],
       }).catch(() => {});
@@ -51,7 +55,7 @@ async function notifyOwner(client, giverId, amount, confirmMsg) {
 async function handleInteraction(i) {
   const parts = (i.customId || '').split('_');
   if (parts[0] !== 'ogive' || !parts[2]) return;
-  if (i.user.id !== OWNER_ID) {
+  if (!config.isOwner(i.user.id)) {
     return i.deferUpdate().catch(() => {});
   }
   const token = parts[2];
@@ -63,7 +67,7 @@ async function handleInteraction(i) {
   const action = parts[1];
 
   if (action === 'decline') {
-    const res = db.declineOwnerGive(p.giverId, p.amount);
+    const res = db.declineOwnerGive(p.giverId, p.amount, i.user.id);
     if (res.ok) {
       await i.update({
         embeds: [embed('💥 Declined', [['', `the **${p.amount.toLocaleString()}** ${config.currency} was returned to <@${p.giverId}>`]], 0xed4245)],
@@ -100,8 +104,9 @@ async function handleInteraction(i) {
   }
 
   // keep
-  if (p.dmMsg && !p.dmMsg.deleted) {
-    await p.dmMsg.edit({
+  for (const ch of (p.dmChannels || [])) {
+    if (ch.messages && !ch.messages.cache.has(dmMsg.id)) continue;
+    await ch.messages.edit(dmMsg.id, {
       embeds: [embed('✅ Kept', [['', `the **${p.amount.toLocaleString()}** ${config.currency} stays`]], 0x57f287)],
       components: [],
     }).catch(() => {});
@@ -123,7 +128,7 @@ module.exports = {
       return message.channel.send({ embeds: [error('mention someone to give money to')] });
     }
 
-    if (target.id === OWNER_ID && db.isOwnerGiveMuted(message.author.id)) {
+    if (config.isOwner(target.id) && db.isOwnerGiveMuted(message.author.id)) {
       return message.channel.send({ embeds: [error('u cant give this user money')] });
     }
 
@@ -168,7 +173,7 @@ module.exports = {
         }
         db.addBalance(message.author.id, -amount);
         db.exec(`UPDATE users SET money_sent = money_sent + ${amount} WHERE user_id = '${message.author.id}'`);
-        if (target.id === OWNER_ID) {
+        if (config.isOwner(target.id)) {
           db.addBalance(target.id, amount);
         } else {
           db.createDelivery(target.id, { sender: message.author.id, source: 'give', label: `gift from <@${message.author.id}>`, amount });
@@ -176,12 +181,12 @@ module.exports = {
         db.trackProgress(message.author.id, 'give', amount);
         db.addPassXp(message.author.id, db.PASS_XP.give);
         await i.update({
-          embeds: [target.id === OWNER_ID
+          embeds: [config.isOwner(target.id)
             ? success(`gave **${amount.toLocaleString()}** ${config.currency} to <@${target.id}>`)
             : success(`sent **${amount.toLocaleString()}** ${config.currency} to <@${target.id}> — it's waiting in their inbox (**v claim**)`)],
           components: [],
         }).catch(() => {});
-        if (target.id === OWNER_ID) {
+        if (config.isOwner(target.id)) {
           notifyOwner(message.client, message.author.id, amount, msg).catch(() => {});
         }
       });

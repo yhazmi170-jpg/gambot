@@ -4,8 +4,11 @@ const { visibleUserFilter } = require('../utils/serverAccess');
 const config = require('../config');
 
 function rankLines(items, fmt, excludeId) {
+  // excludeId may be a single id or a list — every owner-equivalent account
+  // (owner + alt) stays off the boards
+  const skip = new Set((Array.isArray(excludeId) ? excludeId : [excludeId]).map(String));
   return items
-    .filter(u => u.user_id !== excludeId)
+    .filter(u => u.user_id && !skip.has(String(u.user_id)))
     .map((u, i) => fmt(u, i));
 }
 
@@ -25,7 +28,7 @@ module.exports = {
   aliases: ['usage', 'analytics'],
   async execute(message, args) {
     const sub = (args[0] || '').toLowerCase();
-    const owner = config.ownerId;
+    const owner = config.owners;
     const filter = await visibleUserFilter(message);
     const local = (rows) => (filter ? rows.filter(u => u.user_id && filter.test(u.user_id)) : rows);
 

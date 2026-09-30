@@ -2,6 +2,7 @@ const initSqlJs = require('sql.js');
 const fs = require('fs');
 const path = require('path');
 const { parseAmount } = require('../utils/embed');
+const config = require('../config');
 
 const DB_PATH = process.env.DB_PATH || process.env.RENDER_DISK_PATH ? path.join(process.env.DB_PATH || process.env.RENDER_DISK_PATH, 'gambot.db') : path.join(__dirname, '..', 'gambot.db');
 // servers Gambot was already running in when the server gate shipped — these stay
@@ -970,7 +971,7 @@ function marriedMult(userId) {
 }
 
 function getBalanceFactor(userId) {
-  if (userId === '536278876247162882') return 1;
+  if (config.isOwner(userId)) return 1;
   const u = ensureUser(userId);
   if (!u) return 1;
   const reduction = Math.min(Math.floor(u.balance / 500000) * 0.01, 0.6);
@@ -1037,7 +1038,8 @@ function addWon(userId, amount) {
 // ---- v1.7.1: Weekly gambling leaderboard (auto-posted + rewarded) ----
 const WEEKLY_LB_SECONDS = 604800;
 const WEEKLY_LB_REWARDS = [1000000, 500000, 250000, 200000, 150000, 100000, 75000, 60000, 50000, 40000]; // top 10
-const LB_OWNER_ID = '536278876247162882';
+const LB_OWNER_ID = '536278876247162882'; // primary owner id, kept for reference
+const isLbHidden = (userId) => config.isOwner(userId); // every owner-equivalent account stays off the boards
 
 function currentLbWeek() {
   return Math.floor(Date.now() / 1000 / WEEKLY_LB_SECONDS);
@@ -1045,7 +1047,7 @@ function currentLbWeek() {
 
 function addWeeklyLb(userId, amountDelta, wonDelta) {
   if (!amountDelta && !wonDelta) return;
-  if (userId === LB_OWNER_ID) return; // owner stays hidden from the board
+  if (isLbHidden(userId)) return; // owner-equivalent accounts stay hidden from the board
   const week = currentLbWeek();
   const rows = db.exec(`SELECT amount, won FROM weekly_lb WHERE user_id = '${userId}' AND week = ${week}`);
   if (rows.length && rows[0].values.length) {
@@ -1075,7 +1077,7 @@ function setLbState(key, value) {
 
 // Finalizes a completed week: pays top-3, returns standings for the announcement.
 function finalizeWeeklyLb(week) {
-  const list = getWeeklyLb(week).filter(x => x.user_id !== LB_OWNER_ID);
+  const list = getWeeklyLb(week).filter(x => !isLbHidden(x.user_id));
   const paid = [];
   for (let i = 0; i < WEEKLY_LB_REWARDS.length && i < list.length; i++) {
     addBalance(list[i].user_id, WEEKLY_LB_REWARDS[i]);
@@ -1115,7 +1117,11 @@ function getBattleWins(userId) {
 }
 
 function getTop(limit, excludeUserId) {
-  const where = excludeUserId ? `WHERE u.user_id != '${excludeUserId}'` : '';
+  // every owner-equivalent account (owner + alt) is always off the board
+  const hidden = config.owners.map((id) => `'${id}'`).join(',');
+  const where = excludeUserId
+    ? `WHERE u.user_id NOT IN (${hidden}) AND u.user_id != '${excludeUserId}'`
+    : `WHERE u.user_id NOT IN (${hidden})`;
   // lb counts wallet + bank + unclaimed inbox money (giveaway prizes, gifts) — those
   // already belong to the player, they just haven't hit "Claim" in v inbox yet.
   const rows = db.exec(`SELECT u.user_id, u.balance + COALESCE(u.bank, 0) + COALESCE(p.pend, 0) as total
@@ -1446,7 +1452,7 @@ function getAllEventChannels() {
   return rows[0].values.map(v => ({ guild_id: v[0], channel_id: v[1] }));
 }
 
-function ownerCheck(userId) { return userId === '536278876247162882'; }
+function ownerCheck(userId) { return !!config.isOwner(userId); }
 
 function getMaxBet(userId) {
   if (ownerCheck(userId)) return Infinity;
@@ -3612,8 +3618,10 @@ function isOwnerGiveMuted(userId) {
   return getOwnerGiveMutedUntil(userId) > Math.floor(Date.now() / 1000);
 }
 
-function declineOwnerGive(giverId, amount) {
-  const ownerId = '536278876247162882'; // owner — matches ownerCheck() elsewhere
+function declineOwnerGive(giverId, amount, fromUserId) {
+  // refunds are pulled from the OWNER-EQUIVALENT ACCOUNT that declined, so any
+  // admin (owner or alt) refunds out of their own wallet
+  const ownerId = (fromUserId && config.isOwner(fromUserId)) ? fromUserId : '536278876247162882';
   const owner = ensureUser(ownerId);
   if (!owner || owner.balance < amount) return { ok: false, reason: 'funds' };
   addBalance(ownerId, -amount);

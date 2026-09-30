@@ -88,7 +88,7 @@ module.exports = {
     let amount;
     try {
       if ((args[0] || '').toLowerCase() === 'test') {
-        if (message.author.id !== config.ownerId) return;
+        if (!config.isOwner(message.author.id)) return;
         testMode = true;
         args.shift();
       }

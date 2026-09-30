@@ -371,6 +371,47 @@ const nap = () => new Promise((r) => setTimeout(r, 2200));
     check('flipping back to global stops hiding them', after === null, `hidden=${after ? after.size : 'null'}`);
   }
 
+  // ---- owner-equivalent accounts (owner + alt) ----
+  {
+    const ALT = config.owners.find((id) => id !== config.ownerId);
+    check('config lists an owner-equivalent alt', !!ALT && config.isOwner(ALT), `alt=${ALT}`);
+    check('config.isOwner accepts the primary owner', config.isOwner(config.ownerId));
+    check('config.isOwner rejects a normal user', !config.isOwner('some_random_user'));
+
+    // the alt can unlock a server it is standing in
+    const altTarget = 'g_altserver';
+    await nap();
+    const altMsg = makeMessage('v psu', ALT, { id: altTarget, name: 'AltTarget' });
+    await handler.handleMessage(altMsg);
+    check('ALT can run `v psu` (owner parity)', db.isServerActive(altTarget), `sends=${altMsg._sends.length}`);
+
+    // ...and lock one again
+    const altLock = 'v usp';
+    await nap();
+    await handler.handleMessage(makeMessage(altLock, ALT, { id: altTarget, name: 'AltTarget' }));
+    check('ALT can run `v usp` (owner parity)', !db.isServerActive(altTarget));
+
+    // the alt passes the server gate in a LOCKED server (it can run psu there)
+    const locked = 'g_altlocked';
+    await nap();
+    await handler.handleMessage(makeMessage('v usp', config.ownerId, { id: locked, name: 'AltLocked' }));
+    await nap();
+    const gateMsg = makeMessage('v psu', ALT, { id: locked, name: 'AltLocked' });
+    await handler.handleMessage(gateMsg);
+    check('ALT passes the server gate in a locked server', db.isServerActive(locked), `sends=${gateMsg._sends.length}`);
+
+    // a normal user is still refused psu AND still blocked by the gate
+    await nap();
+    await handler.handleMessage(makeMessage('v psu', 'normaluser', { id: 'g_nope', name: 'Nope' }));
+    check('non-admin still cannot psu a server', !db.isServerActive('g_nope'));
+    await nap();
+    await handler.handleMessage(makeMessage('v usp', config.ownerId, { id: 'g_normblocked', name: 'NormBlocked' }));
+    const blocked = makeMessage('v bal', 'normaluser', { id: 'g_normblocked', name: 'NormBlocked' });
+    await handler.handleMessage(blocked);
+    const blockedNotice = blocked._sends.some((s) => s.embeds && /not unlocked yet/.test(JSON.stringify(s.embeds)));
+    check('non-admin still gets the locked-server notice', blockedNotice);
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
 })().catch((e) => { console.error('FATAL', e); process.exit(1); });
