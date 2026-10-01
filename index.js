@@ -870,14 +870,15 @@ client.on('messageCreate', function handleMessageEvent(message) {
   if (message.channel.type === 0) {
     const ar = perks.find(p => p.perk === 'auto_react');
     if (ar) {
-      const emoji = db.getAutoReactEmoji(message.author.id);
-      if (!emoji) return;
-      const resolved = resolveEmoji(message, emoji);
-      if (resolved) {
-        message.react(resolved).catch(err => console.error(`autoreact failed (${emoji}):`, err.message));
-      } else {
-        console.error(`autoreact: could not resolve emoji "${emoji}" for ${message.author.id} — using ⭐`);
-        message.react('⭐').catch(() => {});
+      // up to 4 emojis (slot upgrades in the shop) — react with each one
+      for (const emoji of db.getAutoReactEmojis(message.author.id)) {
+        const resolved = resolveEmoji(message, emoji);
+        if (resolved) {
+          message.react(resolved).catch(err => console.error(`autoreact failed (${emoji}):`, err.message));
+        } else {
+          console.error(`autoreact: could not resolve emoji "${emoji}" for ${message.author.id} — using ⭐`);
+          message.react('⭐').catch(() => {});
+        }
       }
     }
   }

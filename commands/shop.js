@@ -34,6 +34,9 @@ const SHOP = [
     category: 'SERVER TOOLS',
     items: [
       { id: 'auto_react', name: 'Auto-react on messages', price: 1500000, desc: 'set an emoji that the bot auto-reacts to your messages with', use: 'Use v autoreact <emoji> to set your reaction emoji' },
+      { id: 'auto_react2', name: 'Auto-react — 2nd emoji slot', price: 4000000, desc: 'react with TWO emojis at once instead of one', use: 'Use v autoreact ☠️ 🔥 to set both' },
+      { id: 'auto_react3', name: 'Auto-react — 3rd emoji slot', price: 12000000, desc: 'react with THREE emojis at once', use: 'Use v autoreact ☠️ 🔥 💀 to set all three' },
+      { id: 'auto_react4', name: 'Auto-react — 4th emoji slot', price: 30000000, desc: 'react with FOUR emojis at once (max)', use: 'Use v autoreact ☠️ 🔥 💀 🌟 to set all four' },
       { id: 'rain', name: 'v rain <amount>', price: 3000000, desc: 'rain money to everyone online', use: 'Use v rain <amount> to share money with online members' },
       { id: 'duel', name: 'v duel @user <amount>', price: 2000000, desc: '1v1 coinflip challenge another user', use: 'Use v duel @user <amount> to challenge someone' },
     ],

@@ -1674,9 +1674,35 @@ function addRep(giverId, receiverId, amount) {
   save();
 }
 
+// Auto-react holds up to 4 emojis in one column, comma-separated (a comma is not
+// valid inside an emoji, so it is a safe delimiter). Old single-emoji rows still
+// parse as a 1-item list.
+function parseAutoReact(raw) {
+  return String(raw || '').split(',').map(e => e.trim()).filter(Boolean).slice(0, 4);
+}
+function joinAutoReact(list) {
+  return list.map(e => String(e).trim()).filter(Boolean).slice(0, 4).join(',');
+}
+
+// How many emojis this user may set. Base perk = 1 emoji; the shop sells the 2nd,
+// 3rd and 4th slot as separate upgrades and the HIGHEST one owned wins.
+function autoReactSlots(userId) {
+  let slots = 1;
+  if (hasPerk(userId, 'auto_react2')) slots = 2;
+  if (hasPerk(userId, 'auto_react3')) slots = 3;
+  if (hasPerk(userId, 'auto_react4')) slots = 4;
+  return slots;
+}
+
 function setAutoReactEmoji(userId, emoji) {
-  db.run(`UPDATE users SET auto_react_emoji = '${emoji}' WHERE user_id = '${userId}'`);
+  const list = Array.isArray(emoji) ? emoji : parseAutoReact(emoji);
+  db.run(`UPDATE users SET auto_react_emoji = '${joinAutoReact(list)}' WHERE user_id = '${userId}'`);
   save();
+}
+
+function getAutoReactEmojis(userId) {
+  const u = ensureUser(userId);
+  return parseAutoReact(u && u.auto_react_emoji);
 }
 
 function clearAutoReactEmoji(userId) {
@@ -5971,7 +5997,8 @@ hasPerk,
   getVipRole,
   setVipRole,
   setAutoReactEmoji, clearAutoReactEmoji,
-  getAutoReactEmoji, setBadgeEmoji, getBadgeEmoji, setLbEmoji, getLbEmoji,
+  getAutoReactEmoji, getAutoReactEmojis, autoReactSlots, parseAutoReact,
+  setBadgeEmoji, getBadgeEmoji, setLbEmoji, getLbEmoji,
   wasNotified, markNotified,
   muteOwnerGive, getOwnerGiveMutedUntil, isOwnerGiveMuted, declineOwnerGive,
   START_BALANCE,
