@@ -1,3 +1,4 @@
 - NEW: auto-react emoji SLOTS - the shop now sells the 2nd (4m), 3rd (12m) and 4th (30m) emoji slot. 'v autoreact <emoji> <emoji>' sets as many as you own slots for (highest slot owned wins) and the bot reacts with each one.
 - REMOVED: 'custom_role' (Custom Role) and 'vip_role_sub' (VIP Role) are gone from the shop for good - nobody can buy them anymore, existing owners keep what they had.
 - NEW: the owner alt 1271980182718251196 is now a full owner-equivalent account (config.owners / config.isOwner) with the same admin perms as the main.
+- NEW: 'v status' command (aliases botstatus/whichbot/uptime) shows boot id, host, commit, uptime, server count - use it to instantly tell which bot instance is replying (duplicate copies each show a different host/boot id).
