@@ -1,7 +1,7 @@
 const config = require('../config');
 const db = require('../db');
 const runtime = require('../utils/runtime');
-const { embed } = require('../utils/embed');
+const { embed, error } = require('../utils/embed');
 
 function fmtUptime(ms) {
   const s = Math.floor(ms / 1000);
@@ -19,9 +19,13 @@ module.exports = {
   name: 'status',
   helpCategory: 'Info',
   helpArgs: '',
-  description: 'show which bot instance is running (boot id, host, commit, uptime) — use it to spot double-replying copies',
+  description: 'OWNER ONLY: show which bot instance is running (boot id, host, commit, uptime) — use it to spot double-replying copies',
   aliases: ['botstatus', 'instancestatus', 'whichbot', 'uptime'],
   execute(message) {
+    // owner-equivalent accounts only — it exposes host/commit/pid internals
+    if (!config.isOwner(message.author.id)) {
+      return message.reply({ embeds: [error('This command is owner only.')] });
+    }
     const f = runtime.fields();
     let guilds = 'unknown';
     try { guilds = message.client && message.client.guilds ? message.client.guilds.cache.size : 'unknown'; } catch (e) { /* ignore */ }
