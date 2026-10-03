@@ -493,6 +493,31 @@ start().catch(e => console.error('[START] FATAL:', e));
   };
   setInterval(doBackup, 300000);
 
+  // DB watchdog (2026-10-03 incident): after ~2 days uptime the sql.js WASM heap
+  // died with "memory access out of bounds" — every DB read threw, so the bot went
+  // silent (commands crashed, backups refused to upload) until someone restarted it.
+  // The DB FILE was fine (restored sha256 matched byte-for-byte), so the fix is a
+  // fresh process. Detect the dead heap and exit so Render redeploys us in ~40s.
+  const DB_FATAL_RE = /memory access out of bounds|abort\(|RuntimeError/i;
+  const dbIsDead = (e) => !!(e && (DB_FATAL_RE.test(String(e.message || e)) || /sql-wasm|wasm-function/.test(String(e.stack || ''))));
+  let dbDeadLogged = false;
+  const bailOnDeadDb = (where, e) => {
+    if (!dbIsDead(e)) return false;
+    if (!dbDeadLogged) {
+      dbDeadLogged = true;
+      console.error(`[DB FATAL] sql.js heap is dead (${where}): ${e && e.message} — exiting so Render restarts the process with a fresh heap`);
+    }
+    try { _origErr && _origErr('[DB FATAL] exiting for restart'); } catch (x) { /* ignore */ }
+    setTimeout(() => process.exit(1), 250);
+    return true;
+  };
+  // cheap probe every 2 min — catches it even when no messages are arriving
+  setInterval(() => {
+    try { db.exec('SELECT COUNT(*) FROM users'); }
+    catch (e) { bailOnDeadDb('watchdog', e); }
+  }, 120000);
+  process.on('unhandledRejection', (e) => bailOnDeadDb('unhandledRejection', e));
+
   // v1.7.0: hourly vault interest
   setInterval(() => {
     const gain = db.accrueVaultInterest();
