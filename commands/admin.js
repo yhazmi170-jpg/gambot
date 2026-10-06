@@ -177,7 +177,7 @@ module.exports = {
       const lockFile = path.join(root, '.gambot.lock');
       message.channel.send({ embeds: [success('pulling latest + restarting...')] }).then(() => {
         try { execSync('git pull origin master', { stdio: 'pipe', timeout: 15000 }); } catch {}
-        for (const a of config.owners) message.client.users.fetch(a).then(u => u.send('restarting...').catch(() => {})).catch(() => {});
+        for (const a of config.dmOwners) message.client.users.fetch(a).then(u => u.send('restarting...').catch(() => {})).catch(() => {});
         if (global._server) try { global._server.close(); } catch {}
         try { fs.unlinkSync(lockFile); } catch {}
         try { message.client.destroy(); } catch {}
@@ -238,7 +238,7 @@ module.exports = {
         if (!message.guild) return message.channel.send({ embeds: [error('must be in a server')] });
         const ownerId = config.ownerId;
         message.channel.send({ embeds: [success('shutting down...')] }).then(() => {
-          for (const a of config.owners) message.client.users.fetch(a).then(u => u.send('bot is shutting down').catch(() => {})).catch(() => {});
+          for (const a of config.dmOwners) message.client.users.fetch(a).then(u => u.send('bot is shutting down').catch(() => {})).catch(() => {});
           if (global._server) try { global._server.close(); } catch {}
           try { message.client.destroy(); } catch {}
           process.exit(0);

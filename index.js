@@ -437,7 +437,7 @@ start().catch(e => console.error('[START] FATAL:', e));
 
     // Startup DM: ONE short DM per bot boot (boot_id displayed publicly —
     // safe by design, no secrets), retried once, failures logged loudly, never crashes.
-    for (const adminId of config.owners) startupNotifier.onGatewayReady(client, adminId);
+    for (const adminId of config.dmOwners) startupNotifier.onGatewayReady(client, adminId);
 
     client.user.setPresence({
       activities: [{ name: `v${version} | ${config.prefixes[0]} help` }],
@@ -854,7 +854,7 @@ client.on('guildCreate', (g) => {
     const res = db.noteServerPending(g.id, g.name);
     if (res && res.isNew) {
       console.log(`[server-gate] joined ${g.name} (${g.id}) — locked, owner must run 'v psu' there`);
-      for (const adminId of config.owners) {
+      for (const adminId of config.dmOwners) {
         client.users.fetch(adminId).then((u) => u.send(
           `Added to **${g.name}** (\`${g.id}\`). That server is locked — run \`v psu\` in it to turn the bot on.`,
         )).catch(() => {});

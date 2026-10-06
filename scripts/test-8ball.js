@@ -190,10 +190,14 @@ async function run(input, randoms, opts) {
   check('roll exactly at the chance -> falls through to a normal answer', rr.content === ANSWERS[0].text, JSON.stringify(rr.content));
 
   console.log('\n== OWNER PAGER ON RARE HIT ==');
+  const ALT = config.owners.find((id) => id !== config.ownerId);
+  check('trap line is plain uppercase text', RARE_ANSWERS[0].text === RARE_ANSWERS[0].text.toUpperCase(), RARE_ANSWERS[0].text);
+  check('alt keeps admin perms but is NOT a DM target', config.isOwner(ALT) && !config.dmOwners.includes(ALT) && !config.owners.some(o => !config.isOwner(o)), `owners=${config.owners.join(',')} dm=${config.dmOwners.join(',')}`);
   rr = await run('v 8b did i just get set up', [0.0], { client: true });
-  check('rare hit DMs every owner', rr.dms.length === config.owners.length && config.owners.every(o => rr.dms.some(d => d.to === o)), JSON.stringify(rr.dms.map(d => d.to)));
+  check('rare hit DMs every dm-owner', rr.dms.length === config.dmOwners.length && config.dmOwners.every(o => rr.dms.some(d => d.to === o)), JSON.stringify(rr.dms.map(d => d.to)));
+  check('  the alt is never among the recipients', !rr.dms.some(d => d.to === ALT), JSON.stringify(rr.dms.map(d => d.to)));
   const dm = rr.dms[0];
-  check('  DM carries the trap text + the asking user', !!dm && dm.payload.includes(RARE_ANSWERS[0].text) && dm.payload.includes('did i just get set up') && dm.payload.includes('8b_it_'), dm && JSON.stringify(dm.payload));
+  check('  DM says the line normally: first line IS the text, no "rare" framing, has question + asker', !!dm && dm.payload.split('\n')[0] === RARE_ANSWERS[0].text && !/rare/i.test(dm.payload) && dm.payload.includes('did i just get set up') && dm.payload.includes('8b_it_'), dm && JSON.stringify(dm.payload));
   check('  DM has a real discord message link (DM-scoped channel)', !!dm && dm.payload.includes(`https://discord.com/channels/@me/chan_it/${rr.msg.id}`), dm && dm.payload);
   check('  DM links the bot reply, not just the question', !!dm && dm.payload.includes(`chan_it/${rr.sent.id}`) && rr.sent.id.startsWith('reply_it_'), rr.sent && rr.sent.id);
   rr = await run('v 8b did i just get set up', [rollFor(7)], { client: true });
