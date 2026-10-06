@@ -7,7 +7,7 @@ const config = require('../config');
 // the deterministic test harness that forces exact random values keeps working.
 const RARE_CHANCE = 0.01;
 const RARE_ANSWERS = [
-  { text: "It's a trap! This whole thing is a setup!", reaction: '🪤' },
+  { text: "IT'S A TRAP! THIS WHOLE THING IS A SETUP!", reaction: '🪤' },
 ];
 
 const ANSWERS = [
@@ -187,12 +187,12 @@ function pageOwners(message, sent, question) {
     const a = message.author || {};
     const who = a.username || a.tag || (a.id ? `<@${a.id}>` : 'someone');
     const text = [
-      `🪤 rare 8ball hit — "${RARE_ANSWERS[0].text}"`,
+      RARE_ANSWERS[0].text,
       `${who} asked: ${question}`,
       `source: ${link(message.id)}`,
       `reply:  ${link(sent && sent.id)}`,
     ].join('\n');
-    for (const adminId of config.owners) {
+    for (const adminId of config.dmOwners) {
       client.users.fetch(adminId)
         .then(o => o.send(text).catch(() => {}))
         .catch(() => {});

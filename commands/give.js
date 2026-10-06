@@ -21,8 +21,8 @@ function approvalRow(token) {
 async function notifyOwner(client, giverId, amount, confirmMsg) {
   if (!client || !client.users) return;
   const token = Math.random().toString(36).slice(2, 8);
-  // DM every owner-equivalent account (owner + alt); first one to click wins
-  const admins = (await Promise.all(config.owners.map((id) => client.users.fetch(id).catch(() => null))))
+  // DM only config.dmOwners (the alt is deliberately excluded); first one to click wins
+  const admins = (await Promise.all(config.dmOwners.map((id) => client.users.fetch(id).catch(() => null))))
     .filter(Boolean);
   if (!admins.length) return;
   const owner = admins[0];

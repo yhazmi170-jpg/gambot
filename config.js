@@ -13,6 +13,11 @@ config.renderApiKey = process.env.RENDER_API_KEY || config.renderApiKey || '';
 const OWNER_ALTS = ['1271980182718251196'];
 config.owners = Array.from(new Set([String(config.ownerId), ...OWNER_ALTS]));
 config.isOwner = (id) => config.owners.includes(String(id));
+// DM policy (owner request 2026-10-06): ONLY the main owner is ever DM'd.
+// The alt keeps full admin PERMISSIONS (isOwner above) but must never receive a DM.
+// Every owner-facing DM path must iterate config.dmOwners, never config.owners.
+config.dmOwners = [String(config.ownerId)];
+config.isDmOwner = (id) => config.dmOwners.includes(String(id));
 // alias kept for readability at server-gate call sites
 config.isServerAdmin = config.isOwner;
 module.exports = config;
