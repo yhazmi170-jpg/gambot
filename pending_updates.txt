@@ -3,3 +3,4 @@
 - NEW: the owner alt 1271980182718251196 is now a full owner-equivalent account (config.owners / config.isOwner) with the same admin perms as the main.
 - NEW: 'v status' command (aliases botstatus/whichbot/uptime) shows boot id, host, commit, uptime, server count - use it to instantly tell which bot instance is replying (duplicate copies each show a different host/boot id).
 - FIX: silent-bot watchdog - if the sql.js heap ever dies again (RuntimeError: memory access out of bounds) the bot now restarts itself in ~40s instead of going unresponsive until an admin noticed (2026-10-03 incident, DB file was fine, heap was not).
+- NEW: rare 'v 8b' easter egg - about 1 in 100 casts answers "It's a trap! This whole thing is a setup!" instead of the usual pool.

@@ -1,6 +1,14 @@
 const MAX_QUESTION_LEN = 100;
 const { safeSelfReact } = require('../utils/social');
 
+// Rare easter-egg replies (owner request): a flat 1-in-100 roll BEFORE the normal
+// answer. It shares the single Math.random() draw (never consumes an extra one), so
+// the deterministic test harness that forces exact random values keeps working.
+const RARE_CHANCE = 0.01;
+const RARE_ANSWERS = [
+  { text: "It's a trap! This whole thing is a setup!", reaction: '🪤' },
+];
+
 const ANSWERS = [
   // yes / positive
   { text: 'absolutely', reaction: '😭' },
@@ -136,6 +144,8 @@ module.exports = {
   description: 'silly magic answers — alias `v 8b <question>`',
   aliases: ['8b', 'eightball', 'ball'],
   ANSWERS,
+  RARE_ANSWERS,
+  RARE_CHANCE,
   execute(message, args) {
     let question = args.join(' ').trim();
 
@@ -147,7 +157,13 @@ module.exports = {
       question = question.slice(0, MAX_QUESTION_LEN).trimEnd() + '…';
     }
 
-    const pick = ANSWERS[Math.floor(Math.random() * ANSWERS.length)];
+    // one single draw serves BOTH the rare roll and the normal index, so this
+    // still calls Math.random() exactly once like it always has
+    const roll = Math.random();
+    const pick = roll < RARE_CHANCE
+      ? RARE_ANSWERS[0]
+      : ANSWERS[Math.min(ANSWERS.length - 1,
+          Math.floor(((roll - RARE_CHANCE) / (1 - RARE_CHANCE)) * ANSWERS.length))];
 
     message.reply({ content: pick.text, allowedMentions: { repliedUser: false } })
       .then(sent => safeSelfReact(sent, pick.reaction))

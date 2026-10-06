@@ -52,12 +52,13 @@ Module._load = function (request, parent, isMain) {
 
 const db = require('../db');
 const handler = require('../utils/commandHandler');
-const { ANSWERS } = require('../commands/8ball');
+const { ANSWERS, RARE_ANSWERS, RARE_CHANCE } = require('../commands/8ball');
 
 const cookedIdx = ANSWERS.findIndex(a => a.text === 'yeah ur cooked');
 const cookedText = ANSWERS[cookedIdx].text;
 
 let seq = 0;
+let msgSeq = 0;
 const uid = () => '8b_it_' + (++seq);
 
 function makeMessage(content, userId, opts = {}) {
@@ -68,6 +69,9 @@ function makeMessage(content, userId, opts = {}) {
     send(p) { sends.push(p); return Promise.resolve({ delete: () => Promise.resolve() }); },
   };
   return {
+    // unique id per message: the real handler dedupes on message.id, so
+    // reusing undefined would make it drop every command after the first
+    id: 'msg_it_' + (++msgSeq),
     content,
     author: { id: userId, bot: false },
     guild: null,
@@ -87,6 +91,13 @@ function makeMessage(content, userId, opts = {}) {
       return Promise.resolve(sent);
     },
   };
+}
+
+// Map an ANSWERS index to the exact Math.random() value the command must see.
+// The rare easter egg eats the bottom RARE_CHANCE slice of the draw, so index i
+// lives in the slice ABOVE it: roll = RARE_CHANCE + (1-RARE_CHANCE) * (i+0.5)/len.
+function rollFor(i) {
+  return RARE_CHANCE + (1 - RARE_CHANCE) * ((i + 0.5) / ANSWERS.length);
 }
 
 function forcedRandoms(values) {
@@ -144,7 +155,7 @@ async function run(input, randoms, opts) {
   console.log('\n== ANSWER->REACTION MAPPING (deterministic, one per answer) ==');
   const mappingBads = [];
   for (let i = 0; i < ANSWERS.length; i++) {
-    const r = await run('v 8b r?', [(i + 0.5) / ANSWERS.length]);
+    const r = await run('v 8b r?', [rollFor(i)]);
     if (!(r.replyCount === 1 && r.content === ANSWERS[i].text && r.reactions.length === 1 && r.reactions[0] === ANSWERS[i].reaction)) {
       mappingBads.push(`${i}:"${ANSWERS[i].text}" -> got ${JSON.stringify(r.content)} / ${JSON.stringify(r.reactions)}, want ${ANSWERS[i].reaction}`);
     }
@@ -152,17 +163,27 @@ async function run(input, randoms, opts) {
   check('  all answers return their exact assigned reaction', mappingBads.length === 0, mappingBads.join(' | '));
 
   console.log('\n== REPLY FORMAT: only the answer, real reply, no extras ==');
-  let r = await run('v 8b do we do mines all', [0.0]);
+  console.log('\n== RARE EASTER EGG (owner request) ==');
+  const rare = RARE_ANSWERS[0];
+  check('rare pool exists + is actually rare (<=2%)', RARE_ANSWERS.length >= 1 && RARE_CHANCE <= 0.02, `n=${RARE_ANSWERS.length} chance=${RARE_CHANCE}`);
+  check('  rare text has no emoji, no ball, no mentions', rare && !/[🎱😭☠️💀🙏💔🤞⁉️🪤]/.test(rare.text) && !rare.text.includes('@'), rare && rare.text);
+  check('  rare text is not a normal answer', rare && !ANSWERS.some(a => a.text === rare.text), rare && rare.text);
+  let rr = await run('v 8b is this a trap', [0.0]);
+  check('roll below the chance -> the trap answer + its own reaction', rr.content === rare.text && rr.reactions.length === 1 && rr.reactions[0] === rare.reaction, JSON.stringify({ c: rr.content, rx: rr.reactions }));
+  rr = await run('v 8b is this a trap', [RARE_CHANCE]);
+  check('roll exactly at the chance -> falls through to a normal answer', rr.content === ANSWERS[0].text, JSON.stringify(rr.content));
+
+  let r = await run('v 8b do we do mines all', [rollFor(0)]);
   check('v 8b -> one actual Discord reply', r.replyCount === 1 && r.sent !== null, `replies=${r.replyCount}`);
   check('  reply content is ONLY the selected answer', r.content === ANSWERS[0].text, `content="${r.content}"`);
   check('  question NOT repeated', r.content && !r.content.includes('do we do mines all'), r.content);
   check('  no 🎱 / no embed / no manual mention ping', !r.content.includes('🎱') && !r.payload.embeds && r.payload.allowedMentions.repliedUser === false, JSON.stringify(r.payload));
-  r = await run('v 8ball am i cooked', [(cookedIdx + 0.5) / ANSWERS.length]);
+  r = await run('v 8ball am i cooked', [rollFor(cookedIdx)]);
   check('v 8ball am i cooked -> answer + its own ☠️ reaction', r.content === cookedText && r.reactions.length === 1 && r.reactions[0] === '☠️', JSON.stringify({ content: r.content, reactions: r.reactions }));
 
   console.log('\n== ANSWER SELECTION STILL RANDOM (via Math.random index) ==');
   const seen = new Set();
-  for (let i = 0; i < ANSWERS.length; i++) seen.add((await run('v 8b r?', [(i + 0.37) / ANSWERS.length])).content);
+  for (let i = 0; i < ANSWERS.length; i++) seen.add((await run('v 8b r?', [rollFor(i)])).content);
   check('all answers reachable across forced rolls', seen.size === ANSWERS.length, `distinct=${seen.size}`);
 
   console.log('\n== NO QUESTION: tiny usage reply ==');
@@ -171,9 +192,9 @@ async function run(input, randoms, opts) {
   check('  usage text says ask something', r.content && r.content.includes('ask something'), r.content);
 
   console.log('\n== SELF-REACTION: own sent message, exactly one, failure-safe ==');
-  r = await run('v 8b should i?', [(9 + 0.5) / ANSWERS.length]);
+  r = await run('v 8b should i?', [rollFor(9)]);
   check('reaction lands on Gambot OWN reply (sent stub)', r.replyCount === 1 && r.reactions.length === 1 && r.reactions[0] === ANSWERS[9].reaction, JSON.stringify(r.reactions));
-  r = await run('v 8b should i?', [(9 + 0.5) / ANSWERS.length], { failReact: true });
+  r = await run('v 8b should i?', [rollFor(9)], { failReact: true });
   check('  reaction failure does NOT break the answer', r.content === ANSWERS[9].text && r.reactions.length === 0, `content="${r.content}"`);
   check('  reaction failure sends no error message', r.sendCount === 0, `sends=${r.sendCount}`);
 
