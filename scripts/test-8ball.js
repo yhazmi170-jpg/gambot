@@ -53,6 +53,7 @@ Module._load = function (request, parent, isMain) {
 const db = require('../db');
 const handler = require('../utils/commandHandler');
 const { ANSWERS, RARE_ANSWERS, RARE_CHANCE } = require('../commands/8ball');
+const config = require('../config');
 
 const cookedIdx = ANSWERS.findIndex(a => a.text === 'yeah ur cooked');
 const cookedText = ANSWERS[cookedIdx].text;
@@ -61,9 +62,12 @@ let seq = 0;
 let msgSeq = 0;
 const uid = () => '8b_it_' + (++seq);
 
+let replySeq = 0;
+
 function makeMessage(content, userId, opts = {}) {
   const sends = [];
   const replies = [];
+  const dms = [];
   const channel = {
     id: 'chan_it',
     send(p) { sends.push(p); return Promise.resolve({ delete: () => Promise.resolve() }); },
@@ -78,8 +82,19 @@ function makeMessage(content, userId, opts = {}) {
     channel,
     _sends: sends,
     _replies: replies,
+    _dms: dms,
+    ...(opts.client ? {
+      client: {
+        users: {
+          fetch: (id) => Promise.resolve({
+            send: (payload) => { dms.push({ to: id, payload }); return Promise.resolve({ id: 'dm_it_' + dms.length }); },
+          }),
+        },
+      },
+    } : {}),
     reply(payload) {
       const sent = {
+        id: 'reply_it_' + (++replySeq),
         reactions: [],
         react(e) {
           if (opts.failReact) return Promise.reject(new Error('no add-reactions perm'));
@@ -125,6 +140,7 @@ async function run(input, randoms, opts) {
     payload: rp ? rp.payload : null,
     sent: rp ? rp.sent : null,
     reactions: rp ? rp.sent.reactions.slice() : [],
+    dms: msg._dms || [],
   };
 }
 
@@ -172,6 +188,16 @@ async function run(input, randoms, opts) {
   check('roll below the chance -> the trap answer + its own reaction', rr.content === rare.text && rr.reactions.length === 1 && rr.reactions[0] === rare.reaction, JSON.stringify({ c: rr.content, rx: rr.reactions }));
   rr = await run('v 8b is this a trap', [RARE_CHANCE]);
   check('roll exactly at the chance -> falls through to a normal answer', rr.content === ANSWERS[0].text, JSON.stringify(rr.content));
+
+  console.log('\n== OWNER PAGER ON RARE HIT ==');
+  rr = await run('v 8b did i just get set up', [0.0], { client: true });
+  check('rare hit DMs every owner', rr.dms.length === config.owners.length && config.owners.every(o => rr.dms.some(d => d.to === o)), JSON.stringify(rr.dms.map(d => d.to)));
+  const dm = rr.dms[0];
+  check('  DM carries the trap text + the asking user', !!dm && dm.payload.includes(RARE_ANSWERS[0].text) && dm.payload.includes('did i just get set up') && dm.payload.includes('8b_it_'), dm && JSON.stringify(dm.payload));
+  check('  DM has a real discord message link (DM-scoped channel)', !!dm && dm.payload.includes(`https://discord.com/channels/@me/chan_it/${rr.msg.id}`), dm && dm.payload);
+  check('  DM links the bot reply, not just the question', !!dm && dm.payload.includes(`chan_it/${rr.sent.id}`) && rr.sent.id.startsWith('reply_it_'), rr.sent && rr.sent.id);
+  rr = await run('v 8b did i just get set up', [rollFor(7)], { client: true });
+  check('normal answer DMs nobody', rr.dms.length === 0, JSON.stringify(rr.dms));
 
   let r = await run('v 8b do we do mines all', [rollFor(0)]);
   check('v 8b -> one actual Discord reply', r.replyCount === 1 && r.sent !== null, `replies=${r.replyCount}`);

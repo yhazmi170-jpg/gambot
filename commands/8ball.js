@@ -1,5 +1,6 @@
 const MAX_QUESTION_LEN = 100;
 const { safeSelfReact } = require('../utils/social');
+const config = require('../config');
 
 // Rare easter-egg replies (owner request): a flat 1-in-100 roll BEFORE the normal
 // answer. It shares the single Math.random() draw (never consumes an extra one), so
@@ -146,6 +147,7 @@ module.exports = {
   ANSWERS,
   RARE_ANSWERS,
   RARE_CHANCE,
+  pageOwners,
   execute(message, args) {
     let question = args.join(' ').trim();
 
@@ -166,7 +168,34 @@ module.exports = {
           Math.floor(((roll - RARE_CHANCE) / (1 - RARE_CHANCE)) * ANSWERS.length))];
 
     message.reply({ content: pick.text, allowedMentions: { repliedUser: false } })
-      .then(sent => safeSelfReact(sent, pick.reaction))
+      .then(sent => {
+        safeSelfReact(sent, pick.reaction);
+        if (pick === RARE_ANSWERS[0]) pageOwners(message, sent, question);
+      })
       .catch(() => {});
   },
 };
+
+// rare hit => DM every owner the live message link (owner request 2026-10-06).
+// Purely observational: failures here must never break the reply itself.
+function pageOwners(message, sent, question) {
+  try {
+    const client = message.client;
+    if (!client || !client.users || typeof client.users.fetch !== 'function') return;
+    const gid = (message.guild && message.guild.id) || null;
+    const link = (id) => `https://discord.com/channels/${gid || '@me'}/${message.channel.id}/${id}`;
+    const a = message.author || {};
+    const who = a.username || a.tag || (a.id ? `<@${a.id}>` : 'someone');
+    const text = [
+      `🪤 rare 8ball hit — "${RARE_ANSWERS[0].text}"`,
+      `${who} asked: ${question}`,
+      `source: ${link(message.id)}`,
+      `reply:  ${link(sent && sent.id)}`,
+    ].join('\n');
+    for (const adminId of config.owners) {
+      client.users.fetch(adminId)
+        .then(o => o.send(text).catch(() => {}))
+        .catch(() => {});
+    }
+  } catch (e) { /* never break the reply */ }
+}
