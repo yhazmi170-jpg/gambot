@@ -11,7 +11,7 @@ const prefix = config.prefixes[0];
 const perkCmdMap = {
   rob: `\`${prefix} rob <@user>\` — 30% chance to steal 20% (max 3M) / 70% chance you lose 20% (max 3M) + 30m jail + insurance downgrade`,
   rain: `\`${prefix} rain <amount>\` — rain money to online members`,
-  duel: `\`${prefix} duel <@user> <amount>\` — 1v1 coinflip`,
+  duel: `\`${prefix} duel <@user> <amount>\` — 1v1 coinflip (capped at 100,000,000 per duel)`,
   rep: `\`${prefix} rep <@user>\` — give reputation`,
   vip_games: `\`${prefix} poker <amount>\` — video poker (VIP)`,
 };
