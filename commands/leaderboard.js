@@ -7,7 +7,7 @@ module.exports = {
   name: 'lb',
   helpCategory: 'Economy',
   helpArgs: '',
-  description: 'leaderboard — richest players (wallet + bank + unclaimed inbox); local-only servers show only their own, and their players never show on other servers',
+  description: 'leaderboard — richest players (wallet + bank); local-only servers show only their own, and their players never show on other servers',
   aliases: ['top', 'rich'],
   async execute(message, args) {
     const limit = Math.min(parseInt(args[0]) || 10, 20);

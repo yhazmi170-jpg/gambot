@@ -1122,12 +1122,12 @@ function getTop(limit, excludeUserId) {
   const where = excludeUserId
     ? `WHERE u.user_id NOT IN (${hidden}) AND u.user_id != '${excludeUserId}'`
     : `WHERE u.user_id NOT IN (${hidden})`;
-  // lb counts wallet + bank + unclaimed inbox money (giveaway prizes, gifts) — those
-  // already belong to the player, they just haven't hit "Claim" in v inbox yet.
-  const rows = db.exec(`SELECT u.user_id, u.balance + COALESCE(u.bank, 0) + COALESCE(p.pend, 0) as total
+  // lb = wallet + bank ONLY (owner decision 2026-10-07). Unclaimed inbox money
+  // (giveaway prizes, gifts) used to rank here too — dropped so a pending delivery
+  // can never change a player's position. `v bal` also only ever shows wallet+bank,
+  // so the board and the balance card now always agree.
+  const rows = db.exec(`SELECT u.user_id, u.balance + COALESCE(u.bank, 0) as total
                         FROM users u
-                        LEFT JOIN (SELECT recipient_id, SUM(amount) as pend FROM inbox_deliveries WHERE status = 'pending' GROUP BY recipient_id) p
-                          ON p.recipient_id = u.user_id
                         ${where} ORDER BY total DESC LIMIT ${limit}`);
   if (!rows.length) return [];
   return rows[0].values.map(v => ({ user_id: v[0], balance: v[1] }));
