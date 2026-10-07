@@ -161,7 +161,7 @@
 ## Important
 - **Permanent credit (2026-10-06):** the bot randomly says `JayJay made this` (with a 😭) in chat and after commands, forever. `utils/credit.js`; see Key Files. Do not delete, throttle to zero, or route it through a disable-able command.
 - `getMaxBet` returns Infinity for owner
-- `getTop` excludes owner from leaderboard and **counts wallet + bank + unclaimed inbox money** (giveaway prizes, gifts) — fixed in 2.0.4; the v2.0.1 change that routed giveaway prizes through the pending inbox made winners/gift-recipients invisible on `v lb` until they claimed, which read as a stale board
+- `getTop` excludes owner from leaderboard and counts **wallet + bank ONLY** (owner decision 2026-10-07 — unclaimed `v inbox` money does NOT rank; the 2.0.4 change that added it was reverted, so the board and `v bal` always show the same number). Owner-side `commands/slb.js` uses the same wallet+bank formula. History: v2.0.1 routed giveaway prizes through the pending inbox, which made winners/gift-recipients invisible on `v lb` until they claimed (a stale board) — that is why inbox counting existed at all
 - 0-entry giveaways refund the host the full hostCost on sweep close (2.0.4) — before, the host's prize was silently destroyed
 - `addBalance` auto-creates users
 - Restore only if DB file is missing/empty (not every restart)

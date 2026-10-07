@@ -1,4 +1,5 @@
-// Regression test: v lb must rank + display wallet + bank (money incl. what's in the bank).
+// Regression test: v lb must rank + display wallet + bank ONLY (money incl. what's
+// in the bank, EXCLUDING unclaimed inbox deliveries — owner decision 2026-10-07).
 // Setup: money=100 / bank=900 -> leaderboard value MUST be 1000 (money in the bank counted).
 process.env.DB_PATH = '/tmp/lb_test';
 const fs = require('fs');
@@ -66,7 +67,7 @@ function check(name, cond) {
   const sRich = sorted.find(u => u.user_id === rich);
   check('slb wealth board uses wallet+bank (900+100=1000)', sRich && (sRich.balance + (sRich.bank || 0)) === 1000);
 
-  // pending inbox deliveries count toward lb (money won/given but not yet claimed is still theirs)
+  // pending inbox deliveries must NOT count toward lb (owner 2026-10-07)
   const pend = 'usr_pending';
   db.addBalance(pend, 50);
   db.createDelivery(pend, { sender: 'usr_rich', source: 'giveaway', amount: 500, label: 'giveaway prize', payload: { gw: 'lbtest' } });
@@ -84,9 +85,9 @@ function check(name, cond) {
   check('safeClaim moves money to balance', claimRes.ok === true);
   const t2 = db.getTop(20, owner);
   const pRow = t2.find(u => u.user_id === pend);
-  // 50 wallet + 150 pending (claimed 500 moved to balance, cancelled 99999 ignored) => 50+500+150 = 700... wait claimed moves to balance
-  // after claim: wallet = 50 + 500 = 550, pending = 150 -> lb total = 700
-  check('lb counts pending inbox money (and claimed counts once)', pRow && pRow.balance === 700);
+  // after claim: wallet = 50 + 500 = 550, pending = 150 (still unclaimed)
+  // lb must be 550 — the 150 pending never ranks, and claimed money counts once.
+  check('lb IGNORES unclaimed inbox money (wallet+bank only = 550, not 700)', pRow && pRow.balance === 550, pRow && `got ${pRow.balance}`);
 
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);

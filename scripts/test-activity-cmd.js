@@ -61,6 +61,10 @@ async function main() {
   check('activity has description', cmd && !!cmd.description);
   check('aliases include usage', cmd && cmd.aliases && cmd.aliases.includes('usage'));
 
+  // pre-approve the test guild: every new server starts LOCKED behind the `v psu`
+  // gate, so an unapproved fixture guild would only ever see the gate notice
+  db.activateServer('111', ownerId, 'activity-fixture', 'active');
+
   // seed data
   const u1 = 'act_e2e_1', u2 = 'act_e2e_2';
   db.acceptTerms(u1); db.acceptTerms(u2);
@@ -79,11 +83,18 @@ async function main() {
     react: async () => {},
   };
 
+  let msgSeq = 0;
   for (const line of ['v activity', 'v activity usage', 'v activity users', 'v activity gamble', 'v activity wins', 'v activity commands', 'v activity nonsense']) {
     fakeMessage._sent = null;
     fakeMessage.content = line;
+    // unique id per run: the real handler dedupes on message.id (5-min TTL), so a
+    // fixed id makes it drop every command after the first as a duplicate
+    fakeMessage.id = 'm_act_' + (++msgSeq);
     try {
-      await Promise.resolve(handler.handleMessage(fakeMessage));
+      await handler.handleMessage(fakeMessage);
+      // handleMessage fires cmd.execute WITHOUT awaiting it (utils/commandHandler.js:276)
+      // so the reply can land a tick later — poll briefly instead of asserting instantly
+      for (let i = 0; i < 100 && !fakeMessage._sent; i++) await new Promise(r => setTimeout(r, 5));
       check(`handled: ${line}`, !!fakeMessage._sent);
       const t = fakeMessage._sent && fakeMessage._sent.embeds && fakeMessage._sent.embeds[0] && fakeMessage._sent.embeds[0]._title;
       check(`rendered embed for: ${line}`, !!t, `title=${t}`);

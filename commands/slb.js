@@ -27,9 +27,9 @@ module.exports = {
 
     const allUsers = db.getAllUsers();
     const serverUsers = allUsers.filter(u => memberIds.includes(u.user_id));
-    const wealth = u => (u.balance || 0) + (u.bank || 0) + (u.pending_inbox || 0);
+    const wealth = u => (u.balance || 0) + (u.bank || 0); // wallet + bank only — unclaimed inbox never ranks (owner 2026-10-07)
 
-    // Sort by total wealth (wallet + bank + unclaimed inbox money)
+    // Sort by total wealth (wallet + bank — unclaimed inbox excluded)
     const sorted = serverUsers.sort((a, b) => wealth(b) - wealth(a)).slice(0, limit);
 
     if (!sorted.length) return message.channel.send({ embeds: [embed('🏆 Server Leaderboard', [['info', 'no users yet']])] });
