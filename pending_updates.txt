@@ -9,3 +9,6 @@
 - CHANGE: the alt account will never receive a DM again - all owner-facing DMs go through config.dmOwners (main owner only); alt keeps full admin perms.
 - NEW: the bot now randomly drops "JayJay made this" and reacts with 😭 - about 1 in 50 command replies, plus a random chat message in an active server every 60-180 minutes. Permanent credit, disabled automatically in tests.
 - CHANGE: 'v lb' / 'v slb' now rank wallet + bank ONLY - unclaimed 'v inbox' money (giveaway prizes, gifts) no longer counts until you claim it, so the leaderboard always matches what 'v bal' shows.
+- CHANGE: 'v bal' now shows your unclaimed inbox money ('Inbox (unclaimed)') under Bank, so giveaway/gift money you haven't claimed is visible before you run 'v inbox'.
+- CHANGE: 'v bal @user' (pinging someone else) is now owner-only - it's a full audit view: their wallet, bank, unclaimed inbox amount, loan and lifetime stats. Members can only check their own balance.
+- CHANGE: 'v duel' bets are capped at 100,000,000 per duel (duel money never gets the balance-factor cut, so 300m flips were too cheap).

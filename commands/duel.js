@@ -3,6 +3,10 @@ const { embed, error, success, parseAmount } = require('../utils/embed');
 const config = require('../config');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
+// Hard stake cap (owner 2026-10-07): duels are unscaled PvP transfers (no balance-factor
+// cut), so 300m flips were the cheapest way to ride a win streak. 100,000,000 per duel.
+const MAX_DUEL_BET = 100000000;
+
 module.exports = {
   name: 'duel',
   aliases: ['challenge'],
@@ -16,6 +20,9 @@ module.exports = {
     }
     const amount = parseAmount(args[1]);
     if (isNaN(amount) || amount <= 0) return message.channel.send({ embeds: [error('enter a valid bet amount')] });
+    if (amount > MAX_DUEL_BET) {
+      return message.channel.send({ embeds: [error(`duels are capped at **${MAX_DUEL_BET.toLocaleString()}** ${config.currency} — pick a smaller bet`)] });
+    }
 
     const sender = db.ensureUser(message.author.id);
     if (sender.balance < amount) return message.channel.send({ embeds: [error("you don't have enough money")] });
