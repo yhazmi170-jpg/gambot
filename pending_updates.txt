@@ -7,3 +7,4 @@
 - NEW: when the rare 8ball trap line fires, every owner gets a DM with who asked, the question, the source message link and the reply link.
 - CHANGE: the 8ball trap line is now plain CAPS ("IT'S A TRAP! THIS WHOLE THING IS A SETUP!") and the owner DM says it normally with no 'rare' wording.
 - CHANGE: the alt account will never receive a DM again - all owner-facing DMs go through config.dmOwners (main owner only); alt keeps full admin perms.
+- NEW: the bot now randomly drops "JayJay made this" and reacts with 😭 - about 1 in 50 command replies, plus a random chat message in an active server every 60-180 minutes. Permanent credit, disabled automatically in tests.

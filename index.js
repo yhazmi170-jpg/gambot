@@ -435,6 +435,9 @@ start().catch(e => console.error('[START] FATAL:', e));
     console.log(`[GATEWAY_READY] logged in as ${client.user.tag} ${runtime.tag()} guilds=${client.guilds.cache.size} messageCreate_listeners=${mcListeners} origins=${mcOrigins}`);
     setLogClient(client);
 
+    // "JayJay made this" credit: random passive drops in chat, forever (owner request 2026-10-06)
+    try { require('./utils/credit').startPassive(client); } catch (e) { console.error('CREDIT PASSIVE FAILED:', e && e.message); }
+
     // Startup DM: ONE short DM per bot boot (boot_id displayed publicly —
     // safe by design, no secrets), retried once, failures logged loudly, never crashes.
     for (const adminId of config.dmOwners) startupNotifier.onGatewayReady(client, adminId);

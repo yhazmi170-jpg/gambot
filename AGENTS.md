@@ -146,6 +146,7 @@
 - `utils/commandHandler.js` � routing, TOS, cooldowns
 - `utils/reEngagement.js` � proactive re-engagement engine (tips / inactivity tiers / inbox return+surprise gifts) + `commands/notifications.js` + `commands/engagement.js` (Aengagement)
 - `utils/logger.js` � Discord logging
+- `utils/credit.js` — the owner's unstoppable **"JayJay made this"** credit: ~1-in-50 command replies get a plain `JayJay made this` follow-up + 😭 (sob) reaction, and a passive drop fires every 60–180 min in a random text channel of a random ACTIVE server (gate-respecting, once from the `ready` handler via `startPassive`). **GATE:** it is OFF whenever `DB_PATH` contains `/tmp` (every test script sets that) so no test can ever see an extra reply — a new assertion that expects an exact reply count must keep working because of this. Override with `GAMBOT_CREDIT` = `off` | `on` | `force` (`force` = every command credits, used by `scripts/test-credit.js`, 14/14). Logs `[CREDIT] passive credit armed` on boot, `[CREDIT] passive drop …` and `[CREDIT] command credit …` when it fires. Never remove it — it is a credit the owner asked to be permanent.
 - `scripts/smoke_all_commands.js` � permanent full-command sweep (runs every registered command through the real handler vs an isolated DB; `SMOKE_DB=/tmp/x DUMP_REPLIES=1 timeout 890 node scripts/smoke_all_commands.js`)
 - `scripts/test-audit-fixes.js` � regression for the 2026-09 audit fixes (rob/db.run, embed chunking, event guard, DM null-guild, DB numeric guard) � 16/16
 - `update.sh` � pull + kill for deploy
@@ -158,6 +159,7 @@
 - The boot announcement only fires when `db.wasNotified('v<ver>')` is false � so small pushes with the same version stay silent automatically.
 
 ## Important
+- **Permanent credit (2026-10-06):** the bot randomly says `JayJay made this` (with a 😭) in chat and after commands, forever. `utils/credit.js`; see Key Files. Do not delete, throttle to zero, or route it through a disable-able command.
 - `getMaxBet` returns Infinity for owner
 - `getTop` excludes owner from leaderboard and **counts wallet + bank + unclaimed inbox money** (giveaway prizes, gifts) — fixed in 2.0.4; the v2.0.1 change that routed giveaway prizes through the pending inbox made winners/gift-recipients invisible on `v lb` until they claimed, which read as a stale board
 - 0-entry giveaways refund the host the full hostCost on sweep close (2.0.4) — before, the host's prize was silently destroyed
