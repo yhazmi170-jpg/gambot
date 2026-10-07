@@ -8,6 +8,7 @@ const { checkCooldown } = require('./cooldowns');
 const logger = require('./logger');
 const dlog = require('../debuglog');
 const runtime = require('./runtime');
+const credit = require('./credit');
 
 const commands = new Map();
 // Message dedupe: prevent the same Discord message from executing a command twice.
@@ -284,6 +285,10 @@ async function handleMessage(message) {
       logCmdError('execute_sync', err);
       message.channel.send({ embeds: [require('./embed').error('an error occurred')] });
     }
+
+  // "JayJay made this" credit — random follow-up + 😭 (owner request 2026-10-06).
+  // Cosmetic, free-running, never throws, never touches the command's own reply.
+  try { credit.maybeCommandCredit(message); } catch (e) { /* cosmetic */ }
 
   try {
     const lvl = db.grantXp(message.author.id, 25);
