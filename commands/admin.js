@@ -31,6 +31,13 @@ module.exports = {
   name: 'admin',
   aliases: ['ovo'],
   execute(message, args) {
+    // Owner-only for real. The `A` prefix gate in commandHandler already stops
+    // non-owners, but `v ovo …` / `v admin …` used to reach this whole router
+    // (add/remove/wipe/transfer/restart/shutdown) with NO check at all — found
+    // and closed 2026-10-08. Nothing here is ever meant for a normal member.
+    if (!config.isOwner(message.author.id)) {
+      return message.channel.send({ embeds: [error('this command is reserved for the bot owner.')] });
+    }
     try {
     const sub = (args[0] || '').toLowerCase();
     const target = message.mentions.users.first();
@@ -251,6 +258,22 @@ module.exports = {
       const selfNote = wipeTarget.id === ownerId ? ' (your owner powers are kept — they\'re tied to your Discord ID, not the DB)' : '';
       db.wipeUser(wipeTarget.id);
       message.channel.send({ embeds: [success(`fully wiped <@${wipeTarget.id}> — their account is reset to fresh. they'll re-accept TOS on next command${selfNote}`)] });
+    } else if (sub === 'jayjay' || sub === 'jj' || sub === 'credit') {
+      if (!message.guild) return message.channel.send({ embeds: [error('this only works in servers')] });
+      const want = (args[1] || '').toLowerCase();
+      const on = db.isCreditGuildEnabled(message.guild.id);
+      if (want === 'on' || want === 'enable' || want === 'unoff') {
+        db.setCreditGuildEnabled(message.guild.id, true);
+        return message.channel.send({ embeds: [success('jayjay credit is ON in this server — `JayJay made this` is back here')] });
+      }
+      if (want === 'off' || want === 'disable') {
+        db.setCreditGuildEnabled(message.guild.id, false);
+        return message.channel.send({ embeds: [success('jayjay credit is OFF in this server — no more `JayJay made this` lines here')] });
+      }
+      return message.channel.send({ embeds: [embed('JayJay credit', [
+        ['Status', on ? '**ON** — command follow-ups + random chat drops are live in this server' : '**OFF** — this server never says `JayJay made this`'],
+        ['Usage', '`Aovo jayjay on` / `Aovo jayjay off` — this server only, DMs are never affected'],
+      ])] });
     } else if (sub === 'cmds' || sub === 'cmdlist') {
       message.channel.send({ embeds: [embed('Admin Commands', [
         ['Aovo add @user <amount>', 'add money'],
@@ -271,6 +294,7 @@ module.exports = {
           ['Aovo selfbot restart', 'redeploy the selfbot on Render'],
           ['Aovo pupd <message>', 'view/set push update message'],
           ['Aovo announce', 're-post the update message to update channels'],
+          ['Aovo jayjay on|off', 'turn the "JayJay made this" credit on/off in THIS server'],
         ])] });
       } else if (sub === 'pupd' || sub === 'pushupdate') {
         const fs = require('fs');
@@ -348,6 +372,7 @@ module.exports = {
          ['Aovo restart', 'pull updates + restart'],
          ['Aovo pupd <message>', 'view/set push update message'],
          ['Aovo announce', 're-post the update message to update channels'],
+         ['Aovo jayjay on|off', 'turn the "JayJay made this" credit on/off in THIS server'],
        ])] });
     }
     } catch (err) {

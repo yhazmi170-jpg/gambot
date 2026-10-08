@@ -4,6 +4,8 @@
 //   3. event.js unguarded cfg (unknown community-event key crashed)
 //   4. handler DM null-guild guard (commands in DMs used to throw, no reply)
 //   5. DB numeric guard (NaN/undefined/Infinity can never reach economy SQL)
+//   7. admin router owner gate: `v ovo …` / `v admin …` must never reach
+//      add/remove/wipe/… for a non-owner (only the `A` prefix used to gate it)
 process.env.DB_PATH = '/tmp/audit_test';
 const fs = require('fs');
 fs.rmSync('/tmp/audit_test', { recursive: true, force: true });
@@ -169,6 +171,39 @@ let seq = 0;
     const msg2 = makeMessage('v bal', 'dupuser', { guild: null });
     await handler.handleMessage(msg2);
     check('different message id still executes', msg2._sends.length >= 1, 'sends=' + msg2._sends.length);
+  }
+
+  // 7. admin router owner gate (found 2026-10-08): `v ovo …` / `v admin …`
+  //    used to reach the WHOLE admin router (add/remove/wipe/transfer/…)
+  //    with no check at all — the only guard was the `A` prefix gate in
+  //    commandHandler, which a member bypasses by writing `v ovo add …`.
+  {
+    const config = require('../config');
+    const txt = (m) => {
+      const p = m._sends[0];
+      if (!p || !p.embeds) return '';
+      return p.embeds.map(e => `${(e.data && e.data.title) || ''} ${((e.data && e.data.fields) || []).map(f => f.value).join(' ')}`).join(' ');
+    };
+    db.exec(`INSERT INTO users (user_id, balance, bank, terms_accepted) VALUES ('mallory', 5000, 0, 1)`);
+    db.exec(`INSERT INTO users (user_id, balance, bank, terms_accepted) VALUES ('mallory2', 5000, 0, 1)`);
+    db.exec(`INSERT INTO users (user_id, balance, bank, terms_accepted) VALUES ('victim3', 5000, 0, 1)`);
+    const bal = (id) => Number(db.exec(`SELECT balance FROM users WHERE user_id='${id}'`)[0].values[0][0]);
+
+    const m1 = makeMessage('v ovo add <@victim3> 1000000', 'mallory', { guild: { id: 'guild_it' } });
+    await handler.handleMessage(m1);
+    check('non-owner `v ovo add` is blocked', bal('victim3') === 5000 && /reserved for the bot owner/.test(txt(m1)), `bal=${bal('victim3')} reply="${txt(m1).slice(0, 80)}"`);
+
+    // a FRESH non-owner (same one would sit out the 2s default command cooldown)
+    const m2 = makeMessage('v admin wipe <@victim3>', 'mallory2', { guild: { id: 'guild_it' } });
+    await handler.handleMessage(m2);
+    check('non-owner `v admin wipe` is blocked', /reserved for the bot owner/.test(txt(m2)), txt(m2).slice(0, 80));
+
+    // the legitimate owner path must still work (A prefix, admin add).
+    // this harness always returns `victim` from mentions.users.first().
+    const vBefore = bal('victim');
+    const m3 = makeMessage('Aovo add <@victim> 1000', config.ownerId, { guild: { id: 'guild_it' } });
+    await handler.handleMessage(m3);
+    check('owner `Aovo add` still works', bal('victim') === vBefore + 1000 && bal('victim3') === 5000, `victim=${bal('victim')} (was ${vBefore}) reply="${txt(m3).slice(0, 80)}"`);
   }
 
   const extra = (fail === 0) ? '' : ` (${fail} FAILED)`;

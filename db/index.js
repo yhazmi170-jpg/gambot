@@ -121,6 +121,7 @@ async function init() {
   db.run(`CREATE TABLE IF NOT EXISTS purchase_transactions (purchase_id TEXT PRIMARY KEY, user_id TEXT NOT NULL, item_id TEXT NOT NULL, price INTEGER NOT NULL, expires_at INTEGER NOT NULL, committed_at INTEGER NOT NULL DEFAULT (strftime('%s','now')))`);
   db.run(`CREATE TABLE IF NOT EXISTS log_channels (guild_id TEXT PRIMARY KEY, channel_id TEXT NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS cmd_log_channels (guild_id TEXT PRIMARY KEY, channel_id TEXT NOT NULL)`);
+  db.run(`CREATE TABLE IF NOT EXISTS credit_guilds (guild_id TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 1)`);
   db.run(`CREATE TABLE IF NOT EXISTS update_channels (guild_id TEXT PRIMARY KEY, channel_id TEXT NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS event_channels (guild_id TEXT PRIMARY KEY, channel_id TEXT NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS merchant_state (id INTEGER PRIMARY KEY CHECK (id = 1), next_at INTEGER NOT NULL DEFAULT 0)`);
@@ -1401,6 +1402,26 @@ function getLogChannel(guildId) {
   const rows = db.exec(`SELECT channel_id FROM log_channels WHERE guild_id = '${guildId}'`);
   if (!rows.length || !rows[0].values.length) return null;
   return rows[0].values[0][0];
+}
+
+// "JayJay made this" credit, per server (`Aovo jayjay on|off`).
+// No row = ON (opt-out, like every other per-guild toggle). A disabled server
+// is skipped by BOTH credit paths: the ~1-in-50 command follow-up and the
+// 60-180 min passive chat drop.
+function isCreditGuildEnabled(guildId) {
+  if (!guildId) return true;
+  try {
+    const rows = db.exec(`SELECT enabled FROM credit_guilds WHERE guild_id = '${guildId}'`);
+    if (!rows.length || !rows[0].values.length) return true;
+    return rows[0].values[0][0] === 1;
+  } catch (e) {
+    return true;
+  }
+}
+
+function setCreditGuildEnabled(guildId, enabled) {
+  db.run(`INSERT OR REPLACE INTO credit_guilds (guild_id, enabled) VALUES ('${guildId}', ${enabled ? 1 : 0})`);
+  save();
 }
 
 function setCmdLogChannel(guildId, channelId) {
@@ -5973,6 +5994,7 @@ module.exports = {
   setLogChannel,
   getLogChannel,
   setCmdLogChannel, getCmdLogChannel,
+  setCreditGuildEnabled, isCreditGuildEnabled,
   setUpdateChannel, getUpdateChannel, getAllUpdateChannels,
   setEventChannel, getEventChannel, getAllEventChannels,
   getInsuranceRefund,

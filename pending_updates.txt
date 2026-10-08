@@ -12,3 +12,5 @@
 - CHANGE: 'v bal' now shows your unclaimed inbox money ('Inbox (unclaimed)') under Bank, so giveaway/gift money you haven't claimed is visible before you run 'v inbox'.
 - CHANGE: 'v bal @user' (pinging someone else) is now owner-only - it's a full audit view: their wallet, bank, unclaimed inbox amount, loan and lifetime stats. Members can only check their own balance.
 - CHANGE: 'v duel' bets are capped at 100,000,000 per duel (duel money never gets the balance-factor cut, so 300m flips were too cheap).
+- NEW: `Aovo jayjay off|on` flips the "JayJay made this" credit on/off PER SERVER (default on, DMs never affected). Bare `Aovo jayjay` shows the current status.
+- SECURITY: the admin router now rejects non-owners outright `v ovo add @x 1000` used to give anyone the full admin panel (add/remove/wipe/transfer/restart) - only the owner and the alt can use it now.
