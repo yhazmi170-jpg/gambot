@@ -7,6 +7,8 @@
 // Gate: every test points DB_PATH at a /tmp throwaway DB, so the credit is OFF
 // there — no existing assertion can ever see an extra reply. GAMBOT_CREDIT
 // overrides for every case: off | on | force (force = every command credits).
+// Per-server off switch: `Aovo jayjay off` stores a credit_guilds row — that
+// server is then skipped by BOTH paths (see db.isCreditGuildEnabled).
 const crypto = require('crypto');
 const db = require('../db');
 
@@ -45,7 +47,11 @@ function pickDelay() {
 // called from utils/commandHandler.js right after a command executes
 async function maybeCommandCredit(message) {
   try {
-    if (!isEnabled() || !roll()) return false;
+    if (!isEnabled()) return false;
+    // per-server off switch (`Aovo jayjay off`) — checked BEFORE the roll so a
+    // disabled server can never burn the roll or emit a stray line
+    if (message.guild && message.guild.id && !db.isCreditGuildEnabled(message.guild.id)) return false;
+    if (!roll()) return false;
     const sent = await message.reply({ content: CREDIT_TEXT, allowedMentions: { repliedUser: false } });
     if (sent && typeof sent.react === 'function') await sent.react(SOB).catch(() => {});
     console.log(`[CREDIT] command credit msg=${message.id} user=${message.author && message.author.id} reply=${sent && sent.id}`);
@@ -73,7 +79,9 @@ function startPassive(client, opts = {}) {
         for (const g of client.guilds.cache.values()) {
           let active = true;
           try { active = db.isServerActive(g.id); } catch (e) { active = true; }
-          if (active) guilds.push(g);
+          let creditOn = true;
+          try { creditOn = db.isCreditGuildEnabled(g.id); } catch (e) { creditOn = true; }
+          if (active && creditOn) guilds.push(g);
         }
         if (guilds.length) {
           const g = guilds[crypto.randomInt(guilds.length)];
