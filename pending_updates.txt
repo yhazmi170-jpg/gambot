@@ -14,3 +14,4 @@
 - CHANGE: 'v duel' bets are capped at 100,000,000 per duel (duel money never gets the balance-factor cut, so 300m flips were too cheap).
 - NEW: `Aovo jayjay off|on` flips the "JayJay made this" credit on/off PER SERVER (default on, DMs never affected). Bare `Aovo jayjay` shows the current status.
 - SECURITY: the admin router now rejects non-owners outright `v ovo add @x 1000` used to give anyone the full admin panel (add/remove/wipe/transfer/restart) - only the owner and the alt can use it now.
+- HOST: bot moved to a fresh Render account (old account ran out of free hours) - new URL https://gambot-ovib.onrender.com, same GitHub backups, zero data loss (796 users restored at 2026-10-08 21:08Z).
