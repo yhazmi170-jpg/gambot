@@ -232,8 +232,8 @@ heist: {
       battle: {
         name: 'Pet Battle',
         aliases: 'b, fight',
-        desc: 'Battle a bot or another player\'s team with your pet team (3v3 combat).',
-        play: `\`${prefix} battle\` — battle a bot\n\`${prefix} battle bot\` — battle a bot\n\`${prefix} battle @user\` — challenge a player`,
+        desc: 'Battle the bot or challenge a friend with your pet team (3v3 combat).',
+        play: `\`${prefix} battle\` — battle the bot\n\`${prefix} battle @user\` — challenge a friend`,
         tips: 'Build a team with `v team add`. Wins grant coins, XP, battle pass progress, bond, and ~8% chance for a weapon crate. Equip weapons (v weapon) for splash, burn, poison, and healing.',
       },
     };
