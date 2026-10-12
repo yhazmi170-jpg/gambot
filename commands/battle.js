@@ -346,7 +346,7 @@ async function runBattle(message, target, isBot = false) {
 
   const img = renderBattleImage({
     playerName: message.author.username,
-    enemyName: target.username || 'Bot Trainer',
+    enemyName: isBot ? 'Bot' : target.username,
     myPets: myCopy,
     theirPets: theirCopy,
     turns: round,
@@ -394,63 +394,59 @@ async function handleInteraction(i) {
 module.exports = {
   name: 'battle',
   helpCategory: 'Pets',
-  helpArgs: '[bot | @user]',
+  helpArgs: '[@user]',
   aliases: ['b', 'fight'],
-  description: 'battle a bot or another user\'s team',
+  description: 'battle the bot, or challenge a friend',
   handleInteraction,
   async execute(message, args) {
     const target = (message.mentions && message.mentions.users && typeof message.mentions.users.first === 'function')
       ? message.mentions.users.first()
       : null;
-    const isBotArg = args[0] && ['bot', 'ai', 'npc', 'cpu', 'trainer'].includes(args[0].toLowerCase());
-    const isBotMention = target && target.bot;
-    const isNoTarget = !target && !args[0];
 
     const myTeam = db.getTeam(message.author.id);
     if (!myTeam || (!myTeam.slot1 && !myTeam.slot2 && !myTeam.slot3)) {
       return message.channel.send({ embeds: [error('your team is empty — use `v team add`')] });
     }
 
-    if (isBotArg || isBotMention || isNoTarget) {
-      const botName = target ? target.username : 'Bot Trainer';
-      return runBattle(message, { id: 'bot', username: botName, bot: true }, true);
-    }
-
-    if (!target) {
-      return message.channel.send({ embeds: [error('mention someone to battle, or use `v battle bot`')] });
-    }
-    if (target.id === message.author.id) {
-      return message.channel.send({ embeds: [error('you can\'t battle yourself')] });
-    }
-
-    const theirTeam = db.getTeam(target.id);
-    if (!theirTeam || (!theirTeam.slot1 && !theirTeam.slot2 && !theirTeam.slot3)) {
-      return message.channel.send({ embeds: [error(`${target.username}'s team is empty`)] });
-    }
-
-    const id = pendingKey(message.author.id, target.id, Date.now());
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`battle_${id}_yes`).setLabel('⚔️ Fight').setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId(`battle_${id}_no`).setLabel('Cancel').setStyle(ButtonStyle.Danger),
-    );
-
-    const sent = await message.channel.send({
-      embeds: [embed('⚔️ Battle Request', [
-        ['Challenger', `${message.author} (${message.author.username})`],
-        ['Opponent', `${target} (${target.username})`],
-        ['', `${message.author} wants to battle ${target}!\n${target}, **Fight** to accept or **Cancel** to decline.`],
-      ], 0x2b2d31)],
-      components: [row],
-    });
-
-    db.setPendingBattle(id, message.author.id, target.id, Math.floor(Date.now() / 1000) + 60);
-
-    setTimeout(async () => {
-      const p = db.getPendingBattle(id);
-      if (p) {
-        db.deletePendingBattle(id);
-        try { await sent.edit({ embeds: [errEmbed('Battle request expired.')], components: [] }); } catch (_) {}
+    // Mentioning another human user triggers a PvP challenge request
+    if (target && !target.bot) {
+      if (target.id === message.author.id) {
+        return message.channel.send({ embeds: [error('you can\'t battle yourself — use `v battle` to fight the bot')] });
       }
-    }, 60000);
+
+      const theirTeam = db.getTeam(target.id);
+      if (!theirTeam || (!theirTeam.slot1 && !theirTeam.slot2 && !theirTeam.slot3)) {
+        return message.channel.send({ embeds: [error(`${target.username}'s team is empty`)] });
+      }
+
+      const id = pendingKey(message.author.id, target.id, Date.now());
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`battle_${id}_yes`).setLabel('⚔️ Fight').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`battle_${id}_no`).setLabel('Cancel').setStyle(ButtonStyle.Danger),
+      );
+
+      const sent = await message.channel.send({
+        embeds: [embed('⚔️ Battle Request', [
+          ['Challenger', `${message.author} (${message.author.username})`],
+          ['Opponent', `${target} (${target.username})`],
+          ['', `${message.author} wants to battle ${target}!\n${target}, **Fight** to accept or **Cancel** to decline.`],
+        ], 0x2b2d31)],
+        components: [row],
+      });
+
+      db.setPendingBattle(id, message.author.id, target.id, Math.floor(Date.now() / 1000) + 60);
+
+      setTimeout(async () => {
+        const p = db.getPendingBattle(id);
+        if (p) {
+          db.deletePendingBattle(id);
+          try { await sent.edit({ embeds: [errEmbed('Battle request expired.')], components: [] }); } catch (_) {}
+        }
+      }, 60000);
+      return;
+    }
+
+    // Default: instant battle against Bot! No pinging or finding someone needed.
+    return runBattle(message, { id: 'bot', username: 'Bot', bot: true }, true);
   },
 };

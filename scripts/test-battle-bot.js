@@ -74,20 +74,20 @@ const battle = require('../commands/battle');
   await battle.execute({ author: { id: U1, username: 'Player1' }, mentions: { users: new Map() }, channel: mockChannel }, []);
   assert(sentImage, 'Should produce battle image for bot battle with no args');
   assert.strictEqual(lastRender.playerName, 'Player1');
-  assert.strictEqual(lastRender.enemyName, 'Bot Trainer');
+  assert.strictEqual(lastRender.enemyName, 'Bot');
   assert.strictEqual(lastRender.myPets.length, 2, 'My pets should match team count');
   assert.strictEqual(lastRender.theirPets.length, 2, 'Bot team should match player team count');
   console.log('Test 2: No-arg bot battle PASS');
 
-  // 3. Test battle with 'bot' arg
+  // 3. Test battle with any non-mention arg (e.g. '123' or 'bot')
   sentImage = false;
   lastRender = null;
-  await battle.execute({ author: { id: U1, username: 'Player1' }, mentions: { users: new Map() }, channel: mockChannel }, ['bot']);
-  assert(sentImage, 'Should produce battle image for v battle bot');
-  assert.strictEqual(lastRender.enemyName, 'Bot Trainer');
-  console.log('Test 3: v battle bot PASS');
+  await battle.execute({ author: { id: U1, username: 'Player1' }, mentions: { users: new Map() }, channel: mockChannel }, ['random']);
+  assert(sentImage, 'Should produce battle image for non-mention arg');
+  assert.strictEqual(lastRender.enemyName, 'Bot');
+  console.log('Test 3: v battle <non-mention> PASS');
 
-  // 4. Test battle with bot mention
+  // 4. Test battle with bot mention (ignored as a human user, immediately battles Bot)
   sentImage = false;
   lastRender = null;
   const botUser = { id: 'bot_99', username: 'DiscordBot', bot: true };
@@ -95,7 +95,7 @@ const battle = require('../commands/battle');
   mentionsBot.first = () => botUser;
   await battle.execute({ author: { id: U1, username: 'Player1' }, mentions: { users: mentionsBot }, channel: mockChannel }, ['<@bot_99>']);
   assert(sentImage, 'Should produce battle image for v battle @bot');
-  assert.strictEqual(lastRender.enemyName, 'DiscordBot');
+  assert.strictEqual(lastRender.enemyName, 'Bot');
   console.log('Test 4: v battle @bot PASS');
 
   // 5. Test battle with human user (PvP challenge flow)
