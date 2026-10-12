@@ -229,6 +229,13 @@ heist: {
         play: `\`${prefix} raid <stake>\`\nExample: \`${prefix} raid 5000\``,
         tips: 'Attack with a full battle team for the most damage per stake. Top contributors win the biggest share of the pot.',
       },
+      battle: {
+        name: 'Pet Battle',
+        aliases: 'b, fight',
+        desc: 'Battle a bot or another player\'s team with your pet team (3v3 combat).',
+        play: `\`${prefix} battle\` — battle a bot\n\`${prefix} battle bot\` — battle a bot\n\`${prefix} battle @user\` — challenge a player`,
+        tips: 'Build a team with `v team add`. Wins grant coins, XP, battle pass progress, bond, and ~8% chance for a weapon crate. Equip weapons (v weapon) for splash, burn, poison, and healing.',
+      },
     };
 
     // alias map
