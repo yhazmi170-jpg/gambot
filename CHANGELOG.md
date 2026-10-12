@@ -1,5 +1,13 @@
 # Gambot Changelog (full history)
 
+## v2.1.0 patch — Pet Battles against Bots (`v battle bot` / `v battle`, 2026-10-13, no version bump)
+- **NEW: Battle against bots without waiting for friends on Discord.** Players can now run `v battle` (with no arguments), `v battle bot`, `v battle ai`, or mention any bot (`v battle @bot`) to instantly trigger a 3v3 pet battle against a balanced NPC Bot Trainer.
+- **Bot Team Scaling**: Bot team mirrors player team size (1-3 pets), dynamically levels up to match player team's average level, scales HP/ATK/DEF using Gambot leveling curves, rolls personality traits, and equips weapons if the player has weapons equipped.
+- **Full Battle Progression**: Bot battles award full victory rewards (coins, XP, daily/weekly checklist progress, battle pass XP, ~8% weapon crate drop chance, pet leveling XP, and bond progress).
+- **PvP Preserved**: Mentioning a human player (`v battle @friend`) continues to send the interactive `Fight` / `Cancel` button challenge.
+- **Bugfix**: Fixed `const result` assignment crash in `commands/battle.js` when rolling a weapon crate drop.
+- **Tests**: Added `scripts/test-battle-bot.js` (6/6 PASS). Full smoke test suite 104 PASS / 25 EXPECTED / 0 FAIL.
+
 ## v2.1.0 patch — server gate `v psu` / `v usp` (2026-09-27, no version bump, commit `2c409a3`, LIVE)
 - **NEW: a server Gambot is IN is not a server it may be USED in.** Every guild the bot joins now starts **locked** — members get one "the owner has to run `v psu` here" notice per 30 min instead of commands. The 4 servers it was already in are seeded `active` at boot (`db.SEED_ACTIVE_GUILDS`, `INSERT OR IGNORE`, idempotent) so this can never lock a live server. Owner is never gated, DMs are never gated.
 - **NEW `v psu`** (owner only; aliases `pendingserver` / `pserverunlock` / `unlockserver`) — unlocks a server. **NEW `v usp`** (owner only; aliases `lockserver` / `disableserver` / `relock` / `revokepsu`) — locks it again. **Both work from any server**: with no argument they act on the server you are in; with an id they act on any other server, so the owner can copy an id out of `v psu list` and flip a server from wherever they are. A backticked id pasted straight out of the list works; a non-snowflake is refused with a clean message instead of a silent no-op (`utils/serverAccess.js parseGuildId`). `v psu list` prints all three states with ids — `unlocked` / `locked` (owner-disabled) / `waiting` (joined, never approved). Locking hides commands only: no balances, pets or settings are touched, and `v psu` re-opens it instantly. Both commands are in `COMMANDS_BEFORE_TOS` so an unlock/lock can never be stuck behind the TOS prompt.

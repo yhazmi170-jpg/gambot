@@ -44,10 +44,75 @@ function battleMods(pet) {
 
 // Attach each pet's equipped weapon for the battle.
 function attachWeapons(pet) {
+  if (pet._weapon || typeof pet.id !== 'number') return { ...pet };
   const w = db.getAnimalWeapon(pet.id);
   const copy = { ...pet };
   if (w) copy._weapon = w;
   return copy;
+}
+
+// Generate a balanced NPC/bot pet team matching the player's team size and level.
+function generateBotTeam(myPets) {
+  const count = (myPets && myPets.length) ? myPets.length : 3;
+  const avgLevel = Math.max(1, Math.round(myPets.reduce((s, p) => s + (p.level || 1), 0) / count));
+  const botPets = [];
+
+  for (let i = 0; i < count; i++) {
+    const myPet = myPets[i];
+    const rarity = myPet ? myPet.rarity : (db.randomRarity ? db.randomRarity() : 'common');
+    const species = db.randomSpecies ? db.randomSpecies(rarity) : 'Rabbit';
+    const stats = db.randomStats ? db.randomStats(rarity) : { hp: 100, attack: 10, defense: 5 };
+    const levelDiff = Math.max(0, (myPet ? myPet.level : avgLevel) - 1);
+    const botLevel = (myPet ? myPet.level : avgLevel);
+    const hp = stats.hp + levelDiff * 15;
+    const attack = stats.attack + levelDiff * 3;
+    const defense = stats.defense + levelDiff * 2;
+    const trait = db.rollTrait ? db.rollTrait() : 'Brave';
+
+    let botWeapon = null;
+    const playerWeapon = myPet ? (myPet._weapon || db.getAnimalWeapon(myPet.id)) : null;
+    if (playerWeapon || botLevel >= 5) {
+      const types = Object.keys(db.WEAPON_TYPES || {});
+      const wType = types.length ? types[Math.floor(Math.random() * types.length)] : 'great_sword';
+      const meta = (db.WEAPON_TYPES && db.WEAPON_TYPES[wType]) || { name: 'Great Sword', emoji: '⚔️' };
+      const quality = playerWeapon ? playerWeapon.quality : (45 + Math.floor(Math.random() * 25));
+      const wLevel = playerWeapon ? playerWeapon.level : Math.max(1, Math.floor(botLevel / 3));
+      const atkBase = playerWeapon ? playerWeapon.atk : Math.floor((12 + wLevel * 3) * (quality / 50));
+      const defBase = playerWeapon ? playerWeapon.def : Math.floor((6 + wLevel * 2) * (quality / 50));
+      botWeapon = {
+        id: `bot_wep_${i + 1}`,
+        type: wType,
+        rarity: playerWeapon ? playerWeapon.rarity : rarity,
+        quality,
+        level: wLevel,
+        name: meta.name || 'Weapon',
+        emoji: meta.emoji || '⚔️',
+        atk: atkBase,
+        def: defBase,
+      };
+    }
+
+    botPets.push({
+      id: `bot_pet_${i + 1}`,
+      user_id: 'bot',
+      species,
+      rarity,
+      name: species,
+      level: botLevel,
+      exp: 0,
+      hp,
+      max_hp: hp,
+      attack,
+      defense,
+      shiny: false,
+      trait,
+      bond: 0,
+      fed_until: 0,
+      _weapon: botWeapon,
+    });
+  }
+
+  return botPets;
 }
 
 // Holds per-pet status effect state for a battle: { poison: turns, flame: turns, taunt: bool }
@@ -57,15 +122,22 @@ function makeStatuses(pets) {
   return s;
 }
 
-async function runBattle(message, target) {
+async function runBattle(message, target, isBot = false) {
   const myTeam = db.getTeam(message.author.id);
-  const theirTeam = db.getTeam(target.id);
   if (!myTeam || (!myTeam.slot1 && !myTeam.slot2 && !myTeam.slot3)) return message.channel.send({ embeds: [error('your team is empty — use `v team add`')] });
-  if (!theirTeam || (!theirTeam.slot1 && !theirTeam.slot2 && !theirTeam.slot3)) return message.channel.send({ embeds: [error(`${target.username}'s team is empty`) ] });
 
   const myPets = [myTeam.slot1, myTeam.slot2, myTeam.slot3].filter(Boolean).map(id => db.getAnimal(id)).filter(Boolean);
-  const theirPets = [theirTeam.slot1, theirTeam.slot2, theirTeam.slot3].filter(Boolean).map(id => db.getAnimal(id)).filter(Boolean);
-  if (!myPets.length || !theirPets.length) return message.channel.send({ embeds: [error('one of the teams has no valid animals')] });
+  if (!myPets.length) return message.channel.send({ embeds: [error('your team has no valid animals')] });
+
+  let theirPets;
+  if (isBot) {
+    theirPets = generateBotTeam(myPets);
+  } else {
+    const theirTeam = db.getTeam(target.id);
+    if (!theirTeam || (!theirTeam.slot1 && !theirTeam.slot2 && !theirTeam.slot3)) return message.channel.send({ embeds: [error(`${target.username}'s team is empty`)] });
+    theirPets = [theirTeam.slot1, theirTeam.slot2, theirTeam.slot3].filter(Boolean).map(id => db.getAnimal(id)).filter(Boolean);
+    if (!theirPets.length) return message.channel.send({ embeds: [error(`${target.username}'s team has no valid animals`)] });
+  }
 
   const myCopy = myPets.map(p => { const wp = attachWeapons(p); const mods = battleMods(wp); return { ...wp, ...mods, hp: mods.effHp, max_hp: mods.effMaxHp }; });
   const theirCopy = theirPets.map(p => { const wp = attachWeapons(p); const mods = battleMods(wp); return { ...wp, ...mods, hp: mods.effHp, max_hp: mods.effMaxHp }; });
@@ -187,46 +259,94 @@ async function runBattle(message, target) {
   const theirAlive = theirCopy.filter(p => p.hp > 0).length;
   let winner;
   if (myAlive > theirAlive) winner = message.author;
-  else if (theirAlive > myAlive) winner = target;
+  else if (theirAlive > myAlive) winner = isBot ? { id: 'bot', username: target.username || 'Bot Trainer' } : target;
   else winner = null;
 
-  const result = winner ? (winner.id === message.author.id ? `YOU WIN! +${20 * myPets.filter(p => myCopy.find(x => x.id === p.id) && myCopy.find(x => x.id === p.id).hp > 0).length} XP` : `YOU LOSE!`) : 'DRAW!';
+  let result = winner ? (winner.id === message.author.id ? `YOU WIN! +${20 * myPets.filter(p => myCopy.find(x => x.id === p.id) && myCopy.find(x => x.id === p.id).hp > 0).length} XP` : `YOU LOSE!`) : 'DRAW!';
 
   if (winner) {
-    const reward = Math.floor((50 + myPets.length * 10) * db.eventMult('battleMult'));
-    db.payWin(winner.id, reward);
-    db.trackProgress(winner.id, 'battle', 1);
-    db.addChecklistProgress(winner.id, 'daily', 'battle', 1);
-    db.addChecklistProgress(winner.id, 'weekly', 'battle', 1);
-    db.addPassXp(winner.id, db.PASS_XP.battle);
-    const wins = db.addBattleWin(winner.id);
-    const winnerPets = winner.id === message.author.id ? myPets : theirPets;
-    for (const pet of winnerPets) {
-      db.awardPetAchievement(pet.id, 'battle_first');
-      if (wins >= 10) db.awardPetAchievement(pet.id, 'battle_10');
+    if (winner.id === message.author.id) {
+      const reward = Math.floor((50 + myPets.length * 10) * db.eventMult('battleMult'));
+      db.payWin(winner.id, reward);
+      db.trackProgress(winner.id, 'battle', 1);
+      db.addChecklistProgress(winner.id, 'daily', 'battle', 1);
+      db.addChecklistProgress(winner.id, 'weekly', 'battle', 1);
+      db.addPassXp(winner.id, db.PASS_XP.battle);
+      const wins = db.addBattleWin(winner.id);
+      for (const pet of myPets) {
+        db.awardPetAchievement(pet.id, 'battle_first');
+        if (wins >= 10) db.awardPetAchievement(pet.id, 'battle_10');
+      }
+      if (Math.random() < db.WEAPON_BATTLE_DROP_CHANCE) {
+        db.addWeaponCrate(winner.id, 1);
+        result += ' 🏴‍☠️ **WEAPON CRATE DROP!**';
+      }
+      for (const pet of myPets) {
+        const survived = myCopy.find(p => p.id === pet.id);
+        if (survived && survived.hp > 0) db.addExp(pet.id, 20);
+        else db.addExp(pet.id, 5);
+        db.addBond(pet.id, survived && survived.hp > 0 ? 3 : 1);
+      }
+      if (!isBot && theirPets) {
+        for (const pet of theirPets) {
+          const survived = theirCopy.find(p => p.id === pet.id);
+          if (survived && survived.hp > 0) db.addExp(pet.id, 20);
+          else db.addExp(pet.id, 5);
+          db.addBond(pet.id, 1);
+        }
+      }
+    } else {
+      // Opponent won
+      if (!isBot) {
+        const reward = Math.floor((50 + theirPets.length * 10) * db.eventMult('battleMult'));
+        db.payWin(winner.id, reward);
+        db.trackProgress(winner.id, 'battle', 1);
+        db.addChecklistProgress(winner.id, 'daily', 'battle', 1);
+        db.addChecklistProgress(winner.id, 'weekly', 'battle', 1);
+        db.addPassXp(winner.id, db.PASS_XP.battle);
+        const wins = db.addBattleWin(winner.id);
+        for (const pet of theirPets) {
+          db.awardPetAchievement(pet.id, 'battle_first');
+          if (wins >= 10) db.awardPetAchievement(pet.id, 'battle_10');
+        }
+        if (Math.random() < db.WEAPON_BATTLE_DROP_CHANCE) {
+          db.addWeaponCrate(winner.id, 1);
+        }
+        for (const pet of theirPets) {
+          const survived = theirCopy.find(p => p.id === pet.id);
+          if (survived && survived.hp > 0) db.addExp(pet.id, 20);
+          else db.addExp(pet.id, 5);
+          db.addBond(pet.id, survived && survived.hp > 0 ? 3 : 1);
+        }
+      }
+      for (const pet of myPets) {
+        const survived = myCopy.find(p => p.id === pet.id);
+        if (survived && survived.hp > 0) db.addExp(pet.id, 20);
+        else db.addExp(pet.id, 5);
+        db.addBond(pet.id, 1);
+      }
     }
-    if (Math.random() < db.WEAPON_BATTLE_DROP_CHANCE) {
-      db.addWeaponCrate(winner.id, 1);
-      result += ' 🏴‍☠️ **WEAPON CRATE DROP!**';
-    }
-    const winnerPetIds = new Set(winnerPets.map(p => p.id));
+  } else {
+    // Draw
     for (const pet of myPets) {
       const survived = myCopy.find(p => p.id === pet.id);
       if (survived && survived.hp > 0) db.addExp(pet.id, 20);
       else db.addExp(pet.id, 5);
-      db.addBond(pet.id, winnerPetIds.has(pet.id) ? (survived && survived.hp > 0 ? 3 : 1) : 1);
+      db.addBond(pet.id, 1);
     }
-    for (const pet of theirPets) {
-      const survived = theirCopy.find(p => p.id === pet.id);
-      if (survived && survived.hp > 0) db.addExp(pet.id, 20);
-      else db.addExp(pet.id, 5);
-      db.addBond(pet.id, winnerPetIds.has(pet.id) ? (survived && survived.hp > 0 ? 3 : 1) : 1);
+    if (!isBot && theirPets) {
+      for (const pet of theirPets) {
+        const survived = theirCopy.find(p => p.id === pet.id);
+        if (survived && survived.hp > 0) db.addExp(pet.id, 20);
+        else db.addExp(pet.id, 5);
+        db.addBond(pet.id, 1);
+      }
     }
   }
 
   const img = renderBattleImage({
     playerName: message.author.username,
-    enemyName: target.username,
+    enemyName: target.username || 'Bot Trainer',
     myPets: myCopy,
     theirPets: theirCopy,
     turns: round,
@@ -264,7 +384,7 @@ async function handleInteraction(i) {
 
     const challenger = await i.client.users.fetch(pending.challenger_id).catch(() => null);
     if (!challenger) return;
-    await runBattle({ author: challenger, channel: i.message.channel, guild: i.message.guild }, i.user);
+    await runBattle({ author: challenger, channel: i.message.channel, guild: i.message.guild }, i.user, false);
   } catch (e) {
     console.error('battle interaction err:', e);
     try { await i.deferUpdate().catch(() => {}); } catch (_) {}
@@ -274,19 +394,39 @@ async function handleInteraction(i) {
 module.exports = {
   name: 'battle',
   helpCategory: 'Pets',
-  helpArgs: '<@user>',
+  helpArgs: '[bot | @user]',
   aliases: ['b', 'fight'],
-  description: 'battle another user\'s team',
+  description: 'battle a bot or another user\'s team',
   handleInteraction,
   async execute(message, args) {
-    const target = message.mentions.users.first();
-    if (!target || target.bot) return message.channel.send({ embeds: [error('mention someone to battle')] });
-    if (target.id === message.author.id) return message.channel.send({ embeds: [error('you can\'t battle yourself')] });
+    const target = (message.mentions && message.mentions.users && typeof message.mentions.users.first === 'function')
+      ? message.mentions.users.first()
+      : null;
+    const isBotArg = args[0] && ['bot', 'ai', 'npc', 'cpu', 'trainer'].includes(args[0].toLowerCase());
+    const isBotMention = target && target.bot;
+    const isNoTarget = !target && !args[0];
 
     const myTeam = db.getTeam(message.author.id);
+    if (!myTeam || (!myTeam.slot1 && !myTeam.slot2 && !myTeam.slot3)) {
+      return message.channel.send({ embeds: [error('your team is empty — use `v team add`')] });
+    }
+
+    if (isBotArg || isBotMention || isNoTarget) {
+      const botName = target ? target.username : 'Bot Trainer';
+      return runBattle(message, { id: 'bot', username: botName, bot: true }, true);
+    }
+
+    if (!target) {
+      return message.channel.send({ embeds: [error('mention someone to battle, or use `v battle bot`')] });
+    }
+    if (target.id === message.author.id) {
+      return message.channel.send({ embeds: [error('you can\'t battle yourself')] });
+    }
+
     const theirTeam = db.getTeam(target.id);
-    if (!myTeam || (!myTeam.slot1 && !myTeam.slot2 && !myTeam.slot3)) return message.channel.send({ embeds: [error('your team is empty — use `v team add`')] });
-    if (!theirTeam || (!theirTeam.slot1 && !theirTeam.slot2 && !theirTeam.slot3)) return message.channel.send({ embeds: [error(`${target.username}'s team is empty`) ] });
+    if (!theirTeam || (!theirTeam.slot1 && !theirTeam.slot2 && !theirTeam.slot3)) {
+      return message.channel.send({ embeds: [error(`${target.username}'s team is empty`)] });
+    }
 
     const id = pendingKey(message.author.id, target.id, Date.now());
     const row = new ActionRowBuilder().addComponents(
