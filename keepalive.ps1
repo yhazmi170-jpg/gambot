@@ -1,6 +1,7 @@
 # keepalive.ps1 — keep Render free-tier services awake (15 min idle spin-down).
 # Pings every 4 min. Runs from Windows as scheduled task "GambotKeepalive" (AtLogOn).
 $urls = @(
+    "https://gambot-fra.onrender.com/health",
     "https://gambot-ovib.onrender.com/",
     "https://discord-selfy.onrender.com/health"
 )
