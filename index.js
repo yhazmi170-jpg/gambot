@@ -924,7 +924,7 @@ client.on('error', (e) => console.error('[DC] error:', e && e.message));
 let gatewayDownSince = null;
 setInterval(async () => {
   const bootAge = Date.now() - runtime.startedAt;
-  if (bootAge < 90000) return; // 90s grace on boot for initial handshake
+  if (bootAge < 300000) return; // 300s (5 min) grace on boot for handshake and rate limit backoff
 
   const ready = !!(client && client.isReady());
   const ping = (client && client.ws) ? client.ws.ping : -1;
