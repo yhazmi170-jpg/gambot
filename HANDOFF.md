@@ -11,11 +11,12 @@
   3. **Fail-Fast Login**: Eliminated the 10-minute retry dead-lock in `attemptLogin`; failures and 60s timeouts immediately exit for a fresh container restart.
   4. **Health Check Endpoints**: Added `/health` and `/ping` (200 JSON healthy / 503 degraded); updated `/status` and `/` to report 503 during outages. Configured `healthCheckPath: "/health"` directly on Render via API.
   5. **WASM Heap Rolling Maintenance**: Clean rolling restart every 24h (when 0 active games) + RSS memory watchdog (>380MB) with GitHub backup prevents sql.js WASM heap fragmentation and out-of-bounds crashes.
-- **Target deploy**: Render service `gambot` -> `https://gambot-ovib.onrender.com`.
+- **Target deploy**: Render service `gambot-fra` (`srv-db7mcc2d0e5s73ecv6s0`) -> `https://gambot-fra.onrender.com` (Frankfurt region, bypassing Oregon Cloudflare 1015 rate limit). Oregon service suspended.
+- **LIVE STATUS**: `commit=d01a369`, `discord=true`, `guilds=4`, `users=804` on Frankfurt node.
 
 ## NEXT ACTION
-- **Deploy**: Run `/home/yxx1/bin/deploy-gambot.sh "fix: 24/7 uptime resilience, self-keepalive, and gateway watchdog"` to push to master and trigger Render auto-redeploy.
-- **Eyeball**: Verify `curl -s https://gambot-ovib.onrender.com/health` returns status:ok and 200 OK.
+- **UptimeRobot**: User should ensure their UptimeRobot monitor points to `https://gambot-fra.onrender.com/health` (or `/`).
+- **Eyeball**: Verify `curl -s https://gambot-fra.onrender.com/status` returns `discord=true`.
 
 ## Done recently (2026-10-13) — `v battle` against bots (NPC Bot Trainer)
 - [x] **Bot battles supported:** `v battle` (with no args), `v battle bot`, `v battle ai`, `v battle npc`, or mentioning a bot (`v battle @bot`) starts an immediate battle against an NPC Bot Trainer team.
