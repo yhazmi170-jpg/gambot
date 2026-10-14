@@ -195,7 +195,7 @@ const server = http.createServer((req, res) => {
   if (u.pathname === '/health' || u.pathname === '/ping') {
     const isReady = !!(client && client.isReady());
     const ping = (client && client.ws) ? client.ws.ping : -1;
-    const bootGrace = (Date.now() - runtime.startedAt) < 120000;
+    const bootGrace = (Date.now() - runtime.startedAt) < 300000;
     const healthy = isReady || bootGrace;
     res.writeHead(healthy ? 200 : 503, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
@@ -216,7 +216,7 @@ const server = http.createServer((req, res) => {
       const all = db2.getAllUsers ? db2.getAllUsers() : [];
       const isReady = !!(client && client.isReady());
       const ping = (client && client.ws) ? client.ws.ping : -1;
-      const bootGrace = (Date.now() - runtime.startedAt) < 120000;
+      const bootGrace = (Date.now() - runtime.startedAt) < 300000;
       const statusCode = (isReady || bootGrace) ? 200 : 503;
       res.writeHead(statusCode, { 'Content-Type': 'text/plain' });
       const guilds = Array.from(client.guilds.cache.values()).map(g => `${g.id}:${g.name}:${g.memberCount}`);
@@ -290,7 +290,7 @@ const server = http.createServer((req, res) => {
     return;
   }
   const isReady = !!(client && client.isReady());
-  const bootGrace = (Date.now() - runtime.startedAt) < 120000;
+  const bootGrace = (Date.now() - runtime.startedAt) < 300000;
   if (!isReady && !bootGrace) {
     res.writeHead(503, { 'Content-Type': 'text/plain' });
     res.end(`error: discord disconnected uptime_s=${Math.floor(runtime.uptimeMs() / 1000)}`);
@@ -417,6 +417,11 @@ async function start() {
     res.on('data', c => body += c);
     res.on('end', () => {
       console.log(`[NET] Discord API: HTTP ${res.statusCode} — ${body.substring(0, 100)}`);
+      if (res.statusCode === 429) {
+        console.warn('[NET] Cloudflare Error 1015 (Discord API rate limited) — quiet backoff 180s so Cloudflare ban clears...');
+        setTimeout(() => attemptLogin('INIT_BACKOFF'), 180000);
+        return;
+      }
       attemptLogin('INIT');
     });
   });
@@ -434,10 +439,10 @@ function attemptLogin(label) {
   console.log(`[${label}] attempting login...`);
 
   const loginTimeout = setTimeout(() => {
-    console.error(`[${label}] LOGIN TIMED OUT after 60s`);
-    console.error(`[${label}] Exiting process so Render restarts us with a fresh connection...`);
-    process.exit(1);
-  }, 60000);
+    console.error(`[${label}] LOGIN TIMED OUT after 90s — likely Cloudflare rate limit (error 1015)`);
+    console.warn(`[${label}] Quiet backoff 180s so Cloudflare ban clears...`);
+    setTimeout(() => { _loginInProgress = false; attemptLogin('RETRY_BACKOFF'); }, 180000);
+  }, 90000);
 
   client.login(config.token).then(() => {
     clearTimeout(loginTimeout);
@@ -446,6 +451,11 @@ function attemptLogin(label) {
   }).catch((e) => {
     clearTimeout(loginTimeout);
     console.error(`[${label}] FAILED: code=${e.code} name=${e.name} msg=${e.message}`);
+    if (e.status === 429 || e.httpStatus === 429 || String(e.message).includes('429')) {
+      console.warn(`[${label}] Rate limited on login — quiet backoff 180s...`);
+      setTimeout(() => { _loginInProgress = false; attemptLogin('RETRY_BACKOFF'); }, 180000);
+      return;
+    }
     console.error(`[${label}] Exiting process so Render restarts us with a fresh connection...`);
     process.exit(1);
   });
