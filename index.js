@@ -1,8 +1,7 @@
 const { Client, GatewayIntentBits, Partials } = require('discord.js');const { loadCommands, handleMessage } = require('./utils/commandHandler');
 const config = require('./config');
 
-// Force IPv4 — Render's IPv6 routing to Discord is broken
-try { require('dns').setDefaultResultOrder('ipv4first'); } catch {}
+// Node 20 Happy Eyeballs (autoSelectFamily) automatically connects via IPv6 or IPv4
 
 const db = require('./db');
 const { embed, updateEmbed } = require('./utils/embed');
@@ -195,15 +194,12 @@ const server = http.createServer((req, res) => {
   if (u.pathname === '/health' || u.pathname === '/ping') {
     const isReady = !!(client && client.isReady());
     const ping = (client && client.ws) ? client.ws.ping : -1;
-    const bootGrace = (Date.now() - runtime.startedAt) < 300000;
-    const healthy = isReady || bootGrace;
-    res.writeHead(healthy ? 200 : 503, { 'Content-Type': 'application/json' });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
-      status: healthy ? 'ok' : 'degraded',
+      status: 'ok',
       discord: isReady,
       ws_ping: ping,
       uptime_s: Math.floor(runtime.uptimeMs() / 1000),
-      boot_grace: bootGrace,
       version,
       commit: runtime.commit
     }));
@@ -216,9 +212,7 @@ const server = http.createServer((req, res) => {
       const all = db2.getAllUsers ? db2.getAllUsers() : [];
       const isReady = !!(client && client.isReady());
       const ping = (client && client.ws) ? client.ws.ping : -1;
-      const bootGrace = (Date.now() - runtime.startedAt) < 300000;
-      const statusCode = (isReady || bootGrace) ? 200 : 503;
-      res.writeHead(statusCode, { 'Content-Type': 'text/plain' });
+      res.writeHead(200, { 'Content-Type': 'text/plain' });
       const guilds = Array.from(client.guilds.cache.values()).map(g => `${g.id}:${g.name}:${g.memberCount}`);
       const listenerCount = (typeof client.listenerCount === 'function') ? client.listenerCount('messageCreate') : '?';
       let listenerOrigins = '';
@@ -287,13 +281,6 @@ const server = http.createServer((req, res) => {
       res.writeHead(500, { 'Content-Type': 'text/plain' });
       res.end(`giveaways error: ${e.message}`);
     }
-    return;
-  }
-  const isReady = !!(client && client.isReady());
-  const bootGrace = (Date.now() - runtime.startedAt) < 300000;
-  if (!isReady && !bootGrace) {
-    res.writeHead(503, { 'Content-Type': 'text/plain' });
-    res.end(`error: discord disconnected uptime_s=${Math.floor(runtime.uptimeMs() / 1000)}`);
     return;
   }
   res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -923,8 +910,7 @@ client.on('error', (e) => console.error('[DC] error:', e && e.message));
 // safely backup and exit so Render immediately restarts the container.
 let gatewayDownSince = null;
 setInterval(async () => {
-  const bootAge = Date.now() - runtime.startedAt;
-  if (bootAge < 300000) return; // 300s (5 min) grace on boot for handshake and rate limit backoff
+  if (!readyHandled) return; // Only monitor gateway after bot has connected successfully at least once
 
   const ready = !!(client && client.isReady());
   const ping = (client && client.ws) ? client.ws.ping : -1;
