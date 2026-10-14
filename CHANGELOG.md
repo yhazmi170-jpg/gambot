@@ -1,5 +1,13 @@
 # Gambot Changelog (full history)
 
+## v2.1.0 patch — 24/7 Uptime Resilience & Self-Keepalive (2026-10-14, no version bump)
+- **Self-Keepalive Pinger**: Outbound HTTPS ping to `/health` every 4 minutes (240s) from inside the container. Keeps Render free-tier services awake 24/7 by resetting Render's 15-minute idle countdown automatically via real incoming HTTP requests through Cloudflare / Render routing mesh, even when external monitors fail or user machines are asleep.
+- **Gateway Health Watchdog**: Evaluates Discord connection and WebSocket ping every 15s. If disconnected or hung in a zombie/unresponsive state for >= 90s, safely runs a database backup to GitHub and triggers `process.exit(1)` so Render immediately restarts the container in 30 seconds instead of hanging indefinitely.
+- **Fail-Fast Login**: Replaced the 10-minute retry delay and broken client re-login loop with an immediate exit on login failure or 60s timeout, enabling clean container restarts.
+- **Health Check Endpoints**: Added `/health` and `/ping` returning 200 JSON when healthy or within boot grace, and 503 Service Unavailable if Discord is disconnected. Updated `/status` and `/` to report 503 during outages so UptimeRobot accurately detects true bot state.
+- **Render Healthcheck Config**: Configured `healthCheckPath: "/health"` directly on Render service `srv-db408smb7d7c739sf76g` via Render API.
+- **WASM Heap Hygiene & Rolling Restart**: Safe rolling maintenance restart every 24 hours (when active games = 0) and RSS memory watchdog (>380MB) with GitHub database backup to eliminate `memory access out of bounds` sql.js crashes.
+
 ## v2.1.0 patch — Pet Battles against Bots (`v battle bot` / `v battle`, 2026-10-13, no version bump)
 - **NEW: Battle against bots without waiting for friends on Discord.** Players can now run `v battle` (with no arguments), `v battle bot`, `v battle ai`, or mention any bot (`v battle @bot`) to instantly trigger a 3v3 pet battle against a balanced NPC Bot Trainer.
 - **Bot Team Scaling**: Bot team mirrors player team size (1-3 pets), dynamically levels up to match player team's average level, scales HP/ATK/DEF using Gambot leveling curves, rolls personality traits, and equips weapons if the player has weapons equipped.

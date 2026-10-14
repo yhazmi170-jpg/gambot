@@ -16,6 +16,7 @@ const { version } = require('./package.json');
 const logger = require('./utils/logger');
 const { setClient: setLogClient } = logger;
 const giveaway = require('./utils/giveaway');
+const { backup, restore } = require('./backup');
 
 // In-memory guards so the 60s sweep can never process the same giveaway twice in one tick.
 const gwProcessing = new Set();
@@ -176,7 +177,6 @@ const server = http.createServer((req, res) => {
     return;
   }
   if (u.pathname === '/restore') {
-    const { restore } = require('./backup');
     restore().then(r => {
       const db2 = require('./db');
       db2.init().then(() => {
@@ -192,17 +192,39 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
+  if (u.pathname === '/health' || u.pathname === '/ping') {
+    const isReady = !!(client && client.isReady());
+    const ping = (client && client.ws) ? client.ws.ping : -1;
+    const bootGrace = (Date.now() - runtime.startedAt) < 120000;
+    const healthy = isReady || bootGrace;
+    res.writeHead(healthy ? 200 : 503, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      status: healthy ? 'ok' : 'degraded',
+      discord: isReady,
+      ws_ping: ping,
+      uptime_s: Math.floor(runtime.uptimeMs() / 1000),
+      boot_grace: bootGrace,
+      version,
+      commit: runtime.commit
+    }));
+    return;
+  }
   if (u.pathname === '/status') {
     try {
       const db2 = require('./db');
       const top = db2.getTop(5);
       const all = db2.getAllUsers ? db2.getAllUsers() : [];
-      res.writeHead(200, { 'Content-Type': 'text/plain' });
+      const isReady = !!(client && client.isReady());
+      const ping = (client && client.ws) ? client.ws.ping : -1;
+      const bootGrace = (Date.now() - runtime.startedAt) < 120000;
+      const statusCode = (isReady || bootGrace) ? 200 : 503;
+      res.writeHead(statusCode, { 'Content-Type': 'text/plain' });
       const guilds = Array.from(client.guilds.cache.values()).map(g => `${g.id}:${g.name}:${g.memberCount}`);
       const listenerCount = (typeof client.listenerCount === 'function') ? client.listenerCount('messageCreate') : '?';
       let listenerOrigins = '';
       try { listenerOrigins = '[' + ((client.rawListeners && client.rawListeners('messageCreate')) || []).map(l => String(l.name || 'anon')).filter(Boolean).join(',') + ']'; } catch (e) {}
-      res.end(`users=${all.length} top=${JSON.stringify(top)} discord=${client.isReady()} token_len=${(config.token||'').length} node=${process.version} guilds=${guilds.length} list=[${guilds.join(' | ')}] boot_id=${runtime.shortId()} pid=${process.pid} started=${runtime.startedIso} uptime_s=${Math.floor(runtime.uptimeMs() / 1000)} msg_listeners=${listenerCount} msg_listener_origins=${listenerOrigins} commit=${runtime.commit}`);
+      const memRss = Math.round(process.memoryUsage().rss / 1024 / 1024);
+      res.end(`users=${all.length} top=${JSON.stringify(top)} discord=${isReady} ws_ping=${ping} mem_rss_mb=${memRss} token_len=${(config.token||'').length} node=${process.version} guilds=${guilds.length} list=[${guilds.join(' | ')}] boot_id=${runtime.shortId()} pid=${process.pid} started=${runtime.startedIso} uptime_s=${Math.floor(runtime.uptimeMs() / 1000)} msg_listeners=${listenerCount} msg_listener_origins=${listenerOrigins} commit=${runtime.commit}`);
     } catch (e) {
       res.writeHead(500, { 'Content-Type': 'text/plain' });
       res.end(`status error: ${e.message}`);
@@ -267,11 +289,34 @@ const server = http.createServer((req, res) => {
     }
     return;
   }
+  const isReady = !!(client && client.isReady());
+  const bootGrace = (Date.now() - runtime.startedAt) < 120000;
+  if (!isReady && !bootGrace) {
+    res.writeHead(503, { 'Content-Type': 'text/plain' });
+    res.end(`error: discord disconnected uptime_s=${Math.floor(runtime.uptimeMs() / 1000)}`);
+    return;
+  }
   res.writeHead(200, { 'Content-Type': 'text/plain' });
   res.end(`ok v${version} commit=${process.env.RENDER_GIT_COMMIT || process.env.GIT_SHA || 'unknown'}`);
 });
 server.listen(PORT);
 global._server = server;
+
+// Self-keepalive: Render free tier spins down after 15 min of no incoming HTTP traffic.
+// We ping our own public URL (/health) every 4 min (240s) from inside the container.
+// The outbound HTTPS request routes through Cloudflare and hits Render's load balancer
+// as real incoming HTTP traffic, resetting the 15-minute idle countdown automatically.
+const KEEPALIVE_URL = process.env.RENDER_EXTERNAL_URL || 'https://gambot-ovib.onrender.com';
+setInterval(() => {
+  try {
+    const https = require('https');
+    https.get(`${KEEPALIVE_URL}/health`, { timeout: 15000 }, (res) => {
+      res.resume();
+    }).on('error', (e) => {
+      dlog.log({ kind: 'self_ping_warn', err: e.message });
+    });
+  } catch (e) {}
+}, 240000);
 
 let bootNotified = false;
 let _loginInProgress = false;
@@ -312,7 +357,6 @@ loadCommands();
 
 async function start() {
   console.log('[START] 1/4 restore...');
-  const { restore } = require('./backup');
   let restored = null;
   try {
     restored = await restore();
@@ -390,12 +434,10 @@ function attemptLogin(label) {
   console.log(`[${label}] attempting login...`);
 
   const loginTimeout = setTimeout(() => {
-    console.error(`[${label}] LOGIN TIMED OUT after 120s — likely rate limited (error 1015)`);
-    console.error(`[${label}] Waiting 10 minutes before retry...`);
-    try { client.destroy(); } catch {}
-    // Keep _loginInProgress true so watchdog doesn't spam
-    setTimeout(() => { _loginInProgress = false; attemptLogin('RETRY'); }, 600000);
-  }, 120000);
+    console.error(`[${label}] LOGIN TIMED OUT after 60s`);
+    console.error(`[${label}] Exiting process so Render restarts us with a fresh connection...`);
+    process.exit(1);
+  }, 60000);
 
   client.login(config.token).then(() => {
     clearTimeout(loginTimeout);
@@ -404,12 +446,8 @@ function attemptLogin(label) {
   }).catch((e) => {
     clearTimeout(loginTimeout);
     console.error(`[${label}] FAILED: code=${e.code} name=${e.name} msg=${e.message}`);
-    if (e.code === 0 || e.httpStatus === 429) {
-      console.error(`[${label}] Rate limited — waiting 10 minutes`);
-      setTimeout(() => { _loginInProgress = false; attemptLogin('RETRY'); }, 600000);
-    } else {
-      setTimeout(() => { _loginInProgress = false; attemptLogin('RETRY'); }, 60000);
-    }
+    console.error(`[${label}] Exiting process so Render restarts us with a fresh connection...`);
+    process.exit(1);
   });
 }
 
@@ -489,7 +527,6 @@ start().catch(e => console.error('[START] FATAL:', e));
   // backup every 5 min + restore on boot (keeps data alive across Render restarts).
   // NOTE: NO setTimeout kick here — the very first backup must NOT race restore()/db.init(),
   // and a seed/fresh DB must never be pushed. First backup lands ~5 min after ready.
-  const { backup } = require('./backup');
   const doBackup = () => {
     console.log('backup: starting scheduled backup...');
     backup().then(() => console.log('backup: completed')).catch(e => console.error('BACKUP FAILED:', e && e.message));
@@ -866,18 +903,50 @@ client.on('guildCreate', (g) => {
   } catch (e) { console.error('[server-gate] guildCreate failed:', e && e.message); }
 });
 
-client.on('disconnect', (e) => { console.log('[DC] disconnected:', e.code, e.reason); });
+client.on('disconnect', (e) => { console.warn(`[DC] disconnected: code=${e && e.code} reason=${e && e.reason}`); });
 client.on('reconnecting', () => { startupNotifier.gatewayReconnecting(); });
 client.on('resume', () => { startupNotifier.gatewayResumed(); });
-client.on('error', (e) => console.error('[DC] error:', e.message));
+client.on('error', (e) => console.error('[DC] error:', e && e.message));
 
-// Watchdog: if not connected, re-login every 2 minutes
-setInterval(() => {
-  if (!client.isReady()) {
-    console.log('[WATCHDOG] not connected, attempting login...');
-    attemptLogin('WATCHDOG');
+// Gateway Watchdog: runs every 15s. Detects dropped connections, zombie websockets,
+// or hung shards. If disconnected/unresponsive for >= 90 seconds (outside boot grace),
+// safely backup and exit so Render immediately restarts the container.
+let gatewayDownSince = null;
+setInterval(async () => {
+  const bootAge = Date.now() - runtime.startedAt;
+  if (bootAge < 90000) return; // 90s grace on boot for initial handshake
+
+  const ready = !!(client && client.isReady());
+  const ping = (client && client.ws) ? client.ws.ping : -1;
+  const isHealthy = ready && ping >= 0 && ping < 30000;
+
+  if (isHealthy) {
+    if (gatewayDownSince) {
+      console.log(`[GATEWAY_WATCHDOG] recovered after ${Math.floor((Date.now() - gatewayDownSince) / 1000)}s`);
+      gatewayDownSince = null;
+    }
+    return;
   }
-}, 120000);
+
+  if (!gatewayDownSince) {
+    gatewayDownSince = Date.now();
+    console.warn(`[GATEWAY_WATCHDOG] connection unhealthy: ready=${ready} ping=${ping}`);
+    return;
+  }
+
+  const downSec = Math.floor((Date.now() - gatewayDownSince) / 1000);
+  console.warn(`[GATEWAY_WATCHDOG] connection unhealthy for ${downSec}s (ready=${ready} ping=${ping})`);
+
+  if (downSec >= 90) {
+    console.error(`[GATEWAY_WATCHDOG] FATAL: gateway down for ${downSec}s — backing up and exiting for Render restart`);
+    try {
+      await Promise.race([backup(), new Promise(r => setTimeout(r, 8000))]);
+    } catch (e) {
+      console.error('[GATEWAY_WATCHDOG] backup before exit failed:', e && e.message);
+    }
+    process.exit(1);
+  }
+}, 15000);
 
 client.on('messageCreate', function handleMessageEvent(message) {
   try {
@@ -976,3 +1045,22 @@ async function shutdown(signal) {
 }
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
+
+// Rolling maintenance & memory watchdog:
+// 1) Memory leak protection: if RSS exceeds 380MB (Render free limit 512MB), restart cleanly
+// 2) 24h rolling restart: sql.js WASM heap degrades after ~48h. A clean restart every 24h
+//    during an idle moment (0 active games) keeps WASM fresh with 0 data loss.
+setInterval(async () => {
+  const rssMb = Math.round(process.memoryUsage().rss / 1024 / 1024);
+  const uptimeHours = runtime.uptimeMs() / (3600 * 1000);
+
+  if (rssMb > 380) {
+    console.warn(`[MEMORY_WATCHDOG] High RSS memory (${rssMb}MB > 380MB) — triggering clean restart`);
+    await shutdown('MEMORY_WATCHDOG');
+  }
+
+  if (uptimeHours >= 24 && activeGames.size === 0) {
+    console.log(`[MAINTENANCE] 24h uptime reached (${uptimeHours.toFixed(1)}h) and 0 active games — rolling restart for WASM heap hygiene`);
+    await shutdown('MAINTENANCE_24H');
+  }
+}, 180000); // check every 3 min
