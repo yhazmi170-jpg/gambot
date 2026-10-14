@@ -5,12 +5,17 @@
 
 ## Status
 - **Branch**: `master`, version **2.1.0** — small-patch path (no version bump / `update_msg.txt` since 2.1.0; small changes go to `pending_updates.txt`).
-- **LATEST CHANGE (2026-10-13): Pet battles against bots (`v battle bot` / `v battle`)** — players can now battle without waiting for friends on Discord. Bare `v battle`, `v battle bot`, `v battle ai`, or mentioning any bot (@bot) triggers an immediate 3v3 battle against a dynamically scaled NPC Bot Trainer. Full victory rewards (coins, XP, battle pass, ~8% weapon crate drops, pet leveling/bond). PvP against human friends (`v battle @friend`) preserved. Smoke suite green (104 PASS, 25 EXPECTED, 0 FAIL). Added `scripts/test-battle-bot.js` (6/6 PASS).
+- **LATEST CHANGE (2026-10-14): 24/7 Uptime Resilience & Self-Keepalive** — solved the random silent deaths and spin-downs:
+  1. **Self-Keepalive Pinger**: Outbound HTTPS ping to `/health` every 4 minutes (240s) from inside the container keeps Render free-tier awake 24/7 by defeating the 15-minute idle spin-down automatically, even when external monitors or user PCs sleep.
+  2. **Gateway Health Watchdog**: Checks `client.isReady()` and `client.ws.ping` every 15s. Disconnected/zombie socket states >= 90s trigger automatic database backup and `process.exit(1)`, so Render cleanly reboots the container in 30s instead of hanging indefinitely.
+  3. **Fail-Fast Login**: Eliminated the 10-minute retry dead-lock in `attemptLogin`; failures and 60s timeouts immediately exit for a fresh container restart.
+  4. **Health Check Endpoints**: Added `/health` and `/ping` (200 JSON healthy / 503 degraded); updated `/status` and `/` to report 503 during outages. Configured `healthCheckPath: "/health"` directly on Render via API.
+  5. **WASM Heap Rolling Maintenance**: Clean rolling restart every 24h (when 0 active games) + RSS memory watchdog (>380MB) with GitHub backup prevents sql.js WASM heap fragmentation and out-of-bounds crashes.
 - **Target deploy**: Render service `gambot` -> `https://gambot-ovib.onrender.com`.
 
 ## NEXT ACTION
-- **Deploy**: Run `/home/yxx1/bin/deploy-gambot.sh "feat: bot battles (v battle bot / v battle bare)"` to push to master and trigger Render auto-redeploy.
-- **Eyeball**: Verify `curl -s https://gambot-ovib.onrender.com/status` returns the new commit and 200 OK.
+- **Deploy**: Run `/home/yxx1/bin/deploy-gambot.sh "fix: 24/7 uptime resilience, self-keepalive, and gateway watchdog"` to push to master and trigger Render auto-redeploy.
+- **Eyeball**: Verify `curl -s https://gambot-ovib.onrender.com/health` returns status:ok and 200 OK.
 
 ## Done recently (2026-10-13) — `v battle` against bots (NPC Bot Trainer)
 - [x] **Bot battles supported:** `v battle` (with no args), `v battle bot`, `v battle ai`, `v battle npc`, or mentioning a bot (`v battle @bot`) starts an immediate battle against an NPC Bot Trainer team.
