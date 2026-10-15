@@ -137,18 +137,25 @@ async function detectCorruption(buf) {
 
 let backupCounter = 0;
 
-async function backup() {
+let _lastBackedUpHash = null;
+async function backup(opts = {}) {
+  const force = typeof opts === 'object' && opts ? !!opts.force : false;
   console.log(`backup: DB_PATH=${DB_PATH}, exists=${fs.existsSync(DB_PATH)}`);
-  if (!fs.existsSync(DB_PATH)) { console.log('backup: no db file, skipping'); return; }
+  if (!fs.existsSync(DB_PATH)) { console.log('backup: no db file, skipping'); return { ok: false, reason: 'no_db_file' }; }
   const buf = fs.readFileSync(DB_PATH);
   console.log(`backup: DB size=${buf.length} bytes`);
   const dbHash = sha256(buf).slice(0, 16);
   console.log(`backup: sha256=${dbHash}`);
 
+  if (!force && _lastBackedUpHash === dbHash) {
+    console.log(`backup: DB unchanged (${dbHash}), skipping duplicate upload`);
+    return { ok: true, skipped: true, hash: dbHash };
+  }
+
   // Guard: NEVER upload the bundled seed DB as production data
   if (isSeed(buf)) {
     console.error(`backup: SKIPPED — DB is byte-identical to bundled seed.db (${dbHash}); refusing to push seed as production backup`);
-    return;
+    return { ok: false, reason: 'seed_db' };
   }
 
   // Validate DB structure
@@ -208,7 +215,9 @@ async function backup() {
       await saveGoldenBackup(buf);
     }
 
+    _lastBackedUpHash = dbHash;
     console.log(`backed up to github (${snapPath})`);
+    return { ok: true, hash: dbHash, path: snapPath, users };
   } catch (e) {
     console.error('backup FAILED:', e.message);
     throw e;
