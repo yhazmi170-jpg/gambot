@@ -117,7 +117,7 @@ function acquireLock() {
       let stale = true;
       try {
         const oldPid = parseInt(fs.readFileSync(lockFile, 'utf8').trim());
-        if (oldPid) {
+        if (oldPid && oldPid !== process.pid) {
           try {
             const cmd = fs.readFileSync(`/proc/${oldPid}/cmdline`, 'utf8');
             if (cmd.includes('index.js')) {
