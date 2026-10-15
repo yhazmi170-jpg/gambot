@@ -175,6 +175,16 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
+  if (u.pathname === '/backup') {
+    backup({ force: true }).then(r => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, status: 'backup_completed', result: r, now: Date.now() }));
+    }).catch(e => {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: e.message }));
+    });
+    return;
+  }
   if (u.pathname === '/restore') {
     restore().then(r => {
       const db2 = require('./db');
@@ -520,14 +530,13 @@ start().catch(e => console.error('[START] FATAL:', e));
     }
   }, 3600000);
 
-  // backup every 5 min + restore on boot (keeps data alive across Render restarts).
-  // NOTE: NO setTimeout kick here — the very first backup must NOT race restore()/db.init(),
-  // and a seed/fresh DB must never be pushed. First backup lands ~5 min after ready.
+  // backup every 60s (auto-skips if DB unchanged) + restore on boot.
   const doBackup = () => {
-    console.log('backup: starting scheduled backup...');
-    backup().then(() => console.log('backup: completed')).catch(e => console.error('BACKUP FAILED:', e && e.message));
+    backup().then(r => {
+      if (r && !r.skipped) console.log('backup: completed cloud snapshot', r.path);
+    }).catch(e => console.error('BACKUP FAILED:', e && e.message));
   };
-  setInterval(doBackup, 300000);
+  setInterval(doBackup, 60000);
 
   // DB watchdog (2026-10-03 incident): after ~2 days uptime the sql.js WASM heap
   // died with "memory access out of bounds" — every DB read threw, so the bot went
