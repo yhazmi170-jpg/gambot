@@ -12,17 +12,20 @@
   - Continuous 24/7 uptime without idle sleep timers.
   - Clean IP reputation, zero Cloudflare rate limits.
   - Database restored cleanly from cloud backup: 804 users, 11,843 snapshots, zero data lost.
-- **RECENT FIXES IN CODE**:
-  1. **Production Guard Generalization**: `index.js` now recognizes `BOT_HOSTING`, `RENDER`, and `PRODUCTION` environment flags.
-  2. **Container PID Reuse Bug**: Fixed lockfile false positive where a restarted container with recycled PID (e.g. PID 7) matched its own PID in `/proc/${oldPid}/cmdline` and triggered an immediate self-exit.
-  3. **Universal Keepalive Pinger**: Handles both HTTP and HTTPS endpoints cleanly with optional `KEEPALIVE_URL` override.
+- **RECENT FIXES & FEATURES (2026-10-16)**:
+  1. **Instant Cloud Backup System**:
+     - `v backup` Discord command: Owner can force an instant database snapshot push to GitHub anytime with real-time feedback.
+     - `GET /backup` HTTP endpoint (`http://fi10.bot-hosting.cloud:25018/backup`): Allows one-click / curl triggered instant snapshots.
+     - 60s Auto-Sync: Cloud backup interval reduced from 5 min to 60s with hash-caching (`_lastBackedUpHash`) so only real data changes push commits.
+     - Local NVMe Persistence: SQLite transactions call `db.save()` synchronously with `fs.fsyncSync(fd)` on every single write, surviving restarts instantly.
+  2. **Production Guard Generalization**: `index.js` now recognizes `BOT_HOSTING`, `RENDER`, and `PRODUCTION` environment flags.
+  3. **Container PID Reuse Bug**: Fixed lockfile false positive where a restarted container with recycled PID (e.g. PID 7) matched its own PID in `/proc/${oldPid}/cmdline` and triggered an immediate self-exit.
+  4. **Universal Keepalive Pinger**: Handles both HTTP and HTTPS endpoints cleanly with optional `KEEPALIVE_URL` override.
 - **LIVE STATUS**:
-  - `http://fi10.bot-hosting.cloud:25018/status` -> HTTP 200 (`discord=true`, `users=804`, `guilds=4`, `boot_id=ff2cf352`)
-  - `http://fi10.bot-hosting.cloud:25018/health` -> HTTP 200 (`status="ok"`, `discord=true`)
-  - Discord logged in as `ovo#7700`, owner startup DM delivered, chat commands (`v version`, etc.) active and responding in real-time.
-
-## NEXT ACTION
-- Update external monitor (UptimeRobot, etc.) to target `http://fi10.bot-hosting.cloud:25018/health`.
+  - `http://fi10.bot-hosting.cloud:25018/status` -> HTTP 200 (`discord=true`, `users=804`, `guilds=4`, `boot_id=98d9e65b`)
+  - `http://fi10.bot-hosting.cloud:25018/health` -> HTTP 200 (`status="ok"`, `discord=true`, `ws_ping=125`)
+  - `http://fi10.bot-hosting.cloud:25018/backup` -> HTTP 200 (`status="backup_completed"`, snapshot verified on GitHub)
+  - Discord logged in as `ovo#7700`, owner startup DM delivered, chat commands (`v version`, `v backup`) active and responding in real-time.
 
 ## Done recently (2026-10-13) — `v battle` against bots (NPC Bot Trainer)
 - [x] **Bot battles supported:** `v battle` (with no args), `v battle bot`, `v battle ai`, `v battle npc`, or mentioning a bot (`v battle @bot`) starts an immediate battle against an NPC Bot Trainer team.
