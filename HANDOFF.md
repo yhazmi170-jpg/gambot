@@ -4,19 +4,25 @@
 > Read `AGENTS.md` first (incl. the "Two-agent workflow" section), then this.
 
 ## Status
-- **Branch**: `master`, version **2.1.0** — small-patch path (no version bump / `update_msg.txt` since 2.1.0; small changes go to `pending_updates.txt`).
-- **LATEST CHANGE (2026-10-14): 24/7 Uptime Resilience & Self-Keepalive** — solved the random silent deaths and spin-downs:
-  1. **Self-Keepalive Pinger**: Outbound HTTPS ping to `/health` every 4 minutes (240s) from inside the container keeps Render free-tier awake 24/7 by defeating the 15-minute idle spin-down automatically, even when external monitors or user PCs sleep.
-  2. **Gateway Health Watchdog**: Checks `client.isReady()` and `client.ws.ping` every 15s. Disconnected/zombie socket states >= 90s trigger automatic database backup and `process.exit(1)`, so Render cleanly reboots the container in 30s instead of hanging indefinitely.
-  3. **Fail-Fast Login**: Eliminated the 10-minute retry dead-lock in `attemptLogin`; failures and 60s timeouts immediately exit for a fresh container restart.
-  4. **Health Check Endpoints**: Added `/health` and `/ping` (200 JSON healthy / 503 degraded); updated `/status` and `/` to report 503 during outages. Configured `healthCheckPath: "/health"` directly on Render via API.
-  5. **WASM Heap Rolling Maintenance**: Clean rolling restart every 24h (when 0 active games) + RSS memory watchdog (>380MB) with GitHub backup prevents sql.js WASM heap fragmentation and out-of-bounds crashes.
-- **Target deploy**: Render service `gambot-fra` (`srv-db7mcc2d0e5s73ecv6s0`) -> `https://gambot-fra.onrender.com` (Frankfurt region, bypassing Oregon Cloudflare 1015 rate limit). Oregon service suspended.
-- **LIVE STATUS**: `commit=d01a369`, `discord=true`, `guilds=4`, `users=804` on Frankfurt node.
+- **Branch**: `master`, version **2.1.0**.
+- **INCIDENT (2026-10-15/16): Render Monthly Free-Tier Hours Exhausted (750h)**:
+  - Render free tier provides 750 free instance hours per calendar month per account.
+  - Due to dual-service run or mid-month accumulation, the Render account (`tea-db403t2j9qps73flphi0`) consumed all 750h.
+  - Render automatically marked `srv-db7mcc2d0e5s73ecv6s0` (`gambot-fra`) suspended with `HTTP 503` / `x-render-routing: suspend-by-user`.
+- **EVALUATED HOSTING ALTERNATIVES**:
+  1. **Koyeb (Primary Recommendation)**: Free Eco Nano service (512MB RAM), connects to GitHub, continuous deployment, **no 750h monthly cap**. Self-keepalive (pings every 4m) + UptimeRobot defeats the 1h idle sleep.
+  2. **Bot-Hosting.net / Wispbyte**: Dedicated free Discord bot Pterodactyl hosting (Node.js 20). No sleep timer; requires periodic free renewal.
+  3. **Oracle Cloud Infrastructure (OCI Always Free)**: 24/7 dedicated Linux VPS for life (no sleep, no hour limits). Requires credit card verification.
+  4. **Secondary Render Account**: Quick 0-code fix to get a fresh 750h block for remainder of month.
+- **RECENT CHANGES COMPLETED**:
+  1. **NPC Bot Trainer Battles (`v battle bot` / `v battle ai`)**: Full offline training against scaling bot teams when friends are offline, complete with rewards, level scaling, and crates.
+  2. **24/7 Uptime Resilience & Self-Keepalive**: Built-in 4-minute self-pinger, 15s gateway health watchdog with auto-exit/restart on 90s socket hang, fail-fast login, WASM heap 24h rolling maintenance.
+  3. **Frankfurt Migration**: Fixed Oregon Cloudflare 429 Error 1015 IP ban by migrating to Frankfurt egress.
 
 ## NEXT ACTION
-- **UptimeRobot**: User should ensure their UptimeRobot monitor points to `https://gambot-fra.onrender.com/health` (or `/`).
-- **Eyeball**: Verify `curl -s https://gambot-fra.onrender.com/status` returns `discord=true`.
+- Choose hosting platform (Koyeb or secondary Render account for fastest switchover).
+- If Koyeb: connect GitHub `gambot` repo, copy env vars (`TOKEN`, `GITHUB_TOKEN`, `DB_PATH`), update UptimeRobot monitor URL to `*.koyeb.app/health`.
+- If new Render account: generate new API key, deploy via CLI / dashboard, point UptimeRobot.
 
 ## Done recently (2026-10-13) — `v battle` against bots (NPC Bot Trainer)
 - [x] **Bot battles supported:** `v battle` (with no args), `v battle bot`, `v battle ai`, `v battle npc`, or mentioning a bot (`v battle @bot`) starts an immediate battle against an NPC Bot Trainer team.
