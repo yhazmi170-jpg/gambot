@@ -5,24 +5,24 @@
 
 ## Status
 - **Branch**: `master`, version **2.1.0**.
-- **INCIDENT (2026-10-15/16): Render Monthly Free-Tier Hours Exhausted (750h)**:
-  - Render free tier provides 750 free instance hours per calendar month per account.
-  - Due to dual-service run or mid-month accumulation, the Render account (`tea-db403t2j9qps73flphi0`) consumed all 750h.
-  - Render automatically marked `srv-db7mcc2d0e5s73ecv6s0` (`gambot-fra`) suspended with `HTTP 503` / `x-render-routing: suspend-by-user`.
-- **EVALUATED HOSTING ALTERNATIVES**:
-  1. **Koyeb (Primary Recommendation)**: Free Eco Nano service (512MB RAM), connects to GitHub, continuous deployment, **no 750h monthly cap**. Self-keepalive (pings every 4m) + UptimeRobot defeats the 1h idle sleep.
-  2. **Bot-Hosting.net / Wispbyte**: Dedicated free Discord bot Pterodactyl hosting (Node.js 20). No sleep timer; requires periodic free renewal.
-  3. **Oracle Cloud Infrastructure (OCI Always Free)**: 24/7 dedicated Linux VPS for life (no sleep, no hour limits). Requires credit card verification.
-  4. **Secondary Render Account**: Quick 0-code fix to get a fresh 750h block for remainder of month.
-- **RECENT CHANGES COMPLETED**:
-  1. **NPC Bot Trainer Battles (`v battle bot` / `v battle ai`)**: Full offline training against scaling bot teams when friends are offline, complete with rewards, level scaling, and crates.
-  2. **24/7 Uptime Resilience & Self-Keepalive**: Built-in 4-minute self-pinger, 15s gateway health watchdog with auto-exit/restart on 90s socket hang, fail-fast login, WASM heap 24h rolling maintenance.
-  3. **Frankfurt Migration**: Fixed Oregon Cloudflare 429 Error 1015 IP ban by migrating to Frankfurt egress.
+- **DEPLOYMENT: LIVE ON BOT-HOSTING.NET (2026-10-16)**:
+  - Migrated from Render (after 750h free tier exhaustion) to Bot-Hosting.net dedicated Node.js 20 container.
+  - Deployment ID: `1fe4bc97-1951-4fdb-8edb-f54ee2587e19` ("gambot").
+  - Node: `fi10.bot-hosting.cloud` (Finland), port `25018`.
+  - Continuous 24/7 uptime without idle sleep timers.
+  - Clean IP reputation, zero Cloudflare rate limits.
+  - Database restored cleanly from cloud backup: 804 users, 11,843 snapshots, zero data lost.
+- **RECENT FIXES IN CODE**:
+  1. **Production Guard Generalization**: `index.js` now recognizes `BOT_HOSTING`, `RENDER`, and `PRODUCTION` environment flags.
+  2. **Container PID Reuse Bug**: Fixed lockfile false positive where a restarted container with recycled PID (e.g. PID 7) matched its own PID in `/proc/${oldPid}/cmdline` and triggered an immediate self-exit.
+  3. **Universal Keepalive Pinger**: Handles both HTTP and HTTPS endpoints cleanly with optional `KEEPALIVE_URL` override.
+- **LIVE STATUS**:
+  - `http://fi10.bot-hosting.cloud:25018/status` -> HTTP 200 (`discord=true`, `users=804`, `guilds=4`, `boot_id=ff2cf352`)
+  - `http://fi10.bot-hosting.cloud:25018/health` -> HTTP 200 (`status="ok"`, `discord=true`)
+  - Discord logged in as `ovo#7700`, owner startup DM delivered, chat commands (`v version`, etc.) active and responding in real-time.
 
 ## NEXT ACTION
-- Choose hosting platform (Koyeb or secondary Render account for fastest switchover).
-- If Koyeb: connect GitHub `gambot` repo, copy env vars (`TOKEN`, `GITHUB_TOKEN`, `DB_PATH`), update UptimeRobot monitor URL to `*.koyeb.app/health`.
-- If new Render account: generate new API key, deploy via CLI / dashboard, point UptimeRobot.
+- Update external monitor (UptimeRobot, etc.) to target `http://fi10.bot-hosting.cloud:25018/health`.
 
 ## Done recently (2026-10-13) — `v battle` against bots (NPC Bot Trainer)
 - [x] **Bot battles supported:** `v battle` (with no args), `v battle bot`, `v battle ai`, `v battle npc`, or mentioning a bot (`v battle @bot`) starts an immediate battle against an NPC Bot Trainer team.
