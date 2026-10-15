@@ -83,10 +83,10 @@ if (!config.token) {
   process.exit(1);
 }
 
-// HARD GUARD: only run on Render. Prevents the local dev copy from ever
-// booting as the production bot (double-instance wiped player data on 2026-09-07).
-if (!process.env.RENDER) {
-  console.error('refusing to start: this bot is production-only (Render). Local dev copies must NOT run.');
+// HARD GUARD: only run on cloud production environments (Render, Bot-Hosting, etc.).
+// Prevents the local dev copy from ever booting as the production bot.
+if (!process.env.RENDER && !process.env.BOT_HOSTING && !process.env.PRODUCTION) {
+  console.error('refusing to start: this bot is production-only (cloud). Local dev copies must NOT run.');
   process.exit(1);
 }
 
@@ -293,11 +293,11 @@ global._server = server;
 // We ping our own public URL (/health) every 4 min (240s) from inside the container.
 // The outbound HTTPS request routes through Cloudflare and hits Render's load balancer
 // as real incoming HTTP traffic, resetting the 15-minute idle countdown automatically.
-const KEEPALIVE_URL = process.env.RENDER_EXTERNAL_URL || 'https://gambot-ovib.onrender.com';
+const KEEPALIVE_URL = process.env.KEEPALIVE_URL || process.env.RENDER_EXTERNAL_URL || 'http://fi10.bot-hosting.cloud:25018';
 setInterval(() => {
   try {
-    const https = require('https');
-    https.get(`${KEEPALIVE_URL}/health`, { timeout: 15000 }, (res) => {
+    const proto = KEEPALIVE_URL.startsWith('https') ? require('https') : require('http');
+    proto.get(`${KEEPALIVE_URL}/health`, { timeout: 15000 }, (res) => {
       res.resume();
     }).on('error', (e) => {
       dlog.log({ kind: 'self_ping_warn', err: e.message });
@@ -352,12 +352,12 @@ async function start() {
     console.error('[START] restore failed:', e.message);
   }
 
-  // PERMANENT RULE: on Render production, NEVER boot on a seed/fresh/empty DB.
+  // PERMANENT RULE: on cloud production, NEVER boot on a seed/fresh/empty DB.
   // Valid production backup -> restore -> validate -> start Discord.
   // No valid production backup -> refuse to boot (fail loudly, no silent seed).
-  const onRender = !!(process.env.RENDER || process.env.RENDER_SERVICE_ID || process.env.RENDER_EXTERNAL_URL);
-  if (onRender && (!restored || !restored.ok || restored.seed)) {
-    console.error('[START] FATAL: RENDER production has NO valid production DB (restore source=' + (restored && restored.source) + ').');
+  const onProd = !!(process.env.RENDER || process.env.BOT_HOSTING || process.env.PRODUCTION || process.env.RENDER_SERVICE_ID || process.env.RENDER_EXTERNAL_URL);
+  if (onProd && (!restored || !restored.ok || restored.seed)) {
+    console.error('[START] FATAL: Production has NO valid production DB (restore source=' + (restored && restored.source) + ').');
     console.error('[START] FATAL: Refusing to start the bot with seed/fresh data. Set a valid GITHUB_TOKEN to restore the real backup.');
     process.exit(1);
   }
@@ -366,9 +366,8 @@ async function start() {
   await db.init();
 
   // If DB is empty after init, try loading seed.db directly — LOCAL DEV ONLY.
-  // On Render production this must NEVER happen: the no-seed-boot rule above has already exited.
-  const onRender2 = !!(process.env.RENDER || process.env.RENDER_SERVICE_ID || process.env.RENDER_EXTERNAL_URL);
-  if (!onRender2) {
+  // On cloud production this must NEVER happen: the no-seed-boot rule above has already exited.
+  if (!onProd) {
     try {
       const top = db.getTop(1);
       if (!top || top.length === 0) {
