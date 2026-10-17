@@ -107,6 +107,12 @@ if (!process.env.GAMBOT_WORKER) {
   process.on('SIGTERM', () => forwardSignal('SIGTERM'));
   process.on('SIGINT', () => forwardSignal('SIGINT'));
 
+  // Clean any stale lockfile from prior container runs before starting first worker
+  try {
+    const fs = require('fs');
+    fs.unlinkSync(path.join(__dirname, '.gambot.lock'));
+  } catch {}
+
   const startWorker = () => {
     const startedAt = Date.now();
     console.log('[SUPERVISOR] Starting Gambot worker process...');
@@ -163,7 +169,7 @@ function acquireLock() {
       let stale = true;
       try {
         const oldPid = parseInt(fs.readFileSync(lockFile, 'utf8').trim());
-        if (oldPid && oldPid !== process.pid) {
+        if (oldPid && oldPid !== process.pid && oldPid !== process.ppid) {
           try {
             const cmd = fs.readFileSync(`/proc/${oldPid}/cmdline`, 'utf8');
             if (cmd.includes('index.js')) {
