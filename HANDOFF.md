@@ -4,28 +4,26 @@
 > Read `AGENTS.md` first (incl. the "Two-agent workflow" section), then this.
 
 ## Status
-- **Branch**: `master`, version **2.1.0**.
-- **DEPLOYMENT: LIVE ON BOT-HOSTING.NET (2026-10-16)**:
-  - Migrated from Render (after 750h free tier exhaustion) to Bot-Hosting.net dedicated Node.js 20 container.
-  - Deployment ID: `1fe4bc97-1951-4fdb-8edb-f54ee2587e19` ("gambot").
+- **Branch**: `master`, version **2.1.0** (commit `ccb0b56`).
+- **DEPLOYMENT: LIVE ON BOT-HOSTING.NET (2026-10-17)**:
+  - Migrated from Render to Bot-Hosting.net dedicated Node.js 20 container (`1fe4bc97-1951-4fdb-8edb-f54ee2587e19`).
   - Node: `fi10.bot-hosting.cloud` (Finland), port `25018`.
-  - Continuous 24/7 uptime without idle sleep timers.
-  - Clean IP reputation, zero Cloudflare rate limits.
-  - Database restored cleanly from cloud backup: 804 users, 11,843 snapshots, zero data lost.
-- **RECENT FIXES & FEATURES (2026-10-16)**:
-  1. **Instant Cloud Backup System**:
-     - `v backup` Discord command: Owner can force an instant database snapshot push to GitHub anytime with real-time feedback.
-     - `GET /backup` HTTP endpoint (`http://fi10.bot-hosting.cloud:25018/backup`): Allows one-click / curl triggered instant snapshots.
-     - 60s Auto-Sync: Cloud backup interval reduced from 5 min to 60s with hash-caching (`_lastBackedUpHash`) so only real data changes push commits.
-     - Local NVMe Persistence: SQLite transactions call `db.save()` synchronously with `fs.fsyncSync(fd)` on every single write, surviving restarts instantly.
-  2. **Production Guard Generalization**: `index.js` now recognizes `BOT_HOSTING`, `RENDER`, and `PRODUCTION` environment flags.
-  3. **Container PID Reuse Bug**: Fixed lockfile false positive where a restarted container with recycled PID (e.g. PID 7) matched its own PID in `/proc/${oldPid}/cmdline` and triggered an immediate self-exit.
-  4. **Universal Keepalive Pinger**: Handles both HTTP and HTTPS endpoints cleanly with optional `KEEPALIVE_URL` override.
+  - In-Container Supervisor: Keeps container permanently alive; auto-respawns worker process within 2s on any crash or maintenance restart.
+  - Zero data loss: 804 users, continuous GitHub cloud snapshots, local NVMe sync.
+- **RECENT FIXES & INCIDENTS (2026-10-17)**:
+  1. **24h Maintenance Exit Outage & Supervisor Fix**:
+     - *Incident*: Gambot reached 24.0h uptime and executed `shutdown('MAINTENANCE_24H')`. On Render, the host supervisor auto-rebooted the container, but Bot-Hosting marked clean exit 0 as `offline`.
+     - *Fix*: Built an in-container supervisor directly in `index.js` that catches all worker exits and respawns a fresh worker within 2s (with exponential crash backoff up to 30s).
+     - *Lockfile Guard*: `acquireLock()` updated to ignore `process.ppid` (the supervisor) so worker never mistakes its supervisor for a duplicate instance; supervisor unlinks stale locks at boot.
+     - *Memory Watchdog*: Lowered threshold to 210MB (safe limit for 256MB RAM container) with clean restart + supervisor auto-respawn.
+  2. **Instant Cloud Backup System**:
+     - `v backup` Discord command: Owner can force an instant database snapshot push to GitHub anytime.
+     - `GET /backup` HTTP endpoint (`http://fi10.bot-hosting.cloud:25018/backup`): One-click instant cloud snapshot verified live.
+     - 60s Auto-Sync: Hash-caching (`_lastBackedUpHash`) prevents duplicate commits.
 - **LIVE STATUS**:
-  - `http://fi10.bot-hosting.cloud:25018/status` -> HTTP 200 (`discord=true`, `users=804`, `guilds=4`, `boot_id=98d9e65b`)
-  - `http://fi10.bot-hosting.cloud:25018/health` -> HTTP 200 (`status="ok"`, `discord=true`, `ws_ping=125`)
-  - `http://fi10.bot-hosting.cloud:25018/backup` -> HTTP 200 (`status="backup_completed"`, snapshot verified on GitHub)
-  - Discord logged in as `ovo#7700`, owner startup DM delivered, chat commands (`v version`, `v backup`) active and responding in real-time.
+  - `http://fi10.bot-hosting.cloud:25018/status` -> HTTP 200 (`discord=true`, `users=804`, `guilds=4`, `boot_id=e765aa0f`, `pid=32`)
+  - `http://fi10.bot-hosting.cloud:25018/health` -> HTTP 200 (`status="ok"`, `discord=true`, `uptime_s=15+`)
+  - Discord logged in as `ovo#7700`, owner startup DM delivered, chat commands responsive.
 
 ## Done recently (2026-10-13) — `v battle` against bots (NPC Bot Trainer)
 - [x] **Bot battles supported:** `v battle` (with no args), `v battle bot`, `v battle ai`, `v battle npc`, or mentioning a bot (`v battle @bot`) starts an immediate battle against an NPC Bot Trainer team.
