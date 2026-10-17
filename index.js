@@ -90,6 +90,52 @@ if (!process.env.RENDER && !process.env.BOT_HOSTING && !process.env.PRODUCTION) 
   process.exit(1);
 }
 
+// IN-CONTAINER SUPERVISOR:
+// On Bot-Hosting.net and container platforms without an external supervisor, a process exit (e.g. 24h rolling restart or crash)
+// marks the container offline permanently. The supervisor loop forks a worker and auto-respawns it within 2s,
+// keeping the container and Discord bot online 24/7.
+if (!process.env.GAMBOT_WORKER) {
+  const { fork } = require('child_process');
+  let terminating = false;
+  let child = null;
+  let backoffMs = 2000;
+
+  const forwardSignal = (sig) => {
+    terminating = true;
+    if (child) child.kill(sig);
+  };
+  process.on('SIGTERM', () => forwardSignal('SIGTERM'));
+  process.on('SIGINT', () => forwardSignal('SIGINT'));
+
+  const startWorker = () => {
+    const startedAt = Date.now();
+    console.log('[SUPERVISOR] Starting Gambot worker process...');
+    child = fork(__filename, process.argv.slice(2), {
+      env: { ...process.env, GAMBOT_WORKER: '1' },
+      stdio: 'inherit',
+    });
+
+    child.on('exit', (code, signal) => {
+      child = null;
+      if (terminating) {
+        console.log('[SUPERVISOR] Shutdown signal received, supervisor exiting.');
+        process.exit(code ?? 0);
+      }
+      const ranDuration = Date.now() - startedAt;
+      if (ranDuration > 60000) {
+        backoffMs = 2000;
+      } else {
+        backoffMs = Math.min(backoffMs * 2, 30000);
+      }
+      console.warn(`[SUPERVISOR] Worker exited (code=${code}, signal=${signal}). Respawning in ${backoffMs / 1000}s...`);
+      setTimeout(startWorker, backoffMs);
+    });
+  };
+
+  startWorker();
+  return;
+}
+
 // Capture all console output for remote debugging
 const _logs = [];
 const _origLog = console.log;
@@ -1051,15 +1097,16 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
 // Rolling maintenance & memory watchdog:
-// 1) Memory leak protection: if RSS exceeds 380MB (Render free limit 512MB), restart cleanly
-// 2) 24h rolling restart: sql.js WASM heap degrades after ~48h. A clean restart every 24h
-//    during an idle moment (0 active games) keeps WASM fresh with 0 data loss.
+// 1) Memory leak protection: if RSS exceeds safe limit (210MB on 256MB Bot-Hosting container), restart cleanly
+// 2) 24h rolling restart: clean restart every 24h during an idle moment (0 active games) keeps WASM fresh.
+//    Under the in-container supervisor, the restart takes ~2s and auto-reconnects with 0 data loss.
 setInterval(async () => {
   const rssMb = Math.round(process.memoryUsage().rss / 1024 / 1024);
   const uptimeHours = runtime.uptimeMs() / (3600 * 1000);
+  const maxRss = process.env.RAM_LIMIT_MB ? Math.round(process.env.RAM_LIMIT_MB * 0.8) : 210;
 
-  if (rssMb > 380) {
-    console.warn(`[MEMORY_WATCHDOG] High RSS memory (${rssMb}MB > 380MB) — triggering clean restart`);
+  if (rssMb > maxRss) {
+    console.warn(`[MEMORY_WATCHDOG] High RSS memory (${rssMb}MB > ${maxRss}MB) — triggering clean restart`);
     await shutdown('MEMORY_WATCHDOG');
   }
 
