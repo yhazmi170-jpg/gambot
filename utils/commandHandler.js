@@ -129,6 +129,37 @@ async function handleMessage(message) {
   const cmd = getCommand(cmdName);
   if (!cmd) return;
 
+  // Auto-reply wrapper: ensures all command responses and embeds reply directly
+  // to the invoking user's message so users clearly see which response is theirs.
+  if (message.channel && typeof message.channel.send === 'function') {
+    const origChannel = message.channel;
+    const channelProxy = Object.create(origChannel);
+    const origSend = origChannel.send.bind(origChannel);
+    channelProxy.send = function (options, ...rest) {
+      let opts = options;
+      if (typeof opts === 'string') {
+        opts = { content: opts };
+      } else if (opts && typeof opts === 'object') {
+        opts = { ...opts };
+      } else {
+        opts = {};
+      }
+      if (!opts.reply) {
+        opts.reply = { messageReference: message.id, failIfNotExists: false };
+      }
+      return origSend(opts, ...rest);
+    };
+    try {
+      Object.defineProperty(message, 'channel', {
+        value: channelProxy,
+        configurable: true,
+        writable: true,
+      });
+    } catch {
+      message.channel = channelProxy;
+    }
+  }
+
   dlog.log({ kind: 'parsed', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name, raw: message.content.slice(0, 40) });
   console.log(`[COMMAND] ${runtime.tag()} message_id=${message.id} user=${message.author.id} guild=${(message.guild && message.guild.id) || 'DM'} channel=${message.channel.id} cmd=${cmd.name} ts=${Date.now()}`);
 
