@@ -4,26 +4,30 @@
 > Read `AGENTS.md` first (incl. the "Two-agent workflow" section), then this.
 
 ## Status
-- **Branch**: `master`, version **2.1.0** (commit `ccb0b56`).
-- **DEPLOYMENT: LIVE ON BOT-HOSTING.NET (2026-10-17)**:
-  - Migrated from Render to Bot-Hosting.net dedicated Node.js 20 container (`1fe4bc97-1951-4fdb-8edb-f54ee2587e19`).
-  - Node: `fi10.bot-hosting.cloud` (Finland), port `25018`.
-  - In-Container Supervisor: Keeps container permanently alive; auto-respawns worker process within 2s on any crash or maintenance restart.
-  - Zero data loss: 804 users, continuous GitHub cloud snapshots, local NVMe sync.
-- **RECENT FIXES & INCIDENTS (2026-10-17)**:
-  1. **24h Maintenance Exit Outage & Supervisor Fix**:
-     - *Incident*: Gambot reached 24.0h uptime and executed `shutdown('MAINTENANCE_24H')`. On Render, the host supervisor auto-rebooted the container, but Bot-Hosting marked clean exit 0 as `offline`.
-     - *Fix*: Built an in-container supervisor directly in `index.js` that catches all worker exits and respawns a fresh worker within 2s (with exponential crash backoff up to 30s).
-     - *Lockfile Guard*: `acquireLock()` updated to ignore `process.ppid` (the supervisor) so worker never mistakes its supervisor for a duplicate instance; supervisor unlinks stale locks at boot.
-     - *Memory Watchdog*: Lowered threshold to 210MB (safe limit for 256MB RAM container) with clean restart + supervisor auto-respawn.
-  2. **Instant Cloud Backup System**:
-     - `v backup` Discord command: Owner can force an instant database snapshot push to GitHub anytime.
-     - `GET /backup` HTTP endpoint (`http://fi10.bot-hosting.cloud:25018/backup`): One-click instant cloud snapshot verified live.
-     - 60s Auto-Sync: Hash-caching (`_lastBackedUpHash`) prevents duplicate commits.
+- **Branch**: `master`, version **2.1.0**.
+- **DEPLOYMENT: LIVE ON FLY.IO (2026-10-20)**:
+  - Migrated from Bot-Hosting.net (after free tier 3-day renewal grace period suspension) to dedicated Fly.io app `gambot-cloud`.
+  - Machine: `286dee2ad40e58` (1 vCPU, 256MB RAM) in `iad` region.
+  - Persistent NVMe Volume: `gambot_data` (`vol_vz80ngnl1qz13zev`, 1GB) mounted at `/app/data`.
+  - Machine restart policy: `always`, `auto_stop_machines = "off"` — running 24/7 continuously without idle timeouts or coin renewal requirements.
+  - Latency: ultra-low `ws_ping = 14ms`.
+  - Zero data loss: 805 users restored cleanly from GitHub cloud snapshot `gambot-data-v3`.
+- **RECENT FIXES & INCIDENTS (2026-10-20)**:
+  1. **Fly.io 24/7 Production Migration**:
+     - *Incident*: Bot-Hosting.net suspended free tier container after 4 days due to requirement for coin renewal via website.
+     - *Resolution*: Deployed to Fly.io alongside Skuller with permanent 24/7 VM, dedicated encrypted NVMe volume, and zero renewal requirements.
+     - *Endpoints*:
+       - `https://gambot-cloud.fly.dev/health` -> HTTP 200 (`status="ok"`, `discord=true`, `ws_ping=14ms`)
+       - `https://gambot-cloud.fly.dev/status` -> HTTP 200 (`users=805`, `guilds=4`, `boot_id=87af0e44`)
+       - `https://gambot-cloud.fly.dev/backup` -> HTTP 200 (instant cloud snapshot trigger verified)
+  2. **In-Container Supervisor**:
+     - Preserved in `index.js`: catches any crash or maintenance restart and auto-respawns worker in 2s.
+  3. **Instant Cloud Backup System**:
+     - `v backup` Discord command + `/backup` HTTP route backed by `gambot-data-v3` on GitHub.
 - **LIVE STATUS**:
-  - `http://fi10.bot-hosting.cloud:25018/status` -> HTTP 200 (`discord=true`, `users=804`, `guilds=4`, `boot_id=e765aa0f`, `pid=32`)
-  - `http://fi10.bot-hosting.cloud:25018/health` -> HTTP 200 (`status="ok"`, `discord=true`, `uptime_s=15+`)
-  - Discord logged in as `ovo#7700`, owner startup DM delivered, chat commands responsive.
+  - `https://gambot-cloud.fly.dev/status` -> HTTP 200 (`discord=true`, `users=805`, `guilds=4`, `ws_ping=14ms`)
+  - `https://gambot-cloud.fly.dev/health` -> HTTP 200 (`status="ok"`, `discord=true`)
+  - Discord logged in as `ovo#7700`, owner startup DM delivered, chat commands active and responsive in real-time.
 
 ## Done recently (2026-10-13) — `v battle` against bots (NPC Bot Trainer)
 - [x] **Bot battles supported:** `v battle` (with no args), `v battle bot`, `v battle ai`, `v battle npc`, or mentioning a bot (`v battle @bot`) starts an immediate battle against an NPC Bot Trainer team.
