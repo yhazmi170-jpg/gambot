@@ -136,6 +136,9 @@ async function handleMessage(message) {
     const channelProxy = Object.create(origChannel);
     const origSend = origChannel.send.bind(origChannel);
     channelProxy.send = function (options, ...rest) {
+      if (options && (options.constructor?.name === 'MessagePayload' || typeof options.resolveBody === 'function')) {
+        return origSend(options, ...rest);
+      }
       let opts = options;
       if (typeof opts === 'string') {
         opts = { content: opts };

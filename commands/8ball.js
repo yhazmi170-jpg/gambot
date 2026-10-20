@@ -152,7 +152,9 @@ module.exports = {
     let question = args.join(' ').trim();
 
     if (!question.replace(/[?\s]+$/g, '').trim()) {
-      return message.reply({ content: 'ask something 😭', allowedMentions: { repliedUser: false } });
+      return message.reply({ content: 'ask something 😭', allowedMentions: { repliedUser: false } }).catch(err => {
+        console.error('[8BALL ERROR] reply failed:', err && err.message);
+      });
     }
 
     if (question.length > MAX_QUESTION_LEN) {
@@ -172,7 +174,9 @@ module.exports = {
         safeSelfReact(sent, pick.reaction);
         if (pick === RARE_ANSWERS[0]) pageOwners(message, sent, question);
       })
-      .catch(() => {});
+      .catch(err => {
+        console.error('[8BALL ERROR] reply failed:', err && err.message);
+      });
   },
 };
 
