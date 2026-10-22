@@ -356,6 +356,24 @@ async function init() {
   )`);
   db.run(`CREATE INDEX IF NOT EXISTS inbox_recipient_idx ON inbox_deliveries (recipient_id, status)`);
 
+  // Self-heal: giveaways whose Discord message is gone used to be re-run on
+  // every boot, re-creating the winner's prize. Collapse duplicate giveaway
+  // deliveries so a claimed prize can never leave another pending copy behind.
+  try {
+    const dupRows = db.exec(`SELECT d.id FROM inbox_deliveries d
+      JOIN inbox_deliveries x
+        ON x.recipient_id = d.recipient_id AND x.payload = d.payload AND x.source = 'giveaway'
+      WHERE d.source = 'giveaway' AND d.status = 'pending'
+        AND (x.status = 'claimed' OR (x.status = 'pending' AND x.id < d.id))
+      GROUP BY d.id`);
+    const dupIds = dupRows.length ? dupRows[0].values.map(v => v[0]) : [];
+    for (const id of dupIds) db.run(`DELETE FROM inbox_deliveries WHERE id = ${Number(id)}`);
+    if (dupIds.length) {
+      save();
+      console.log(`[inbox] removed ${dupIds.length} duplicate giveaway delivery(ies)`);
+    }
+  } catch (e) { console.error('[inbox] giveaway dedupe failed:', (e && e.message) || e); }
+
   // 2026-09 proactive re-engagement: v notifications prefs, per-user tip/return state,
   // exactly-once reward grants, and a single global daily-budget row.
   db.run(`CREATE TABLE IF NOT EXISTS notify_prefs (
