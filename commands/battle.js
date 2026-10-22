@@ -51,44 +51,50 @@ function attachWeapons(pet) {
   return copy;
 }
 
-// Generate a balanced NPC/bot pet team matching the player's team size and level.
+// Generate an NPC/bot pet team: random animals, random levels, random weapons.
+// Level is kept within +/-2 of the player's average so it stays winnable and
+// can't be farmed with a maxed-out team.
 function generateBotTeam(myPets) {
   const count = (myPets && myPets.length) ? myPets.length : 3;
-  const avgLevel = Math.max(1, Math.round(myPets.reduce((s, p) => s + (p.level || 1), 0) / count));
+  const safePets = myPets || [];
+  const avgLevel = Math.max(1, Math.round(safePets.reduce((s, p) => s + (p.level || 1), 0) / count));
+  const minLevel = Math.max(1, avgLevel - 2);
+  const maxLevel = avgLevel + 2;
   const botPets = [];
 
   for (let i = 0; i < count; i++) {
-    const myPet = myPets[i];
-    const rarity = myPet ? myPet.rarity : (db.randomRarity ? db.randomRarity() : 'common');
-    const species = db.randomSpecies ? db.randomSpecies(rarity) : 'Rabbit';
-    const stats = db.randomStats ? db.randomStats(rarity) : { hp: 100, attack: 10, defense: 5 };
-    const levelDiff = Math.max(0, (myPet ? myPet.level : avgLevel) - 1);
-    const botLevel = (myPet ? myPet.level : avgLevel);
+    // Fully random animal — independent of whatever the player brought.
+    const rarity = db.randomRarity ? db.randomRarity() : 'common';
+    const species = (db.randomSpecies && db.randomSpecies(rarity)) || 'Rabbit';
+    const stats = (db.randomStats && db.randomStats(rarity)) || { hp: 100, attack: 10, defense: 5 };
+
+    const botLevel = minLevel + Math.floor(Math.random() * (maxLevel - minLevel + 1));
+    const levelDiff = botLevel - 1;
     const hp = stats.hp + levelDiff * 15;
     const attack = stats.attack + levelDiff * 3;
     const defense = stats.defense + levelDiff * 2;
     const trait = db.rollTrait ? db.rollTrait() : 'Brave';
 
+    // Every bot gets a random weapon (random type + rarity + quality).
     let botWeapon = null;
-    const playerWeapon = myPet ? (myPet._weapon || db.getAnimalWeapon(myPet.id)) : null;
-    if (playerWeapon || botLevel >= 5) {
+    if (db.makeWeapon && db.rollWeaponRarity) {
       const types = Object.keys(db.WEAPON_TYPES || {});
       const wType = types.length ? types[Math.floor(Math.random() * types.length)] : 'great_sword';
+      const wRarity = db.rollWeaponRarity();
+      const wLevel = Math.max(1, Math.round(botLevel / 2));
+      const base = db.makeWeapon(wType, wRarity);
       const meta = (db.WEAPON_TYPES && db.WEAPON_TYPES[wType]) || { name: 'Great Sword', emoji: '⚔️' };
-      const quality = playerWeapon ? playerWeapon.quality : (45 + Math.floor(Math.random() * 25));
-      const wLevel = playerWeapon ? playerWeapon.level : Math.max(1, Math.floor(botLevel / 3));
-      const atkBase = playerWeapon ? playerWeapon.atk : Math.floor((12 + wLevel * 3) * (quality / 50));
-      const defBase = playerWeapon ? playerWeapon.def : Math.floor((6 + wLevel * 2) * (quality / 50));
+      const growth = 1 + (wLevel - 1) * 0.12;
       botWeapon = {
         id: `bot_wep_${i + 1}`,
         type: wType,
-        rarity: playerWeapon ? playerWeapon.rarity : rarity,
-        quality,
+        rarity: wRarity,
+        quality: base.quality,
         level: wLevel,
         name: meta.name || 'Weapon',
         emoji: meta.emoji || '⚔️',
-        atk: atkBase,
-        def: defBase,
+        atk: Math.max(1, Math.floor(base.atk * growth)),
+        def: Math.max(1, Math.floor(base.def * growth)),
       };
     }
 
@@ -145,21 +151,26 @@ async function runBattle(message, target, isBot = false) {
   const theirStatus = makeStatuses(theirCopy);
 
   // damage helper with weapon effect hooks
+  function statusOf(pet) {
+    return myStatus[pet.id] || theirStatus[pet.id] || null;
+  }
   function doDamage(attacker, target, side, myPetsArr, theirPetsArr, log, statuses) {
     const weapon = attacker._weapon;
     const power = weapon ? 0.6 + (weapon.quality / 100) * 0.8 : 0;
     const dmg = Math.max(0, attacker.effAtk - Math.floor(target.effDef / 2) + Math.floor(Math.random() * 10));
 
+    const tgtStatus = statusOf(target);
+    const ownStatus = statusOf(attacker);
     let dealt = dmg;
     let note = '';
-    if (weapon && weapon.type === 'poison_dagger') { statuses[target.id].poison = 3; note = ' ☠️ **poisoned!**'; }
-    if (weapon && weapon.type === 'flame_staff') { statuses[target.id].flame = 3; note = ' 🔥 **burned!**'; }
+    if (weapon && weapon.type === 'poison_dagger' && tgtStatus) { tgtStatus.poison = 3; note = ' ☠️ **poisoned!**'; }
+    if (weapon && weapon.type === 'flame_staff' && tgtStatus) { tgtStatus.flame = 3; note = ' 🔥 **burned!**'; }
     if (weapon && weapon.type === 'vamp_staff') {
       const heal = Math.floor(dmg * (0.2 + power * 0.2));
       attacker.hp = Math.min(attacker.max_hp, attacker.hp + heal);
       note = ` 🩸 **lifesteal +${heal}**`;
     }
-    if (weapon && weapon.type === 'aegis') { statuses[attacker.id].taunt = true; note = ' 🛡️ **now taunting!**'; }
+    if (weapon && weapon.type === 'aegis' && ownStatus) { ownStatus.taunt = true; note = ' 🛡️ **now taunting!**'; }
     target.hp = Math.max(0, target.hp - dealt);
     log.push(`**${attacker.species}**${weapon ? ' ' + weapon.emoji : ''} deals ${dealt} damage to **${target.species}** (${target.hp} HP left)${note}`);
     if (target.hp <= 0) log.push(`💀 **${target.species}** fainted!`);

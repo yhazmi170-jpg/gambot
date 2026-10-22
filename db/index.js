@@ -1796,7 +1796,9 @@ function randomRarity() {
 }
 
 function randomSpecies(rarity) {
-  const list = SPECIES[rarity];
+  // Defensive: a legacy/bad rarity (e.g. weapon rarity 'mythical', NULL) must
+  // never crash a battle — fall back to common.
+  const list = SPECIES[rarity] || SPECIES.common;
   return list[Math.floor(Math.random() * list.length)];
 }
 
@@ -1910,7 +1912,7 @@ function nextDexMilestone(progress) {
 
 function randomStats(rarity) {
   const base = { common: [100, 10, 5], uncommon: [130, 18, 12], rare: [180, 30, 22], epic: [270, 50, 38], legendary: [400, 75, 60], mythic: [650, 130, 100] };
-  const [hp, atk, def] = base[rarity];
+  const [hp, atk, def] = base[rarity] || base.common;
   return {
     hp: Math.floor(hp * (0.9 + Math.random() * 0.2)),
     attack: Math.floor(atk * (0.85 + Math.random() * 0.3)),
