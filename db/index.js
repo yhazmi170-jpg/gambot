@@ -1382,8 +1382,10 @@ function markGiveawayAnnounced(messageId) {
 
 // Has the winner's giveaway inbox delivery already been created?
 // Tagged with payload { gw: <giveaway message_id> } so re-runs are idempotent.
+// ANY status counts (pending OR claimed): a claimed prize must never be
+// re-delivered when the sweep re-runs after a restart.
 function hasGiveawayDelivery(messageId, userId) {
-  const rows = db.exec(`SELECT COUNT(*) FROM inbox_deliveries WHERE recipient_id = '${safeStr(userId)}' AND source = 'giveaway' AND status = 'pending' AND payload LIKE '%"gw":"${safeStr(messageId)}"%'`);
+  const rows = db.exec(`SELECT COUNT(*) FROM inbox_deliveries WHERE recipient_id = '${safeStr(userId)}' AND source = 'giveaway' AND payload LIKE '%"gw":"${safeStr(messageId)}"%'`);
   return rows.length && rows[0].values[0][0] > 0;
 }
 

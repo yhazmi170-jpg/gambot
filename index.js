@@ -29,11 +29,14 @@ async function announceGiveaway(client, gw, winners, mode, perWinner) {
   const winnerList = giveaway.winnerLines(winners, mode, perWinner, gw.prize, config.currency).join('\n');
   let updated = false;
   const ch = await client.channels.fetch(gw.channel_id).catch(() => null);
-  if (ch) {
-    // 1) edit the original giveaway message into its finished state + strip buttons
-    try {
-      const msg = await ch.messages.fetch(gw.message_id);
-      await msg.edit({
+  if (!ch) return false;
+  // If the original message is gone there is nothing left to finish. Return
+  // false so the caller marks it announced instead of re-DMing every boot.
+  const msg = await ch.messages.fetch(gw.message_id).catch(() => null);
+  if (!msg) return false;
+  // 1) edit the original giveaway message into its finished state + strip buttons
+  try {
+    await msg.edit({
         embeds: [embed('🎉 Giveaway', [
           ['Winner(s)', winnerList],
           ['Prize', mode === 'full'
@@ -68,7 +71,6 @@ async function announceGiveaway(client, gw, winners, mode, perWinner) {
       }
     } catch (e) {}
     try { if (ch.guild) db.addIncident(ch.guild.id, 'giveaway', `${winners.length} winner(s) drew a **${gw.prize.toLocaleString()}** giveaway`); } catch (e) {}
-  }
   // 4) DM every winner so they know to claim their inbox delivery
   for (const w of winners) {
     client.users.fetch(w).then(u => {
@@ -742,10 +744,10 @@ start().catch(e => console.error('[START] FATAL:', e));
           }
         }
         const updated = await announceGiveaway(client, gw, winners, mode, perWinner);
-        if (updated) {
-          db.markGiveawayAnnounced(gwId);
-          dlog.log({ kind: 'gw', gw: gwId, stage: 'announced', winners: winners.length, mode, per: perWinner });
-        }
+        // Always mark it done — otherwise a giveaway whose original message is
+        // gone stays at announced=0 and re-DMs the winners on every restart.
+        db.markGiveawayAnnounced(gwId);
+        dlog.log({ kind: 'gw', gw: gwId, stage: 'announced', winners: winners.length, mode, per: perWinner, updated });
       } catch (err) {
         gwAnnouncing.delete(gwId);
         console.error(`[gw] announce error for ${gwId}:`, (err && err.message) || err);
