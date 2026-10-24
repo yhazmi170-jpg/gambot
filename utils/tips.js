@@ -9,7 +9,6 @@ const TIPS = [
   `your autohunt bot costs ${db.AUTOHUNT_COST_PER_MIN || 50} coins/min and pausing is free — it catches up missed cycles on your next command.`,
   `a weapon crate is ${(db.WEAPON_CRATE_PRICE || 15000).toLocaleString()} coins, but crates can also drop from hunting and battle wins. equip weapons only on team animals (v weapon equip).`,
   `insurance tiers refill a flat % of losses (10 → 15 → 20 → 25%). the highest owned tier wins automatically.`,
-  `the bigger your balance, the softer your gambling payouts: −1% per 500k, floor at 40%. daily/weekly/work scale too, but PvP transfers (give/duel/rob) never get cut.`,
   `trait essence costs go up fast: floor(20 × (level+1)^1.5). level 1 is cheap, the curve hurts after that.`,
   `a created clan costs ${(db.CLAN_CREATE_COST || 5000000).toLocaleString()} coins and is tied to you, not a server — anyone can join from anywhere.`,
   `rain events boost work income and daily quests stay payable once a day. streak resets after 48h idle — miss a day and you lose the chain.`,

@@ -128,8 +128,8 @@ async function main() {
     check('toggled off (god_luck=0)', db.getGodLuck(target) === 0);
     const before = db.getBalance(target);
     const paid = db.payWin(target, 10000, 0);
-    check('normal win back to balance cut (0.94 at 3M -> 9400)', paid === 9400, paid);
-    check('no extra credit beyond 9400', db.getBalance(target) === before + 9400);
+    check('normal win without balance cut (10000 at 3M -> 10000)', paid === 10000, paid);
+    check('no extra credit beyond 10000', db.getBalance(target) === before + 10000);
   }
 
   // raw id arg (no mention object)

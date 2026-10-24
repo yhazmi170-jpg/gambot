@@ -79,7 +79,6 @@ function buildMenuEmbed(uid) {
   const tips = [
     `\`${prefix} gamehelp <game>\` — rules for each game`,
     `\`${prefix} version\` — bot version (v${version})`,
-    'Higher balance = slightly lower rewards/wins (caps at 60% less)',
   ];
   return new EmbedBuilder().setColor(0x2b2d31)
     .setTitle(`Gambot v${version}`)
