@@ -1,5 +1,5 @@
 const db = require('../db');
-const { card, error } = require('../utils/embed');
+const { error } = require('../utils/embed');
 const config = require('../config');
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -28,17 +28,12 @@ function calcWin(reels, bet) {
   return 0;
 }
 
-function renderSlotMachine(reels, revealCount) {
-  const display = reels.map((r, i) => (revealCount > i ? REELS[r] : '•')).join('  ┆  ');
-  return `╭─────── **SLOTS** ───────╮\n│      ${display}      │ ◄\n╰─────────────────────────╯`;
-}
-
 module.exports = {
   name: 'slots',
   helpCategory: 'Games',
   helpArgs: '<amount>',
   description: 'spin the slots',
-  aliases: ['slot'],
+  aliases: ['slot', 's'],
   async execute(message, args) {
     const { amount, error: betError } = db.parseBet(message.author.id, args[0]);
     if (betError) return message.channel.send({ embeds: [error(betError)] });
@@ -46,92 +41,65 @@ module.exports = {
     const user = db.ensureUser(message.author.id);
     if (user.balance < amount) return message.channel.send({ embeds: [error('not enough money')] });
 
-    let reels = spin();
+    const authorName = message.author.username || 'Player';
+    const currency = config.currency;
 
-    const msg = await message.channel.send({
-      embeds: [card({
-        title: 'Slots',
-        description: `${renderSlotMachine(reels, 0)}\n\n*Spinning the reels...*`,
-        fields: [
-          ['Wager', `**${amount.toLocaleString()}** ${config.currency}`, true],
-          ['Status', '**Rolling...**', true],
-        ],
-        color: 0x5865f2,
-        footer: `Player: ${message.author.username}`,
-      })],
-    }).catch(err => {
+    const top = spin();
+    const middle = spin();
+    const bottom = spin();
+
+    const initialMsg = await message.channel.send(
+      `🎰 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and pulled the slot machine!\n\n` +
+      `___SLOTS___\n` +
+      `  🌀 | 🌀 | 🌀\n` +
+      `  🌀 | 🌀 | 🌀  ◄\n` +
+      `  🌀 | 🌀 | 🌀\n\n` +
+      `*The reels are spinning...*`
+    ).catch(err => {
       console.error('Failed to send initial slots message:', err);
       return null;
     });
-    if (!msg) return;
+    if (!initialMsg) return;
 
-    await sleep(400);
-    await msg.edit({
-      embeds: [card({
-        title: 'Slots',
-        description: `${renderSlotMachine(reels, 1)}\n\n*Locking reels...*`,
-        fields: [
-          ['Wager', `**${amount.toLocaleString()}** ${config.currency}`, true],
-          ['Status', '**Reel 1 Locked**', true],
-        ],
-        color: 0x5865f2,
-        footer: `Player: ${message.author.username}`,
-      })],
-    }).catch(() => {});
+    const delay = process.env.DB_PATH ? 10 : 750;
+    await sleep(delay);
 
-    await sleep(400);
-    await msg.edit({
-      embeds: [card({
-        title: 'Slots',
-        description: `${renderSlotMachine(reels, 2)}\n\n*Locking reels...*`,
-        fields: [
-          ['Wager', `**${amount.toLocaleString()}** ${config.currency}`, true],
-          ['Status', '**Reel 2 Locked**', true],
-        ],
-        color: 0x5865f2,
-        footer: `Player: ${message.author.username}`,
-      })],
-    }).catch(() => {});
-
-    await sleep(400);
-
-    const winnings = calcWin(reels, amount);
+    const winnings = calcWin(middle, amount);
+    let outcomeText = '';
 
     if (winnings > 0) {
       const net = winnings - amount;
       const paid = db.payWin(message.author.id, net);
-      const jackpot = reels[0] === 6 && reels[1] === 6 && reels[2] === 6;
-      const mult = (winnings / amount).toFixed(1);
-      await msg.edit({
-        embeds: [card({
-          title: jackpot ? '777 Mega Jackpot!' : 'Winner!',
-          description: `${renderSlotMachine(reels, 3)}\n\n${jackpot ? '**Triple Sevens — Jackpot Hit!**' : '**Winning spin!**'}`,
-          fields: [
-            ['Wager', `**${amount.toLocaleString()}** ${config.currency}`, true],
-            ['Multiplier', `**${mult}x**`, true],
-            ['Payout', `**+${paid.toLocaleString()}** ${config.currency}`, true],
-          ],
-          color: jackpot ? 0xffd700 : 0x57f287,
-          footer: `Player: ${message.author.username} • Net: +${paid.toLocaleString()} ${config.currency}`,
-        })],
-      }).catch(() => {});
+      const jackpot = middle[0] === 6 && middle[1] === 6 && middle[2] === 6;
+      if (jackpot) {
+        outcomeText = `... and hit the **777 MEGA JACKPOT**! You won **${paid.toLocaleString()}** ${currency}!`;
+      } else {
+        outcomeText = `... and you won **${paid.toLocaleString()}** ${currency}!`;
+      }
     } else {
       db.addBalance(message.author.id, -amount);
       db.addGambled(message.author.id, amount);
       const refund = db.getInsuranceRefund(message.author.id, amount);
-      if (refund > 0) db.addBalance(message.author.id, refund);
-      await msg.edit({
-        embeds: [card({
-          title: 'Slots — No Match',
-          description: `${renderSlotMachine(reels, 3)}\n\n${refund > 0 ? '*Insurance activated. Partial refund credited.*' : '*Better luck next spin.*'}`,
-          fields: [
-            ['Wager', `**${amount.toLocaleString()}** ${config.currency}`, true],
-            ['Result', refund > 0 ? `Lost **${amount.toLocaleString()}**\n**+${refund.toLocaleString()}** refunded` : `Lost **${amount.toLocaleString()}** ${config.currency}`, true],
-          ],
-          color: 0xed4245,
-          footer: `Player: ${message.author.username}`,
-        })],
-      }).catch(() => {});
+      if (refund > 0) {
+        db.addBalance(message.author.id, refund);
+        outcomeText = `... and you lost **${amount.toLocaleString()}** ${currency}... (🛡️ **${refund.toLocaleString()}** refunded)`;
+      } else {
+        outcomeText = `... and you lost **${amount.toLocaleString()}** ${currency}...`;
+      }
     }
+
+    const t = top.map(i => REELS[i]).join(' | ');
+    const m = middle.map(i => REELS[i]).join(' | ');
+    const b = bottom.map(i => REELS[i]).join(' | ');
+
+    const finalContent =
+      `🎰 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and pulled the slot machine!\n\n` +
+      `___SLOTS___\n` +
+      `  ${t}\n` +
+      `  ${m}  ◄\n` +
+      `  ${b}\n\n` +
+      outcomeText;
+
+    await initialMsg.edit(finalContent).catch(() => {});
   },
 };
