@@ -60,12 +60,15 @@ function makeMessage(content, userId) {
       });
     },
   };
-  return { content, author: { id: userId, bot: false }, guild: { id: 'guild_it' }, channel, _sends: sends };
+  return { id: 'm_' + (++seq) + '_' + Date.now(), content, author: { id: userId, bot: false }, guild: { id: 'guild_it' }, channel, _sends: sends };
 }
 
 // Pull the coinflip reply (the message containing the 🪙 coin) out of all sends.
 function coinReply(msg) {
-  for (const s of msg._sends) if (typeof s === 'string' && s.includes('🪙')) return s;
+  for (const s of msg._sends) {
+    if (typeof s === 'string' && s.includes('🪙')) return s;
+    if (s && typeof s.content === 'string' && s.content.includes('🪙')) return s.content;
+  }
   return null;
 }
 function errorReply(msg) {
@@ -89,6 +92,7 @@ async function run(input) {
 
 (async () => {
   await db.init();
+  db.activateServer('guild_it', 'seed');
   handler.loadCommands();
 
   // capture the exact args array the live parser hands to the command

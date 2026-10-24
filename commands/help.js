@@ -62,26 +62,36 @@ function loadCategories() {
   return cats;
 }
 
+const CATEGORY_EMOJIS = {
+  Economy: '💰',
+  Games: '🎲',
+  Pets: '🐾',
+  Social: '👥',
+  Fun: '🎭',
+  Shop: '🛍️',
+};
+
 function buildMenuEmbed(uid) {
   const owned = db.getUserPerks(uid).map(p => p.perk);
   const cats = loadCategories();
-  const lines = cats.map(([cat], i) => `**${i + 1}. ${cat}**`).join('\n');
+  const lines = cats.map(([cat], i) => `**${CATEGORY_EMOJIS[cat] || '📁'} ${cat}** — \`${prefix} help ${cat.toLowerCase()}\``).join('\n');
   const hasPerks = owned.length > 0;
   const tips = [
     `\`${prefix} gamehelp <game>\` — rules for each game`,
     `\`${prefix} version\` — bot version (v${version})`,
-    'Higher balance = slightly lower rewards/wins (caps at 60% less)',
+    'Tip: higher balance slightly reduces gambling payouts (max 60% cut)',
   ];
-  return new EmbedBuilder().setColor(0x2b2d31)
-    .setTitle(`Gambot v${version}`)
-    .setDescription(`pick a category to see its commands${hasPerks ? `\n**Perks** — ${owned.length} owned, tap to see them` : ''}\n\n${lines}\n\n${tips.join(' · ')}`);
+  return new EmbedBuilder().setColor(0x5865f2)
+    .setTitle(`✨ Gambot v${version}`)
+    .setDescription(`Select a category below to explore commands:${hasPerks ? `\n⭐ **Perks** — ${owned.length} unlocked, tap to view` : ''}\n\n${lines}\n\n💡 ${tips.join('\n💡 ')}`)
+    .setFooter({ text: 'Gambot Economy & RPG • discord.js v14' });
 }
 
 function buildMenuRow(uid) {
   const owned = db.getUserPerks(uid).map(p => p.perk);
   const cats = loadCategories();
   const buttons = cats.map(([cat], i) =>
-    new ButtonBuilder().setCustomId(`help_cat_${i}`).setLabel(cat).setStyle(ButtonStyle.Secondary));
+    new ButtonBuilder().setCustomId(`help_cat_${i}`).setLabel(`${CATEGORY_EMOJIS[cat] || '📁'} ${cat}`).setStyle(ButtonStyle.Secondary));
   const rows = [];
   let row = [];
   for (const b of buttons) {
@@ -90,7 +100,7 @@ function buildMenuRow(uid) {
   }
   const hasPerks = owned.length > 0;
   if (row.length || hasPerks) {
-    if (hasPerks) row.push(new ButtonBuilder().setCustomId('help_perks').setLabel('Perks').setStyle(ButtonStyle.Secondary));
+    if (hasPerks) row.push(new ButtonBuilder().setCustomId('help_perks').setLabel('⭐ Perks').setStyle(ButtonStyle.Primary));
     if (row.length) rows.push(new ActionRowBuilder().addComponents(row));
   }
   return rows;
@@ -98,7 +108,7 @@ function buildMenuRow(uid) {
 
 function buildCategoryEmbed(cat) {
   const fields = chunkFields(cat[0], cat[1]);
-  return embed(`Help — ${cat[0]}`, fields, 0x2b2d31);
+  return embed(`${CATEGORY_EMOJIS[cat[0]] || '📁'} Help — ${cat[0]}`, fields, 0x5865f2);
 }
 
 function buildCategoryRows() {

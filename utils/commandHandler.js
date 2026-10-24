@@ -56,27 +56,24 @@ function getCommand(name) {
 
 async function handleMessage(message) {
   if (message.author.bot) return;
-  // Message dedupe: block re-execution of the same message ID.
-  // This runs before any command parsing/mutation so a duplicated gateway
-  // event or reconnect spike cannot cause double-command execution.
-  const already = processedMessages.get(message.id);
-  if (already !== undefined) {
-    const age = Date.now() - already;
-    if (age < MESSAGE_TTL_MS) {
-      console.log(`[DUPLICATE_DROP] ${runtime.tag()} message_id=${message.id} first_seen=${already} dropped_at=${Date.now()} age_ms=${age}`);
-      dlog.log({ kind: 'dup_message_blocked', id: message.id, age_ms: age });
-      return; // silently ignore — the original execution already sent a response
+  if (message.id) {
+    const already = processedMessages.get(message.id);
+    if (already !== undefined) {
+      const age = Date.now() - already;
+      if (age < MESSAGE_TTL_MS) {
+        console.log(`[DUPLICATE_DROP] ${runtime.tag()} message_id=${message.id} first_seen=${already} dropped_at=${Date.now()} age_ms=${age}`);
+        dlog.log({ kind: 'dup_message_blocked', id: message.id, age_ms: age });
+        return; // silently ignore — the original execution already sent a response
+      }
+      processedMessages.delete(message.id);
     }
-    // expired entry — purge and allow re-processing
-    processedMessages.delete(message.id);
+    if (processedMessages.size >= MAX_PROCESSED) {
+      const keys = Array.from(processedMessages.keys());
+      const oldest = keys.sort((a, b) => processedMessages.get(a) - processedMessages.get(b));
+      oldest.slice(0, MAX_PROCESSED / 2).forEach(k => processedMessages.delete(k));
+    }
+    processedMessages.set(message.id, Date.now());
   }
-  // Keep the map bounded: evict oldest entries once we exceed the cap.
-  if (processedMessages.size >= MAX_PROCESSED) {
-    const keys = Array.from(processedMessages.keys());
-    const oldest = keys.sort((a, b) => processedMessages.get(a) - processedMessages.get(b));
-    oldest.slice(0, MAX_PROCESSED / 2).forEach(k => processedMessages.delete(k));
-  }
-  processedMessages.set(message.id, Date.now());
   const content = message.content.trim();
   let prefix = null;
   let cmdName = null;

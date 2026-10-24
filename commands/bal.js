@@ -36,18 +36,28 @@ module.exports = {
 
     const inbox = inboxSummary(target.id);
     const moneyLabel = config.currency.charAt(0).toUpperCase() + config.currency.slice(1);
+    const avatarUrl = target.displayAvatarURL ? target.displayAvatarURL({ dynamic: true, size: 256 }) : null;
+    const netWorth = (user.balance + user.bank + inbox.total).toLocaleString();
+
     const fields = [
-      ['User', `<@${target.id}>`],
-      [moneyLabel, `**${user.balance.toLocaleString()}**`],
-      ['Bank', `**${user.bank.toLocaleString()}**`],
-      ['Inbox (unclaimed)', `**${inbox.total.toLocaleString()}**${inbox.count ? ` · ${inbox.count} pending` : ''}`],
-      ['Gems', `${user.gems} 💎`],
+      ['User', `<@${target.id}>`, true],
+      [moneyLabel, `**${user.balance.toLocaleString()}**`, true],
+      ['Bank', `**${user.bank.toLocaleString()}**`, true],
+      ['Inbox (unclaimed)', `**${inbox.total.toLocaleString()}**${inbox.count ? ` (${inbox.count} pending)` : ''}`, true],
+      ['Gems', `**${user.gems}** 💎`, true],
     ];
-    if (viewingOther && user.loan > 0) fields.push(['Loan', `**${user.loan.toLocaleString()}**`]);
+    if (viewingOther && user.loan > 0) fields.push(['Loan', `**${user.loan.toLocaleString()}**`, true]);
     fields.push(
-      ['Total Gambled', user.total_gambled ? user.total_gambled.toLocaleString() : '0'],
-      ['Total Won', user.total_won ? user.total_won.toLocaleString() : '0'],
+      ['Total Gambled', `**${user.total_gambled ? user.total_gambled.toLocaleString() : '0'}**`, true],
+      ['Total Won', `**${user.total_won ? user.total_won.toLocaleString() : '0'}**`, true],
     );
-    return message.channel.send({ embeds: [embed('💰 Balance', fields)] });
+
+    const e = embed('💰 Balance', fields, 0x5865f2);
+    if (avatarUrl) {
+      e.setAuthor({ name: `${target.username}'s Wallet`, iconURL: avatarUrl });
+      e.setThumbnail(avatarUrl);
+    }
+    e.setFooter({ text: `Net Worth: ${netWorth} ${config.currency} • Gambot Economy` });
+    return message.channel.send({ embeds: [e] });
   },
 };

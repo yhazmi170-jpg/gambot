@@ -24,12 +24,15 @@ const info = db.claimDaily(message.author.id);
     const finalReward = Math.floor(info.reward * factor * rewardMult);
     const diff = finalReward - info.reward;
     if (diff !== 0) db.addBalance(message.author.id, diff);
+    const avatarUrl = message.author.displayAvatarURL ? message.author.displayAvatarURL({ dynamic: true }) : null;
     message.channel.send({
-      embeds: [embed('🎁 Daily', [
-        ['Reward', `**${finalReward}** ${config.currency}${married ? ' (❤️ married +10%)' : ''}${factor < 1 ? ` (${Math.round((1 - factor) * 100)}% reduction)` : ''}${rewardMult > 1 ? ` (event x${rewardMult})` : ''}`],
-        ['Streak', `day **${info.streak}**`],
-        ['Next', info.reward >= info.max ? 'max streak reached!' : `+500 per day (max ${info.max})`],
-      ])],
+      embeds: [embed('🎁 Daily Reward', [
+        ['💰 Claimed', `**+${finalReward.toLocaleString()}** ${config.currency}${married ? ' (❤️ +10%)' : ''}${factor < 1 ? ` (${Math.round((1 - factor) * 100)}% cut)` : ''}${rewardMult > 1 ? ` (x${rewardMult} event)` : ''}`, true],
+        ['🔥 Streak', `**${info.streak} Day${info.streak === 1 ? '' : 's'}**`, true],
+        ['⭐ Progress', info.reward >= info.max ? 'Max streak reached!' : `+500/day (cap: ${info.max.toLocaleString()})`, true],
+      ], 0x57f287)
+      .setAuthor({ name: `${message.author.username}'s Daily Reward`, iconURL: avatarUrl })
+      .setFooter({ text: 'Claim every 24h to keep your daily streak alive!' })],
     });
   },
 };

@@ -63,4 +63,47 @@ function parseAmount(str) {
   return Math.floor(num);
 }
 
-module.exports = { embed, error, success, parseAmount, chunkText, updateEmbed };
+function progressBar(current, max, length = 10) {
+  if (max <= 0) return '▱'.repeat(length);
+  const ratio = Math.max(0, Math.min(1, current / max));
+  const filled = Math.round(ratio * length);
+  const empty = length - filled;
+  return '▰'.repeat(filled) + '▱'.repeat(empty);
+}
+
+function card(opts = {}) {
+  const e = new EmbedBuilder();
+  if (opts.color !== undefined) e.setColor(opts.color);
+  else e.setColor(0x5865f2);
+  if (opts.title) e.setTitle(opts.title);
+  if (opts.url) e.setURL(opts.url);
+  if (opts.author) {
+    if (typeof opts.author === 'string') e.setAuthor({ name: opts.author });
+    else e.setAuthor(opts.author);
+  }
+  if (opts.description) e.setDescription(opts.description);
+  if (opts.thumbnail) e.setThumbnail(opts.thumbnail);
+  if (opts.image) e.setImage(opts.image);
+  if (opts.footer) {
+    if (typeof opts.footer === 'string') e.setFooter({ text: opts.footer });
+    else e.setFooter(opts.footer);
+  }
+  if (opts.timestamp) e.setTimestamp(opts.timestamp === true ? new Date() : opts.timestamp);
+  if (Array.isArray(opts.fields)) {
+    for (const f of opts.fields) {
+      if (!f) continue;
+      const [name, value, inline = false] = Array.isArray(f) ? f : [f.name, f.value, f.inline];
+      if (value === undefined || value === null) continue;
+      const str = String(value);
+      if (str.length <= FIELD_VALUE_LIMIT) {
+        e.addFields({ name: String(name), value: str, inline: !!inline });
+      } else {
+        chunkText(str).forEach((c, i) =>
+          e.addFields({ name: i === 0 ? String(name) : `${name} (cont.)`, value: c, inline: false }));
+      }
+    }
+  }
+  return e;
+}
+
+module.exports = { embed, error, success, parseAmount, chunkText, updateEmbed, progressBar, card };

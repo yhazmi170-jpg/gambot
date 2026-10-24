@@ -91,30 +91,41 @@ module.exports = {
     db.addPassXp(userId, db.PASS_XP.hunt * count);
 
     if (message.guild) { try { db.recordDiscoveries(message.guild.id, userId, results); } catch (e) {} }
+
+    const rarityRank = { common: 1, uncommon: 2, rare: 3, epic: 4, legendary: 5, mythic: 6 };
+    let highestRarity = 'common';
+    for (const a of results) {
+      const r = (a.rarity || 'common').toLowerCase();
+      if ((rarityRank[r] || 0) > (rarityRank[highestRarity] || 0)) highestRarity = r;
+    }
+    const embedColor = rarityColors[highestRarity] || 0x5865f2;
+
     const fields = results.map((a, i) => [
-      `#${i + 1}`,
-      `${rarityEmojis[(a.rarity || 'common').toLowerCase()] || '⚪'} **${a.species}** — ${a.rarity.toUpperCase()}${a.gemDrop ? ` 💎+${a.gemDrop}` : ''}\n` +
-      `❤️ ${a.hp} ⚔️ ${a.attack} 🛡️ ${a.defense}`,
+      `#${i + 1} • ${a.species}`,
+      `${rarityEmojis[(a.rarity || 'common').toLowerCase()] || '⚪'} **${a.rarity.toUpperCase()}**${a.gemDrop ? ` 💎+${a.gemDrop}` : ''}\n` +
+      `❤️ \`${a.hp}\` ⚔️ \`${a.attack}\` 🛡️ \`${a.defense}\``,
       true,
     ]);
 
-    const summary = [`\`v zoo\` to see all your animals`];
-    summary.push(HUNT_VIBES[Math.floor(Math.random() * HUNT_VIBES.length)]);
-    summary.push(`spent **${coins}** coins`);
-    if (coinsEarned > 0) summary.push(`gain trait: **+${coinsEarned}** coins`);
-    if (gemsEarned > 0) summary.push(`💎 found **${gemsEarned} gem${gemsEarned > 1 ? 's' : ''}**!`);
-    if (eggsFound > 0) summary.push(`🥚 found **${eggsFound} egg${eggsFound > 1 ? 's' : ''}**! (\`v hatch\` to open)`);
-    if (weaponCratesFound > 0) summary.push(`🏴‍☠️ found **${weaponCratesFound} weapon crate${weaponCratesFound > 1 ? 's' : ''}**! (\`v weaponcrate open\`)`);
-    summary.push(`💎 gems: **${db.getGems(userId)}**`);
-    if (xpResult) summary.push(`**+${xpEarned}** xp${xpMult > 1 ? ` (event x${xpMult})` : ''}`);
-    if (xpResult && xpResult.leveledUp) summary.push(`leveled up to **${xpResult.newLevel}**!`);
-    summary.push('`v huntbot` for upgrades · `v sacrifice` for essence');
+    const summary = [];
+    summary.push(`🌲 *${HUNT_VIBES[Math.floor(Math.random() * HUNT_VIBES.length)]}*`);
+    summary.push(`🪙 Spent: **${coins.toLocaleString()}** coins`);
+    if (coinsEarned > 0) summary.push(`💰 Coin Yield: **+${coinsEarned.toLocaleString()}** coins`);
+    if (gemsEarned > 0) summary.push(`💎 Found: **${gemsEarned} gem${gemsEarned > 1 ? 's' : ''}**!`);
+    if (eggsFound > 0) summary.push(`🥚 Found: **${eggsFound} egg${eggsFound > 1 ? 's' : ''}**! (\`v hatch\`)`);
+    if (weaponCratesFound > 0) summary.push(`🏴‍☠️ Found: **${weaponCratesFound} weapon crate${weaponCratesFound > 1 ? 's' : ''}**! (\`v weaponcrate open\`)`);
+    if (xpResult) summary.push(`✨ XP: **+${xpEarned}** xp${xpMult > 1 ? ` (x${xpMult} event)` : ''}`);
+    if (xpResult && xpResult.leveledUp) summary.push(`⬆️ **Leveled up to Level ${xpResult.newLevel}!**`);
+
+    const avatarUrl = message.author.displayAvatarURL ? message.author.displayAvatarURL({ dynamic: true }) : null;
 
     message.channel.send({
-      embeds: [embed(`${rarityEmojis[(results[0].rarity||'').toLowerCase()] || '⚪'} Hunt${count > 1 ? ` x${count}` : ''}`, [
+      embeds: [embed(`${rarityEmojis[highestRarity] || '⚪'} Hunt Expedition${count > 1 ? ` (${count}x)` : ''}`, [
         ...fields,
-        ['', summary.join('\n')],
-      ], 0x2b2d31)],
+        ['🎒 Expedition Summary', summary.join('\n'), false],
+      ], embedColor)
+      .setAuthor({ name: `${message.author.username}'s Hunt`, iconURL: avatarUrl })
+      .setFooter({ text: `Gems: ${db.getGems(userId)} • v zoo to view inventory • v sacrifice for essence` })],
     });
   },
 };
