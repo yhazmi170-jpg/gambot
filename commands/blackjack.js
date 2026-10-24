@@ -70,6 +70,8 @@ function board({ name, player, dealer, reveal, bet, result }) {
   return lines.join('\n');
 }
 
+const activeGames = new Map();
+
 function playLoop(msg, player, dealer, deck, bet, userId, name) {
   const buttons = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('bj_hit').setLabel('Hit').setStyle(ButtonStyle.Primary),
@@ -88,6 +90,7 @@ function playLoop(msg, player, dealer, deck, bet, userId, name) {
         player.push(deck.pop());
         const npv = handValue(player);
         if (npv > 21) {
+          activeGames.delete(userId);
           db.addBalance(userId, -bet);
           db.addGambled(userId, bet);
           const refund = db.getInsuranceRefund(userId, bet);
@@ -105,10 +108,10 @@ function playLoop(msg, player, dealer, deck, bet, userId, name) {
         await interaction.deferUpdate();
         playLoop(msg, player, dealer, deck, bet, userId, name);
       } else {
+        activeGames.delete(userId);
         while (handValue(dealer) < 17) dealer.push(deck.pop());
         const dv = handValue(dealer);
         const pv2 = handValue(player);
-        // lucky removed - no longer affects blackjack
         let result, color;
         if (dv > 21 || pv2 > dv) {
           const paid = db.payWin(userId, bet);
@@ -134,10 +137,10 @@ function playLoop(msg, player, dealer, deck, bet, userId, name) {
 
     col.on('end', async (collected) => {
       if (!collected.size) {
+        activeGames.delete(userId);
         while (handValue(dealer) < 17) dealer.push(deck.pop());
         const dv = handValue(dealer);
         const pv2 = handValue(player);
-        // lucky removed - no longer affects blackjack
         let result, color;
         if (dv > 21 || pv2 > dv) {
           const paid = db.payWin(userId, bet);
@@ -168,6 +171,24 @@ module.exports = {
   description: 'blackjack — beat the dealer to 21',
   aliases: ['bj', 'twentyone'],
   execute(message, args) {
+    if (activeGames.has(message.author.id)) {
+      const g = activeGames.get(message.author.id);
+      const resuming = `🎲 ~ Resuming your active blackjack game!`;
+      const buttons = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('bj_hit').setLabel('Hit').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('bj_stand').setLabel('Stand').setStyle(ButtonStyle.Danger),
+      );
+      return message.channel.send({
+        content: resuming,
+        embeds: [bjEmbed(board({ name: g.name, player: g.player, dealer: g.dealer, reveal: false, bet: g.bet }))],
+        components: [buttons],
+      }).then(msg => {
+        if (global._interactionOwners) global._interactionOwners.set(msg.id, message.author.id);
+        g.msg = msg;
+        playLoop(msg, g.player, g.dealer, g.deck, g.bet, message.author.id, g.name);
+      }).catch(() => {});
+    }
+
     const { amount, error: betError } = db.parseBet(message.author.id, args[0]);
     if (betError) return message.channel.send({ embeds: [error(betError)] });
 
@@ -200,6 +221,8 @@ module.exports = {
         }), 0x57f287)],
       });
     }
+
+    activeGames.set(message.author.id, { player, dealer, deck, bet: amount, name });
 
     const initialButtons = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('bj_hit').setLabel('Hit').setStyle(ButtonStyle.Primary),

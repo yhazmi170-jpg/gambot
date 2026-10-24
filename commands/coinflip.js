@@ -29,7 +29,7 @@ module.exports = {
     const mult = 1;
 
     const initialMsg = await message.channel.send(
-      `🪙 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and picked **${side}**...\n*The coin spins in the air...*`
+      `🪙 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and picked **${side}**\nThe coin spins... 🔄`
     );
 
     const delay = process.env.DB_PATH ? 10 : 750;
@@ -38,7 +38,7 @@ module.exports = {
     if (win) {
       const profit = amount * mult;
       const paid = db.payWin(message.author.id, profit);
-      const text = `🪙 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and picked **${side}**...\nThe coin spins and landed **${result}**! and won **${paid}** ${currency}!`;
+      const text = `🪙 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and picked **${side}**\nThe coin spins... 🪙 landed on **${result}**! and won **${paid}** ${currency}!`;
       if (initialMsg && typeof initialMsg.edit === 'function') {
         await initialMsg.edit(text).catch(() => {});
       }
@@ -49,9 +49,9 @@ module.exports = {
       let text = '';
       if (refund > 0) {
         db.addBalance(message.author.id, refund);
-        text = `🪙 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and picked **${side}**...\nThe coin spins and landed **${result}**... and lost **${amount}** ${currency}! (🛡️ **${refund}** refunded)`;
+        text = `🪙 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and picked **${side}**\nThe coin spins... 🪙 landed on **${result}**... and lost **${amount}** ${currency}! (🛡️ **${refund}** refunded)`;
       } else {
-        text = `🪙 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and picked **${side}**...\nThe coin spins and landed **${result}**... and lost **${amount}** ${currency}!`;
+        text = `🪙 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and picked **${side}**\nThe coin spins... 🪙 landed on **${result}**... and lost **${amount}** ${currency}!`;
       }
       if (initialMsg && typeof initialMsg.edit === 'function') {
         await initialMsg.edit(text).catch(() => {});

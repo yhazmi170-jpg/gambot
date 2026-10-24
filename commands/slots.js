@@ -1,5 +1,5 @@
 const db = require('../db');
-const { error } = require('../utils/embed');
+const { card, error } = require('../utils/embed');
 const config = require('../config');
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -48,14 +48,18 @@ module.exports = {
     const middle = spin();
     const bottom = spin();
 
-    const initialMsg = await message.channel.send(
-      `🎰 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and pulled the slot machine!\n\n` +
-      `___SLOTS___\n` +
-      `  🌀 | 🌀 | 🌀\n` +
-      `  🌀 | 🌀 | 🌀  ◄\n` +
-      `  🌀 | 🌀 | 🌀\n\n` +
-      `*The reels are spinning...*`
-    ).catch(err => {
+    const initialEmbed = card({
+      description:
+        `🎰 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and pulled the slot machine!\n\n` +
+        `___SLOTS___\n` +
+        `  🌀 | 🌀 | 🌀\n` +
+        `  🌀 | 🌀 | 🌀  ◄\n` +
+        `  🌀 | 🌀 | 🌀\n\n` +
+        `*The reels are spinning...*`,
+      color: 0x5865f2,
+    });
+
+    const initialMsg = await message.channel.send({ embeds: [initialEmbed] }).catch(err => {
       console.error('Failed to send initial slots message:', err);
       return null;
     });
@@ -66,11 +70,11 @@ module.exports = {
 
     const winnings = calcWin(middle, amount);
     let outcomeText = '';
+    const jackpot = middle[0] === 6 && middle[1] === 6 && middle[2] === 6;
 
     if (winnings > 0) {
       const net = winnings - amount;
       const paid = db.payWin(message.author.id, net);
-      const jackpot = middle[0] === 6 && middle[1] === 6 && middle[2] === 6;
       if (jackpot) {
         outcomeText = `... and hit the **777 MEGA JACKPOT**! You won **${paid.toLocaleString()}** ${currency}!`;
       } else {
@@ -92,14 +96,18 @@ module.exports = {
     const m = middle.map(i => REELS[i]).join(' | ');
     const b = bottom.map(i => REELS[i]).join(' | ');
 
-    const finalContent =
-      `🎰 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and pulled the slot machine!\n\n` +
-      `___SLOTS___\n` +
-      `  ${t}\n` +
-      `  ${m}  ◄\n` +
-      `  ${b}\n\n` +
-      outcomeText;
+    const color = jackpot ? 0xffd700 : (winnings > 0 ? 0x57f287 : 0xed4245);
+    const finalEmbed = card({
+      description:
+        `🎰 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and pulled the slot machine!\n\n` +
+        `___SLOTS___\n` +
+        `  ${t}\n` +
+        `  ${m}  ◄\n` +
+        `  ${b}\n\n` +
+        outcomeText,
+      color,
+    });
 
-    await initialMsg.edit(finalContent).catch(() => {});
+    await initialMsg.edit({ embeds: [finalEmbed] }).catch(() => {});
   },
 };

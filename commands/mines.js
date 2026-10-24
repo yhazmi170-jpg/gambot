@@ -1,7 +1,15 @@
 const db = require('../db');
 const config = require('../config');
 const { embed, error, parseAmount } = require('../utils/embed');
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const {
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  MessageFlags,
+} = require('discord.js');
 
 const activeGames = new Map();
 const ROWS = 3; const COLS = 3; const BOMBS = 3;
@@ -22,66 +30,15 @@ function mult(gems, bombs) {
   return Math.max(1.05, Math.round(m * boost * 100) / 100);
 }
 
-function renderGrid(game) {
-  const rows = [];
-  for (let r = 0; r < ROWS; r++) {
-    const cells = [];
-    for (let c = 0; c < COLS; c++) {
-      const idx = r * COLS + c;
-      if (game.hitBomb === idx) {
-        cells.push('💥');
-      } else if (game.revealed.has(idx)) {
-        if (game.bombs[idx]) cells.push('💣');
-        else cells.push('💎');
-      } else {
-        cells.push('⬛');
-      }
-    }
-    rows.push(cells.join(' '));
-  }
-  return rows.join('\n');
-}
-
-function buildButtons(game) {
-  const rows = [];
-  for (let r = 0; r < ROWS; r++) {
-    const tileRow = [];
-    for (let c = 0; c < COLS; c++) {
-      const idx = r * COLS + c;
-      const rev = game.revealed.has(idx);
-      let emoji, style, disabled;
-      if (game.hitBomb === idx) { emoji = '💥'; style = ButtonStyle.Danger; disabled = true; }
-      else if (game.lastSafe === idx) { emoji = '💎'; style = ButtonStyle.Success; disabled = true; }
-      else if (rev && game.bombs[idx]) { emoji = '💣'; style = ButtonStyle.Danger; disabled = true; }
-      else if (rev) { emoji = '💎'; style = ButtonStyle.Primary; disabled = true; }
-      else { emoji = null; style = ButtonStyle.Secondary; disabled = !game.active; }
-      const b = new ButtonBuilder().setCustomId(`m_${idx}`).setStyle(style).setDisabled(disabled);
-      if (emoji) b.setEmoji(emoji);
-      else b.setLabel('\u200b');
-      tileRow.push(b);
-    }
-    rows.push(new ActionRowBuilder().addComponents(tileRow));
-  }
-
-  const canCashOut = game.active && game.revealed.size > 0 && game.hitBomb === undefined;
-  const cashButton = new ButtonBuilder()
-    .setCustomId('m_cash')
-    .setLabel('Cash Out')
-    .setEmoji('💰')
-    .setStyle(canCashOut ? ButtonStyle.Success : ButtonStyle.Secondary)
-    .setDisabled(!canCashOut);
-  rows.push(new ActionRowBuilder().addComponents(cashButton));
-  return rows;
-}
-
 function buildContainer(game, outcome) {
   const rc = game.revealed.size;
   const b = game.bombCount;
   const bet = game.bet;
-  const grid = renderGrid(game);
 
-  const lines = [grid, ''];
-  lines.push(`Bet: **${bet.toLocaleString()}** ${config.currency}  •  Mines: **${b}**`);
+  const lines = [
+    `### 💣 Mines`,
+    `Bet: **${bet.toLocaleString()}** ${config.currency}  •  Mines: **${b}**`,
+  ];
 
   if (outcome) {
     lines.push('', outcome);
@@ -107,8 +64,47 @@ function buildContainer(game, outcome) {
     }
   }
 
-  const color = outcome ? (outcome.includes('Cashed Out') || outcome.includes('Cleared') ? 0x57f287 : 0xed4245) : 0x2b2d31;
-  return { embeds: [embed('💣 Mines', [['', lines.join('\n')]], color)], components: buildButtons(game) };
+  const color = outcome ? (outcome.includes('Cashed Out') || outcome.includes('Cleared') ? 0x57f287 : 0xed4245) : 0x5865f2;
+
+  const actionRows = [];
+  for (let r = 0; r < ROWS; r++) {
+    const tileRow = [];
+    for (let c = 0; c < COLS; c++) {
+      const idx = r * COLS + c;
+      const rev = game.revealed.has(idx);
+      let emoji, style, disabled;
+      if (game.hitBomb === idx) { emoji = '💥'; style = ButtonStyle.Danger; disabled = true; }
+      else if (game.lastSafe === idx) { emoji = '💎'; style = ButtonStyle.Success; disabled = true; }
+      else if (rev && game.bombs[idx]) { emoji = '💣'; style = ButtonStyle.Danger; disabled = true; }
+      else if (rev) { emoji = '💎'; style = ButtonStyle.Primary; disabled = true; }
+      else { emoji = null; style = ButtonStyle.Secondary; disabled = !game.active; }
+      const b = new ButtonBuilder().setCustomId(`m_${idx}`).setStyle(style).setDisabled(disabled);
+      if (emoji) b.setEmoji(emoji);
+      else b.setLabel('\u200b');
+      tileRow.push(b);
+    }
+    actionRows.push(new ActionRowBuilder().addComponents(tileRow));
+  }
+
+  const canCashOut = game.active && game.revealed.size > 0 && game.hitBomb === undefined;
+  const cashButton = new ButtonBuilder()
+    .setCustomId('m_cash')
+    .setLabel('Cash Out')
+    .setEmoji('💰')
+    .setStyle(canCashOut ? ButtonStyle.Success : ButtonStyle.Secondary)
+    .setDisabled(!canCashOut);
+  actionRows.push(new ActionRowBuilder().addComponents(cashButton));
+
+  const container = new ContainerBuilder()
+    .setAccentColor(color)
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')))
+    .addSeparatorComponents(new SeparatorBuilder().setDivider(true))
+    .addActionRowComponents(...actionRows);
+
+  return {
+    components: [container],
+    flags: [MessageFlags.IsComponentsV2],
+  };
 }
 
 module.exports = {
