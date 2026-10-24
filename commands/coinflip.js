@@ -8,7 +8,7 @@ module.exports = {
   helpArgs: '<amount> heads/tails',
   description: '50/50 coinflip',
   aliases: ['cf', 'coin', 'flip'],
-  execute(message, args) {
+  async execute(message, args) {
     const { amount, error: betError } = db.parseBet(message.author.id, args[0]);
     if (betError) return message.channel.send({ embeds: [error(betError)] });
 
@@ -21,21 +21,41 @@ module.exports = {
     }
 
     const side = choice[0] === 'h' ? 'heads' : 'tails';
-    
-    const result = Math.random() < (0.5) ? side : (side === 'heads' ? 'tails' : 'heads');
+    const authorName = message.author.username || 'Player';
+    const currency = config.currency;
+
+    const result = Math.random() < 0.5 ? side : (side === 'heads' ? 'tails' : 'heads');
     const win = result === side;
     const mult = 1;
+
+    const initialMsg = await message.channel.send(
+      `🪙 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and picked **${side}**...\n*The coin spins in the air...*`
+    );
+
+    const delay = process.env.DB_PATH ? 10 : 750;
+    await new Promise(r => setTimeout(r, delay));
 
     if (win) {
       const profit = amount * mult;
       const paid = db.payWin(message.author.id, profit);
-      message.channel.send(`🪙 picked **${side}** — landed **${result}** — won **${paid}**`);
+      const text = `🪙 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and picked **${side}**...\nThe coin spins and landed **${result}**! and won **${paid}** ${currency}!`;
+      if (initialMsg && typeof initialMsg.edit === 'function') {
+        await initialMsg.edit(text).catch(() => {});
+      }
     } else {
       db.addBalance(message.author.id, -amount);
       db.addGambled(message.author.id, amount);
       const refund = db.getInsuranceRefund(message.author.id, amount);
-      if (refund > 0) { db.addBalance(message.author.id, refund); message.channel.send(`🪙 picked **${side}** — landed **${result}** — lost **${amount}** (🛡️ **${refund}** refunded)`); }
-      else message.channel.send(`🪙 picked **${side}** — landed **${result}** — lost **${amount}**`);
+      let text = '';
+      if (refund > 0) {
+        db.addBalance(message.author.id, refund);
+        text = `🪙 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and picked **${side}**...\nThe coin spins and landed **${result}**... and lost **${amount}** ${currency}! (🛡️ **${refund}** refunded)`;
+      } else {
+        text = `🪙 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and picked **${side}**...\nThe coin spins and landed **${result}**... and lost **${amount}** ${currency}!`;
+      }
+      if (initialMsg && typeof initialMsg.edit === 'function') {
+        await initialMsg.edit(text).catch(() => {});
+      }
     }
   },
 };

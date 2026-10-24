@@ -74,17 +74,16 @@ const CATEGORY_EMOJIS = {
 function buildMenuEmbed(uid) {
   const owned = db.getUserPerks(uid).map(p => p.perk);
   const cats = loadCategories();
-  const lines = cats.map(([cat]) => `**${cat}** — \`${prefix} help ${cat.toLowerCase()}\``).join('\n');
+  const lines = cats.map(([cat], i) => `**${i + 1}. ${cat}**`).join('\n');
   const hasPerks = owned.length > 0;
   const tips = [
     `\`${prefix} gamehelp <game>\` — rules for each game`,
     `\`${prefix} version\` — bot version (v${version})`,
-    'Tip: higher balance slightly reduces gambling payouts (max 60% cut)',
+    'Higher balance = slightly lower rewards/wins (caps at 60% less)',
   ];
-  return new EmbedBuilder().setColor(0x5865f2)
+  return new EmbedBuilder().setColor(0x2b2d31)
     .setTitle(`Gambot v${version}`)
-    .setDescription(`Select a category below to explore commands:${hasPerks ? `\n**Perks** — ${owned.length} unlocked` : ''}\n\n${lines}\n\n${tips.join('\n')}`)
-    .setFooter({ text: 'Gambot Economy & RPG • discord.js v14' });
+    .setDescription(`pick a category to see its commands${hasPerks ? `\n**Perks** — ${owned.length} owned, tap to see them` : ''}\n\n${lines}\n\n${tips.join(' · ')}`);
 }
 
 function buildMenuRow(uid) {
@@ -100,7 +99,7 @@ function buildMenuRow(uid) {
   }
   const hasPerks = owned.length > 0;
   if (row.length || hasPerks) {
-    if (hasPerks) row.push(new ButtonBuilder().setCustomId('help_perks').setLabel('Perks').setStyle(ButtonStyle.Primary));
+    if (hasPerks) row.push(new ButtonBuilder().setCustomId('help_perks').setLabel('Perks').setStyle(ButtonStyle.Secondary));
     if (row.length) rows.push(new ActionRowBuilder().addComponents(row));
   }
   return rows;
@@ -108,7 +107,7 @@ function buildMenuRow(uid) {
 
 function buildCategoryEmbed(cat) {
   const fields = chunkFields(cat[0], cat[1]);
-  return embed(`Help — ${cat[0]}`, fields, 0x5865f2);
+  return embed(`Help — ${cat[0]}`, fields, 0x2b2d31);
 }
 
 function buildCategoryRows() {

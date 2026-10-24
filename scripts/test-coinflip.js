@@ -52,10 +52,14 @@ function makeMessage(content, userId) {
   const channel = {
     id: 'chan_it',
     send(payload) {
+      const idx = sends.length;
       sends.push(payload);
       return Promise.resolve({
         delete: () => Promise.resolve(),
-        edit: () => Promise.resolve(),
+        edit: (newPayload) => {
+          sends[idx] = newPayload;
+          return Promise.resolve();
+        },
         createMessageComponentCollector: () => ({ on() {} }),
       });
     },

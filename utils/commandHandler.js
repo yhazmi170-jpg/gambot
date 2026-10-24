@@ -304,18 +304,13 @@ async function handleMessage(message) {
   }  dlog.log({ kind: 'step', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name, step: 'pre_execute' });
 
   try {
-    const result = cmd.execute(message, args);
+    const result = await cmd.execute(message, args);
     dlog.log({ kind: 'executed', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name });
-    if (result instanceof Promise) result.catch(err => {
-      dlog.log({ kind: 'throw', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name, step: 'execute_promise', err: err && err.message });
-      logCmdError('execute_promise', err);
-      message.channel.send({ embeds: [error('an error occurred')] }).catch(() => {});
-    });
-    } catch (err) {
-      dlog.log({ kind: 'throw', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name, step: 'execute_sync', err: err && err.message });
-      logCmdError('execute_sync', err);
-      message.channel.send({ embeds: [require('./embed').error('an error occurred')] });
-    }
+  } catch (err) {
+    dlog.log({ kind: 'throw', guild: message.guild && message.guild.id, user: message.author.id, cmd: cmd.name, step: 'execute', err: err && err.message });
+    logCmdError('execute', err);
+    message.channel.send({ embeds: [require('./embed').error('an error occurred')] });
+  }
 
   // "JayJay made this" credit — random follow-up + 😭 (owner request 2026-10-06).
   // Cosmetic, free-running, never throws, never touches the command's own reply.
