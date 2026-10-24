@@ -120,9 +120,9 @@ module.exports = {
     const avatarUrl = message.author.displayAvatarURL ? message.author.displayAvatarURL({ dynamic: true }) : null;
 
     message.channel.send({
-      embeds: [embed(`${rarityEmojis[highestRarity] || '⚪'} Hunt Expedition${count > 1 ? ` (${count}x)` : ''}`, [
+      embeds: [embed(`Hunt Expedition${count > 1 ? ` (${count}x)` : ''}`, [
         ...fields,
-        ['🎒 Expedition Summary', summary.join('\n'), false],
+        ['Summary', summary.join('\n'), false],
       ], embedColor)
       .setAuthor({ name: `${message.author.username}'s Hunt`, iconURL: avatarUrl })
       .setFooter({ text: `Gems: ${db.getGems(userId)} • v zoo to view inventory • v sacrifice for essence` })],

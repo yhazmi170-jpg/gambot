@@ -29,8 +29,8 @@ function calcWin(reels, bet) {
 }
 
 function renderSlotMachine(reels, revealCount) {
-  const display = reels.map((r, i) => (revealCount > i ? REELS[r] : '🌀')).join('  ┆  ');
-  return `╭─────── 🎰 **SLOTS** ───────╮\n│      ${display}      │ ◄\n╰─────────────────────────────╯`;
+  const display = reels.map((r, i) => (revealCount > i ? REELS[r] : '•')).join('  ┆  ');
+  return `╭─────── **SLOTS** ───────╮\n│      ${display}      │ ◄\n╰─────────────────────────╯`;
 }
 
 module.exports = {
@@ -50,11 +50,11 @@ module.exports = {
 
     const msg = await message.channel.send({
       embeds: [card({
-        title: '🎰 Vegas Slot Machine',
+        title: 'Slots',
         description: `${renderSlotMachine(reels, 0)}\n\n*Spinning the reels...*`,
         fields: [
           ['Wager', `**${amount.toLocaleString()}** ${config.currency}`, true],
-          ['Status', '🟡 **Rolling...**', true],
+          ['Status', '**Rolling...**', true],
         ],
         color: 0x5865f2,
         footer: `Player: ${message.author.username}`,
@@ -68,11 +68,11 @@ module.exports = {
     await sleep(400);
     await msg.edit({
       embeds: [card({
-        title: '🎰 Vegas Slot Machine',
+        title: 'Slots',
         description: `${renderSlotMachine(reels, 1)}\n\n*Locking reels...*`,
         fields: [
           ['Wager', `**${amount.toLocaleString()}** ${config.currency}`, true],
-          ['Status', '🟡 **Reel 1 Locked**', true],
+          ['Status', '**Reel 1 Locked**', true],
         ],
         color: 0x5865f2,
         footer: `Player: ${message.author.username}`,
@@ -82,11 +82,11 @@ module.exports = {
     await sleep(400);
     await msg.edit({
       embeds: [card({
-        title: '🎰 Vegas Slot Machine',
+        title: 'Slots',
         description: `${renderSlotMachine(reels, 2)}\n\n*Locking reels...*`,
         fields: [
           ['Wager', `**${amount.toLocaleString()}** ${config.currency}`, true],
-          ['Status', '🟡 **Reel 2 Locked**', true],
+          ['Status', '**Reel 2 Locked**', true],
         ],
         color: 0x5865f2,
         footer: `Player: ${message.author.username}`,
@@ -104,8 +104,8 @@ module.exports = {
       const mult = (winnings / amount).toFixed(1);
       await msg.edit({
         embeds: [card({
-          title: jackpot ? '💥 777 MEGA JACKPOT! 💥' : '🎉 WINNER!',
-          description: `${renderSlotMachine(reels, 3)}\n\n${jackpot ? '✨ **TRIPLE SEVENS — JACKPOT HIT!** ✨' : '🎉 **Congratulations! Winning spin!**'}`,
+          title: jackpot ? '777 Mega Jackpot!' : 'Winner!',
+          description: `${renderSlotMachine(reels, 3)}\n\n${jackpot ? '**Triple Sevens — Jackpot Hit!**' : '**Winning spin!**'}`,
           fields: [
             ['Wager', `**${amount.toLocaleString()}** ${config.currency}`, true],
             ['Multiplier', `**${mult}x**`, true],
@@ -122,11 +122,11 @@ module.exports = {
       if (refund > 0) db.addBalance(message.author.id, refund);
       await msg.edit({
         embeds: [card({
-          title: '🎰 Slots — No Match',
-          description: `${renderSlotMachine(reels, 3)}\n\n${refund > 0 ? '🛡️ *Insurance activated! Partial refund credited.*' : '*Better luck next spin!*'}`,
+          title: 'Slots — No Match',
+          description: `${renderSlotMachine(reels, 3)}\n\n${refund > 0 ? '*Insurance activated. Partial refund credited.*' : '*Better luck next spin.*'}`,
           fields: [
             ['Wager', `**${amount.toLocaleString()}** ${config.currency}`, true],
-            ['Result', refund > 0 ? `Lost **${amount.toLocaleString()}**\n🛡️ **+${refund.toLocaleString()}** refunded` : `Lost **${amount.toLocaleString()}** ${config.currency}`, true],
+            ['Result', refund > 0 ? `Lost **${amount.toLocaleString()}**\n**+${refund.toLocaleString()}** refunded` : `Lost **${amount.toLocaleString()}** ${config.currency}`, true],
           ],
           color: 0xed4245,
           footer: `Player: ${message.author.username}`,

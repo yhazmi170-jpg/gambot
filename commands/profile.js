@@ -46,36 +46,36 @@ module.exports = {
 
     const fields = [
       ['Level & Progression', `**Level ${li.level}**\n${progressBar(li.xp, li.needed, 8)} \`${Math.floor(li.progress * 100)}%\` (${li.xp.toLocaleString()}/${li.needed.toLocaleString()} XP)`, false],
-      ['💰 Balance', `**${user.balance.toLocaleString()}** ${config.currency}`, true],
-      ['🏦 Bank Vault', `**${user.bank.toLocaleString()}** ${config.currency}`, true],
-      ['💎 Gems & Essence', `**${user.gems}** 💎 • **${user.essence}** ✨`, true],
-      ['🐾 Animals & Team', `**${animals}** owned${teamCount ? ` • **${teamCount}** team` : ''}`, true],
-      ['🏆 Battle Wins', `**${battleWins}** wins`, true],
-      ['🔥 Daily Streak', `**${user.daily_streak || 0}** days`, true],
-      ['🎲 Total Gambled', `**${user.total_gambled.toLocaleString()}** ${config.currency}`, true],
-      ['📈 Total Won', `**${user.total_won.toLocaleString()}** ${config.currency}`, true],
-      ['🛡️ Insurance', ins ? `**${insPct[ins]}%** refund` : 'None', true],
-      ['🎖️ Title', titleLine(target.id), true],
-      ['⭐ Reputation', `**${user.reputation}** rep`, true],
-      ['💳 Credit Score', `**${user.credit_score}**`, true],
+      ['Balance', `**${user.balance.toLocaleString()}** ${config.currency}`, true],
+      ['Bank Vault', `**${user.bank.toLocaleString()}** ${config.currency}`, true],
+      ['Gems & Essence', `**${user.gems}** 💎 • **${user.essence}** ✨`, true],
+      ['Animals & Team', `**${animals}** owned${teamCount ? ` • **${teamCount}** team` : ''}`, true],
+      ['Battle Wins', `**${battleWins}** wins`, true],
+      ['Daily Streak', `**${user.daily_streak || 0}** days`, true],
+      ['Total Gambled', `**${user.total_gambled.toLocaleString()}** ${config.currency}`, true],
+      ['Total Won', `**${user.total_won.toLocaleString()}** ${config.currency}`, true],
+      ['Insurance', ins ? `**${insPct[ins]}%** refund` : 'None', true],
+      ['Title', titleLine(target.id), true],
+      ['Reputation', `**${user.reputation}** rep`, true],
+      ['Credit Score', `**${user.credit_score}**`, true],
     ];
 
-    if (eggs || seals) fields.push(['🥚 Eggs & Seals', `**${eggs}** eggs • **${seals}** seals`, true]);
-    if (freeBet > 0) fields.push(['🎁 Free Bet', `**${freeBet.toLocaleString()}** coins`, true]);
-    if (user.loan > 0) fields.push(['⚠️ Loan', `**${user.loan.toLocaleString()}** outstanding`, true]);
-    if (clan) fields.push(['🛡️ Clan', `**${clan.name}**`, true]);
-    if (plot) fields.push(['🏡 Plot', `Lv.**${plot.level}**`, true]);
-    if (inJail) fields.push(['🔒 Jail', `Until <t:${Math.floor(user.jail_until / 1000)}:R>`, true]);
+    if (eggs || seals) fields.push(['Eggs & Seals', `**${eggs}** eggs • **${seals}** seals`, true]);
+    if (freeBet > 0) fields.push(['Free Bet', `**${freeBet.toLocaleString()}** coins`, true]);
+    if (user.loan > 0) fields.push(['Loan', `**${user.loan.toLocaleString()}** outstanding`, true]);
+    if (clan) fields.push(['Clan', `**${clan.name}**`, true]);
+    if (plot) fields.push(['Plot', `Lv.**${plot.level}**`, true]);
+    if (inJail) fields.push(['Jail', `Until <t:${Math.floor(user.jail_until / 1000)}:R>`, true]);
 
     if (marriage) {
       const partnerId = marriage.user_id === target.id ? marriage.partner_id : marriage.user_id;
-      fields.push(['💍 Married to', `<@${partnerId}>`, true]);
+      fields.push(['Married to', `<@${partnerId}>`, true]);
     }
     if (children.length) {
-      fields.push(['👶 Children', children.map(c => `<@${c}>`).join(', '), true]);
+      fields.push(['Children', children.map(c => `<@${c}>`).join(', '), true]);
     }
     if (parents.length) {
-      fields.push(['👪 Parents', parents.map(p => `<@${p}>`).join(', '), true]);
+      fields.push(['Parents', parents.map(p => `<@${p}>`).join(', '), true]);
     }
     if (perks.length) {
       const lines = perks.map(p => {
@@ -86,11 +86,11 @@ module.exports = {
         }
         return p.perk;
       });
-      fields.push(['⚡ Active Perks', lines.join(', '), false]);
+      fields.push(['Active Perks', lines.join(', '), false]);
     }
 
     const e = card({
-      author: { name: `${badge}${target.username}'s Adventure Profile`, iconURL: avatarUrl },
+      author: { name: `${badge}${target.username}'s Profile`, iconURL: avatarUrl },
       thumbnail: avatarUrl,
       fields,
       color: 0x5865f2,
