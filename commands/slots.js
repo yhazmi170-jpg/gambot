@@ -65,7 +65,39 @@ module.exports = {
     });
     if (!initialMsg) return;
 
-    const delay = process.env.DB_PATH ? 10 : 750;
+    const delay = process.env.DB_PATH ? 10 : 500;
+    await sleep(delay);
+
+    // Frame 1: Reel 1 locked
+    await initialMsg.edit({
+      embeds: [card({
+        description:
+          `🎰 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and pulled the slot machine!\n\n` +
+          `___SLOTS___\n` +
+          `  ${REELS[top[0]]} | 🌀 | 🌀\n` +
+          `  ${REELS[middle[0]]} | 🌀 | 🌀  ◄\n` +
+          `  ${REELS[bottom[0]]} | 🌀 | 🌀\n\n` +
+          `*Locking reels...*`,
+        color: 0x5865f2,
+      })],
+    }).catch(() => {});
+
+    await sleep(delay);
+
+    // Frame 2: Reel 2 locked
+    await initialMsg.edit({
+      embeds: [card({
+        description:
+          `🎰 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and pulled the slot machine!\n\n` +
+          `___SLOTS___\n` +
+          `  ${REELS[top[0]]} | ${REELS[top[1]]} | 🌀\n` +
+          `  ${REELS[middle[0]]} | ${REELS[middle[1]]} | 🌀  ◄\n` +
+          `  ${REELS[bottom[0]]} | ${REELS[bottom[1]]} | 🌀\n\n` +
+          `*Locking reels...*`,
+        color: 0x5865f2,
+      })],
+    }).catch(() => {});
+
     await sleep(delay);
 
     const winnings = calcWin(middle, amount);
