@@ -4,7 +4,7 @@ const { embed, error, parseAmount } = require('../utils/embed');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 const activeGames = new Map();
-const ROWS = 4; const COLS = 4; const BOMBS = 4;
+const ROWS = 3; const COLS = 3; const BOMBS = 3;
 
 function createGrid(bc) {
   const cells = Array(ROWS * COLS).fill(false);
@@ -14,10 +14,32 @@ function createGrid(bc) {
 }
 
 function mult(gems, bombs) {
+  if (gems === 0) return 1;
   let m = 1;
-  for (let i = 0; i < gems; i++) m *= (ROWS * COLS - i) / (ROWS * COLS - bombs - i);
-  const boost = 1.1;
-  return Math.round(m * boost * 100) / 100;
+  const total = ROWS * COLS;
+  for (let i = 0; i < gems; i++) m *= (total - i) / (total - bombs - i);
+  const boost = 0.98;
+  return Math.max(1.05, Math.round(m * boost * 100) / 100);
+}
+
+function renderGrid(game) {
+  const rows = [];
+  for (let r = 0; r < ROWS; r++) {
+    const cells = [];
+    for (let c = 0; c < COLS; c++) {
+      const idx = r * COLS + c;
+      if (game.hitBomb === idx) {
+        cells.push('💥');
+      } else if (game.revealed.has(idx)) {
+        if (game.bombs[idx]) cells.push('💣');
+        else cells.push('💎');
+      } else {
+        cells.push('⬛');
+      }
+    }
+    rows.push(cells.join(' '));
+  }
+  return rows.join('\n');
 }
 
 function buildButtons(game) {
@@ -32,7 +54,7 @@ function buildButtons(game) {
       else if (game.lastSafe === idx) { emoji = '💎'; style = ButtonStyle.Success; disabled = true; }
       else if (rev && game.bombs[idx]) { emoji = '💣'; style = ButtonStyle.Danger; disabled = true; }
       else if (rev) { emoji = '💎'; style = ButtonStyle.Primary; disabled = true; }
-      else { emoji = null; style = ButtonStyle.Secondary; disabled = false; }
+      else { emoji = null; style = ButtonStyle.Secondary; disabled = !game.active; }
       const b = new ButtonBuilder().setCustomId(`m_${idx}`).setStyle(style).setDisabled(disabled);
       if (emoji) b.setEmoji(emoji);
       else b.setLabel('\u200b');
@@ -40,9 +62,15 @@ function buildButtons(game) {
     }
     rows.push(new ActionRowBuilder().addComponents(tileRow));
   }
-  // dedicated 5th row for cash-out so all 16 tiles (4x4) stay clickable
-  const cd = game.hitBomb !== undefined || !game.active;
-  rows.push(new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('m_cash').setEmoji('💰').setStyle(cd ? ButtonStyle.Secondary : ButtonStyle.Success).setDisabled(cd)));
+
+  const canCashOut = game.active && game.revealed.size > 0 && game.hitBomb === undefined;
+  const cashButton = new ButtonBuilder()
+    .setCustomId('m_cash')
+    .setLabel('Cash Out')
+    .setEmoji('💰')
+    .setStyle(canCashOut ? ButtonStyle.Success : ButtonStyle.Secondary)
+    .setDisabled(!canCashOut);
+  rows.push(new ActionRowBuilder().addComponents(cashButton));
   return rows;
 }
 
@@ -50,8 +78,11 @@ function buildContainer(game, outcome) {
   const rc = game.revealed.size;
   const b = game.bombCount;
   const bet = game.bet;
-  const lines = [];
-  lines.push(`${game.testMode ? '🧪 ' : '💣 '}Mines${game.testMode ? ' [TEST MODE]' : ''}  |  Bet: \`${bet.toLocaleString()}\`  |  Mines: \`${b}\``);
+  const grid = renderGrid(game);
+
+  const lines = [grid, ''];
+  lines.push(`Bet: **${bet.toLocaleString()}** ${config.currency}  •  Mines: **${b}**`);
+
   if (outcome) {
     lines.push('', outcome);
   } else {
@@ -59,20 +90,23 @@ function buildContainer(game, outcome) {
       const curMult = mult(rc, b);
       const curPayout = Math.floor(game.bet * curMult);
       const curPaid = Math.floor((curPayout - game.bet) * db.getBalanceFactor(game.userId)) + game.bet;
-      const cutNote = curPaid < curPayout ? ` (${(curPaid / game.bet).toFixed(2)}× after balance cut)` : '';
-      lines.push('', `Cash Out: \`${curPaid.toLocaleString()} (${curMult.toFixed(2)}×)\`${cutNote}`);
+      const cutNote = curPaid < curPayout ? ` (${(curPaid / game.bet).toFixed(2)}× after cut)` : '';
+      lines.push(`Cash Out: **${curPaid.toLocaleString()}** (${curMult.toFixed(2)}×)${cutNote}`);
     }
-    if (rc < ROWS * COLS - b) {
+    const safeGems = ROWS * COLS - b;
+    if (rc < safeGems) {
       const nextMult = mult(rc + 1, b);
       const nextPayout = Math.floor(game.bet * nextMult);
       const nextPaid = Math.floor((nextPayout - game.bet) * db.getBalanceFactor(game.userId)) + game.bet;
-      const cutNote = nextPaid < nextPayout ? ` (${(nextPaid / game.bet).toFixed(2)}× after balance cut)` : '';
-      lines.push(`Next: \`${nextPaid.toLocaleString()} (${nextMult.toFixed(2)}×)\`${cutNote}`);
+      const cutNote = nextPaid < nextPayout ? ` (${(nextPaid / game.bet).toFixed(2)}× after cut)` : '';
+      lines.push(`Next: **${nextPaid.toLocaleString()}** (${nextMult.toFixed(2)}×)${cutNote}`);
     }
-    if (rc >= ROWS * COLS - b) lines.push('All gems cleared!');
-    lines.push(`Gems: **${rc}**`);
-    if (rc === 0 && !game.hasCustomMines) lines.push('', `_\`v mines <bet> <mines>\` to set mine count_`);
+    lines.push(`Gems Found: **${rc} / ${safeGems}**`);
+    if (rc === 0 && !game.hasCustomMines) {
+      lines.push('', `_\`v mines <bet> <mines>\` (1–8 mines)_`);
+    }
   }
+
   const color = outcome ? (outcome.includes('Cashed Out') || outcome.includes('Cleared') ? 0x57f287 : 0xed4245) : 0x2b2d31;
   return { embeds: [embed('💣 Mines', [['', lines.join('\n')]], color)], components: buildButtons(game) };
 }
@@ -80,9 +114,9 @@ function buildContainer(game, outcome) {
 module.exports = {
   name: 'mines',
   helpCategory: 'Games',
-  helpArgs: '<amount>',
+  helpArgs: '<amount> [mines]',
   description: 'reveal tiles, avoid mines',
-  aliases: ['mine'],
+  aliases: ['mine', 'm'],
   execute(message, args) {
     let testMode = false;
     let amount;
@@ -93,7 +127,6 @@ module.exports = {
         args.shift();
       }
 
-      let amount;
       const u = db.ensureUser(message.author.id);
       if (!u) return message.channel.send({ embeds: [error('you need to accept terms first — `v agree`')] });
       if ((args[0] || '').toLowerCase() === 'all' && !testMode) { amount = Math.min(u.balance, db.getMaxBet(message.author.id)); if (amount <= 0) return message.channel.send({ embeds: [error('you have no money')] }); }
@@ -116,7 +149,7 @@ module.exports = {
       }
 
       const customMines = parseInt(args[1]);
-      const hasCustomMines = !isNaN(customMines) && customMines >= 1 && customMines <= 15;
+      const hasCustomMines = !isNaN(customMines) && customMines >= 1 && customMines <= 8;
       let bombCount;
       if (hasCustomMines) {
         bombCount = customMines;
@@ -133,12 +166,15 @@ module.exports = {
       col.on('collect', async (i) => {
         if (!game.active) { await i.deferUpdate().catch(() => {}); return; }
         if (i.customId === 'm_cash') {
+          if (game.revealed.size === 0) { await i.deferUpdate().catch(() => {}); return; }
           game.active = false; activeGames.delete(message.author.id);
           const p = Math.floor(game.bet * mult(game.revealed.size, game.bombCount));
           const paid = game.testMode ? (p - game.bet) : db.payWin(message.author.id, p - game.bet, game.bet);
           const total = game.bet + paid;
           const gotMult = game.testMode ? '' : ` — got **${(total / game.bet).toFixed(2)}×**${paid < p - game.bet ? ' (balance cut)' : ''}`;
-          return i.update({ embeds: [embed('💣 Mines', [['', `${game.testMode ? '🧪' : '💣'} Cashed Out${game.testMode ? ' [TEST]' : ''}\n\n**${total.toLocaleString()}** ${config.currency} (+**${paid}**)${gotMult}${game.testMode ? ' (no money gained)' : ''}`]], 0x57f287)] }).catch(() => {});
+          for (let j = 0; j < ROWS * COLS; j++) game.revealed.add(j);
+          const outcome = `💰 **Cashed Out!**\n**+${total.toLocaleString()}** ${config.currency}${gotMult}`;
+          return i.update(buildContainer(game, outcome)).catch(() => {});
         }
         const idx = parseInt(i.customId.split('_')[1]);
         if (game.revealed.has(idx)) { await i.deferUpdate().catch(() => {}); return; }
@@ -150,8 +186,8 @@ module.exports = {
             refund = db.getInsuranceRefund(message.author.id, game.bet);
             if (refund > 0) db.addBalance(message.author.id, refund);
           }
-          const lines = [`${game.testMode ? '🧪' : '💥'} Touched a mine!${game.testMode ? ' [TEST]' : ''}\n\nLost **${game.bet.toLocaleString()}** ${config.currency}${refund > 0 ? ` (refund **${refund}**)` : ''}${game.testMode ? ' (no money lost)' : ''}`];
-          return i.update({ embeds: [embed('💣 Mines', [['', lines.join('\n')]], 0xed4245)], components: buildButtons(game) }).catch(() => {});
+          const outcome = `💥 **Touched a mine!**\nLost **${game.bet.toLocaleString()}** ${config.currency}${refund > 0 ? ` (refund **${refund.toLocaleString()}**)` : ''}`;
+          return i.update(buildContainer(game, outcome)).catch(() => {});
         }
         game.revealed.add(idx); game.lastSafe = idx;
         const rc = game.revealed.size;
@@ -162,8 +198,8 @@ module.exports = {
           const total = game.bet + paid;
           const gotMult = game.testMode ? '' : ` — got **${(total / game.bet).toFixed(2)}×**${paid < p - game.bet ? ' (balance cut)' : ''}`;
           for (let j = 0; j < ROWS * COLS; j++) game.revealed.add(j);
-          const lines = [`${game.testMode ? '🧪' : '💣'} All Cleared!${game.testMode ? ' [TEST]' : ''}\n\n**${total.toLocaleString()}** ${config.currency} (+**${paid}**)${gotMult}${game.testMode ? ' (no money gained)' : ''}`];
-          return i.update({ embeds: [embed('💣 Mines', [['', lines.join('\n')]], 0x57f287)], components: buildButtons(game) }).catch(() => {});
+          const outcome = `🎉 **All Cleared!**\n**+${total.toLocaleString()}** ${config.currency}${gotMult}`;
+          return i.update(buildContainer(game, outcome)).catch(() => {});
         }
         i.update(buildContainer(game)).catch(() => {});
       });
