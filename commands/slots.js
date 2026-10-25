@@ -1,5 +1,5 @@
 const db = require('../db');
-const { card, error } = require('../utils/embed');
+const { error } = require('../utils/embed');
 const config = require('../config');
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -48,18 +48,15 @@ module.exports = {
     const middle = spin();
     const bottom = spin();
 
-    const initialEmbed = card({
-      description:
-        `🎰 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and pulled the slot machine!\n\n` +
-        `**\` ___SLOTS___ \`**\n` +
-        `  🌀   🌀   🌀\n` +
-        `▶ 🌀   🌀   🌀 ◀\n` +
-        `  🌀   🌀   🌀\n\n` +
-        `*The reels are spinning...*`,
-      color: 0x5865f2,
-    });
+    const initialContent =
+      `🎰 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and pulled the slot machine!\n\n` +
+      `**\` ___SLOTS___ \`**\n` +
+      `  🌀   🌀   🌀\n` +
+      `▶ 🌀   🌀   🌀 ◀\n` +
+      `  🌀   🌀   🌀\n\n` +
+      `*The reels are spinning...*`;
 
-    const initialMsg = await message.channel.send({ embeds: [initialEmbed] }).catch(err => {
+    const initialMsg = await message.channel.send(initialContent).catch(err => {
       console.error('Failed to send initial slots message:', err);
       return null;
     });
@@ -70,34 +67,26 @@ module.exports = {
     await sleep(delay);
 
     // Frame 1: Left reel (index 0) locked
-    await initialMsg.edit({
-      embeds: [card({
-        description:
-          `🎰 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and pulled the slot machine!\n\n` +
-          `**\` ___SLOTS___ \`**\n` +
-          `  ${REELS[top[0]]}   🌀   🌀\n` +
-          `▶ ${REELS[middle[0]]}   🌀   🌀 ◀\n` +
-          `  ${REELS[bottom[0]]}   🌀   🌀\n\n` +
-          `*Locking reels...*`,
-        color: 0x5865f2,
-      })],
-    }).catch(() => {});
+    await initialMsg.edit(
+      `🎰 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and pulled the slot machine!\n\n` +
+      `**\` ___SLOTS___ \`**\n` +
+      `  ${REELS[top[0]]}   🌀   🌀\n` +
+      `▶ ${REELS[middle[0]]}   🌀   🌀 ◀\n` +
+      `  ${REELS[bottom[0]]}   🌀   🌀\n\n` +
+      `*Locking reels...*`
+    ).catch(() => {});
 
     await sleep(delay);
 
     // Frame 2: Right reel (index 2) locked (OwO reveal order: left -> right -> center)
-    await initialMsg.edit({
-      embeds: [card({
-        description:
-          `🎰 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and pulled the slot machine!\n\n` +
-          `**\` ___SLOTS___ \`**\n` +
-          `  ${REELS[top[0]]}   🌀   ${REELS[top[2]]}\n` +
-          `▶ ${REELS[middle[0]]}   🌀   ${REELS[middle[2]]} ◀\n` +
-          `  ${REELS[bottom[0]]}   🌀   ${REELS[bottom[2]]}\n\n` +
-          `*Locking reels...*`,
-        color: 0x5865f2,
-      })],
-    }).catch(() => {});
+    await initialMsg.edit(
+      `🎰 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and pulled the slot machine!\n\n` +
+      `**\` ___SLOTS___ \`**\n` +
+      `  ${REELS[top[0]]}   🌀   ${REELS[top[2]]}\n` +
+      `▶ ${REELS[middle[0]]}   🌀   ${REELS[middle[2]]} ◀\n` +
+      `  ${REELS[bottom[0]]}   🌀   ${REELS[bottom[2]]}\n\n` +
+      `*Locking reels...*`
+    ).catch(() => {});
 
     await sleep(delay);
 
@@ -130,18 +119,14 @@ module.exports = {
     const m = `${REELS[middle[0]]}   ${REELS[middle[1]]}   ${REELS[middle[2]]}`;
     const b = `${REELS[bottom[0]]}   ${REELS[bottom[1]]}   ${REELS[bottom[2]]}`;
 
-    const color = jackpot ? 0xffd700 : (winnings > 0 ? 0x57f287 : 0xed4245);
-    const finalEmbed = card({
-      description:
-        `🎰 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and pulled the slot machine!\n\n` +
-        `**\` ___SLOTS___ \`**\n` +
-        `  ${t}\n` +
-        `▶ ${m} ◀\n` +
-        `  ${b}\n\n` +
-        outcomeText,
-      color,
-    });
+    const finalContent =
+      `🎰 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and pulled the slot machine!\n\n` +
+      `**\` ___SLOTS___ \`**\n` +
+      `  ${t}\n` +
+      `▶ ${m} ◀\n` +
+      `  ${b}\n\n` +
+      outcomeText;
 
-    await initialMsg.edit({ embeds: [finalEmbed] }).catch(() => {});
+    await initialMsg.edit(finalContent).catch(() => {});
   },
 };
