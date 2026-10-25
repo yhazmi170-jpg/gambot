@@ -1,14 +1,13 @@
-const { AttachmentBuilder } = require('discord.js');
+const { EmbedBuilder } = require('discord.js');
 const db = require('../db');
 const { error } = require('../utils/embed');
-const { generateLevelCard } = require('../utils/levelCard');
 
 module.exports = {
   name: 'level',
   helpCategory: 'Economy',
   helpArgs: '[user]',
   aliases: ['lvl', 'xp'],
-  description: 'check your level and progress banner',
+  description: 'check your level and progress',
   async execute(message, args) {
     let target = message.author;
     if (message.mentions?.users?.first && message.mentions.users.first()) {
@@ -26,6 +25,11 @@ module.exports = {
     const info = db.levelInfo(uid);
     const next = db.xpForLevel(info.level);
     const rank = db.getLevelRank ? db.getLevelRank(uid) : 1;
+    const pct = Math.floor(info.progress * 100);
+    const barLen = 12;
+    const filled = Math.max(0, Math.min(barLen, Math.floor(info.progress * barLen)));
+    const bar = '▰'.repeat(filled) + '▱'.repeat(barLen - filled);
+    const reward = Math.floor(1000 * (info.level + 1) * db.getBalanceFactor(uid));
 
     let title = 'A Gambot User';
     const eq = db.getEquippedTitle ? db.getEquippedTitle(uid) : null;
@@ -33,28 +37,22 @@ module.exports = {
       title = db.TITLES[eq].name;
     }
 
-    const avatarUrl = target.displayAvatarURL ? target.displayAvatarURL({ extension: 'png', forceStatic: true, size: 256 }) : null;
+    const avatarUrl = target.displayAvatarURL ? target.displayAvatarURL({ dynamic: true, size: 256 }) : null;
 
-    try {
-      const buffer = await generateLevelCard({
-        username: target.username,
-        title,
-        level: info.level,
-        rank,
-        xp: info.xp,
-        needed: next,
-        progress: info.progress,
-        avatarUrl,
-      });
+    const levelEmbed = new EmbedBuilder()
+      .setColor(0x5865f2)
+      .setAuthor({ name: target.username, iconURL: avatarUrl || undefined })
+      .setTitle(`Level ${info.level} • Rank #${rank}`)
+      .setDescription(
+        `**${title}**\n\n` +
+        `**Progress**\n` +
+        `${bar} \`${info.xp.toLocaleString()}/${next.toLocaleString()} XP\` (${pct}%)\n\n` +
+        `**Next Level Reward**\n` +
+        `**+${reward.toLocaleString()}** money`
+      )
+      .setThumbnail(avatarUrl || null)
+      .setFooter({ text: `Gambot Progression • Rank #${rank}` });
 
-      const attachment = new AttachmentBuilder(buffer, { name: 'level.png' });
-      await message.channel.send({ files: [attachment] });
-    } catch (err) {
-      console.error('[level] Error generating level card:', err);
-      const reward = Math.floor(1000 * (info.level + 1) * db.getBalanceFactor(uid));
-      message.channel.send({
-        content: `**${target.username}** • Level ${info.level} • XP: ${info.xp.toLocaleString()}/${next.toLocaleString()} • Next reward: ${reward.toLocaleString()} money`,
-      });
-    }
+    message.channel.send({ embeds: [levelEmbed] });
   },
 };
