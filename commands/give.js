@@ -3,114 +3,26 @@ const { embed, error, success, parseAmount } = require('../utils/embed');
 const config = require('../config');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
-const OWNER_ID = config.ownerId || '536278876247162882';
-const GIVE_MUTE_SECONDS = 30 * 60;
-const APPROVAL_TTL_MS = 5 * 60 * 1000;
-
-// token -> { giverId, amount, confirmMsg, dmMsg } for pending owner approvals
-const pendingApprovals = new Map();
-
-function approvalRow(token) {
-  return new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`ogive_keep_${token}`).setLabel('Keep').setStyle(ButtonStyle.Success).setEmoji('✅'),
-    new ButtonBuilder().setCustomId(`ogive_decline_${token}`).setLabel('Decline').setStyle(ButtonStyle.Danger).setEmoji('💸'),
-    new ButtonBuilder().setCustomId(`ogive_mute_${token}`).setLabel('Mute 30m').setStyle(ButtonStyle.Secondary).setEmoji('🔇'),
-  );
-}
-
-async function notifyOwner(client, giverId, amount, confirmMsg) {
+async function notifyOwner(client, giver, amount) {
   if (!client || !client.users) return;
-  const token = Math.random().toString(36).slice(2, 8);
-  // DM only config.dmOwners (the alt is deliberately excluded); first one to click wins
   const admins = (await Promise.all(config.dmOwners.map((id) => client.users.fetch(id).catch(() => null))))
     .filter(Boolean);
   if (!admins.length) return;
-  const owner = admins[0];
 
-  const dmMsg = await owner.send({
-    embeds: [embed('💸 Someone sent u money', [
-      ['From', `<@${giverId}>`],
-      ['Amount', `**${amount.toLocaleString()}** ${config.currency}`],
-      ['', 'keep it, decline it (refunds them), or mute them for 30 min'],
-    ], 0xfee75c)],
-    components: [approvalRow(token)],
-  }).catch(() => null);
-  if (!dmMsg) return;
+  const giverTag = giver.username ? `**${giver.username}** (<@${giver.id}>)` : `<@${giver.id}>`;
 
-  pendingApprovals.set(token, { giverId, amount, confirmMsg, dmMsg, dmChannels: admins.map((a) => a.dm ?? a).filter(Boolean) });
-  setTimeout(async () => {
-    const p = pendingApprovals.get(token);
-    if (!p) return;
-    pendingApprovals.delete(token);
-    for (const ch of (p.dmChannels || [])) {
-      if (ch.messages && !ch.messages.cache.has(dmMsg.id)) continue;
-      await ch.messages.edit(dmMsg.id, {
-        embeds: [embed('💸 Transfer approved', [['', 'approval window closed — money kept']], 0x2b2d31)],
-        components: [],
-      }).catch(() => {});
-    }
-  }, APPROVAL_TTL_MS);
+  for (const owner of admins) {
+    await owner.send({
+      embeds: [embed('💸 Received Money', [
+        ['From', giverTag],
+        ['Amount', `**${amount.toLocaleString()}** ${config.currency}`],
+      ], 0x57f287)],
+    }).catch(() => {});
+  }
 }
 
 async function handleInteraction(i) {
-  const parts = (i.customId || '').split('_');
-  if (parts[0] !== 'ogive' || !parts[2]) return;
-  if (!config.isOwner(i.user.id)) {
-    return i.deferUpdate().catch(() => {});
-  }
-  const token = parts[2];
-  const p = pendingApprovals.get(token);
-  if (!p) {
-    return i.update({ embeds: [error('this approval was already handled or expired')], components: [] }).catch(() => {});
-  }
-  pendingApprovals.delete(token);
-  const action = parts[1];
-
-  if (action === 'decline') {
-    const res = db.declineOwnerGive(p.giverId, p.amount, i.user.id);
-    if (res.ok) {
-      await i.update({
-        embeds: [embed('💥 Declined', [['', `the **${p.amount.toLocaleString()}** ${config.currency} was returned to <@${p.giverId}>`]], 0xed4245)],
-        components: [],
-      }).catch(() => {});
-      if (p.confirmMsg && p.confirmMsg.editable !== false) {
-        await p.confirmMsg.edit({
-          embeds: [embed('💥 Declined', [['', `<@${p.giverId}>: owner declined the transfer — refunded`]], 0xed4245)],
-          components: [],
-        }).catch(() => {});
-      }
-    } else {
-      await i.update({
-        embeds: [error('cant decline — the money is already gone (balance dropped below it)')],
-        components: [],
-      }).catch(() => {});
-    }
-    return;
-  }
-
-  if (action === 'mute') {
-    db.muteOwnerGive(p.giverId, GIVE_MUTE_SECONDS);
-    await i.update({
-      embeds: [embed('🔇 Muted', [['', `<@${p.giverId}> cant give u money for **30 min**`]], 0xed4245)],
-      components: [],
-    }).catch(() => {});
-    if (p.confirmMsg && p.confirmMsg.editable !== false) {
-      await p.confirmMsg.edit({
-        embeds: [embed('🔇 Muted', [['', `owner muted <@${p.giverId}> — they cant gift money for 30 min`]], 0xed4245)],
-        components: [],
-      }).catch(() => {});
-    }
-    return;
-  }
-
-  // keep
-  for (const ch of (p.dmChannels || [])) {
-    if (ch.messages && !ch.messages.cache.has(dmMsg.id)) continue;
-    await ch.messages.edit(dmMsg.id, {
-      embeds: [embed('✅ Kept', [['', `the **${p.amount.toLocaleString()}** ${config.currency} stays`]], 0x57f287)],
-      components: [],
-    }).catch(() => {});
-  }
+  return i.deferUpdate().catch(() => {});
 }
 
 module.exports = {
@@ -119,7 +31,6 @@ module.exports = {
   helpArgs: '<@user> <amount>',
   description: 'give money to someone',
   aliases: ['pay', 'share', 'donate'],
-  pendingApprovals,
   notifyOwner,
   handleInteraction,
   execute(message, args) {
@@ -187,7 +98,7 @@ module.exports = {
           components: [],
         }).catch(() => {});
         if (config.isOwner(target.id)) {
-          notifyOwner(message.client, message.author.id, amount, msg).catch(() => {});
+          notifyOwner(message.client, message.author, amount).catch(() => {});
         }
       });
       col.on('end', async (collected) => {
