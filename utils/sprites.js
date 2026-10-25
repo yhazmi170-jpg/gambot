@@ -461,12 +461,146 @@ const DRAW = {
   },
 };
 
+const ALIASES = {
+  anubis: 'Wolf',
+  piglet: 'Boar',
+  pig: 'Boar',
+  chicken: 'Chick',
+  chick: 'Chick',
+  bunny: 'Rabbit',
+  duck: 'Duckling',
+  sheep: 'Deer',
+  goat: 'Deer',
+  goldfish: 'Fish',
+  otter: 'Ferret',
+  capybara: 'Hamster',
+  sloth: 'Koala',
+  koala: 'Hamster',
+  penguin: 'Chick',
+  ladybug: 'Butterfly',
+  cricket: 'Frog',
+  bumblebee: 'Butterfly',
+  skunk: 'Raccoon',
+  guineapig: 'Hamster',
+  wallaby: 'Deer',
+  puffin: 'Parrot',
+  beaver: 'Raccoon',
+  swan: 'Duckling',
+  peacock: 'Parrot',
+  meerkat: 'Ferret',
+  marmot: 'Hamster',
+  iguana: 'Lizard',
+  dolphin: 'Fish',
+  jaguar: 'Panther',
+  grizzly: 'Boar',
+  moose: 'Deer',
+  hippo: 'Boar',
+  lion: 'Panther',
+  tiger: 'Panther',
+  cheetah: 'Panther',
+  rhino: 'Boar',
+  elephant: 'Boar',
+  gorilla: 'Panther',
+  crocodile: 'Lizard',
+  manticore: 'Griffin',
+  sphinx: 'Griffin',
+  roc: 'Eagle',
+  wyvern: 'Dragon',
+  hydra: 'Dragon',
+  chimera: 'Cerberus',
+  golem: 'Kraken',
+  naga: 'Cobra',
+  sleipnir: 'Pegasus',
+  titanoboa: 'Jormungandr',
+  odin: 'Thunderbird',
+  zeus: 'Thunderbird',
+  bahamut: 'Dragon',
+  tiamat: 'Dragon',
+  cthulhu: 'Kraken',
+  godzilla: 'Dragon',
+};
+
+function resolveSpecies(speciesStr) {
+  if (!speciesStr) return { base: 'Rabbit', tint: null };
+  const raw = String(speciesStr).trim();
+  const lower = raw.toLowerCase();
+
+  let tint = null;
+  if (/spectral|ghost|phantom|spirit/.test(lower)) tint = 'spectral';
+  else if (/emerald|jade|poison|venom/.test(lower)) tint = 'emerald';
+  else if (/shadow|dark|void|abyss|night/.test(lower)) tint = 'shadow';
+  else if (/ruby|blood|infernal|fire|flame/.test(lower)) tint = 'ruby';
+  else if (/golden|gold|solar|sun|radiant/.test(lower)) tint = 'golden';
+  else if (/frost|ice|glacier|crystal|frozen/.test(lower)) tint = 'frost';
+
+  const words = raw.split(/\s+/);
+  for (let i = words.length - 1; i >= 0; i--) {
+    const w = words[i].toLowerCase().replace(/[^a-z]/g, '');
+    for (const k of Object.keys(DRAW)) {
+      if (k.toLowerCase() === w) return { base: k, tint };
+    }
+    if (ALIASES[w]) return { base: ALIASES[w], tint };
+  }
+
+  for (const k of Object.keys(DRAW)) {
+    if (lower.includes(k.toLowerCase())) return { base: k, tint };
+  }
+  for (const [k, v] of Object.entries(ALIASES)) {
+    if (lower.includes(k)) return { base: v, tint };
+  }
+
+  return { base: 'Rabbit', tint };
+}
+
+function applyTint(c, tint) {
+  if (!tint) return;
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      let [r, g, b, a] = c.get(x, y);
+      if (a === 0) continue;
+      // Keep outline intact
+      if (r <= 35 && g <= 35 && b <= 45) continue;
+      // Keep eye white/dark intact
+      if (r === 26 && g === 26 && b === 26) continue;
+
+      if (tint === 'spectral') {
+        r = Math.min(255, Math.floor(r * 0.4 + 110));
+        g = Math.min(255, Math.floor(g * 0.8 + 150));
+        b = Math.min(255, Math.floor(b * 0.9 + 180));
+      } else if (tint === 'emerald') {
+        r = Math.min(255, Math.floor(r * 0.25 + 20));
+        g = Math.min(255, Math.floor(g * 1.1 + 80));
+        b = Math.min(255, Math.floor(b * 0.35 + 40));
+      } else if (tint === 'shadow') {
+        r = Math.min(255, Math.floor(r * 0.5 + 40));
+        g = Math.min(255, Math.floor(g * 0.3 + 15));
+        b = Math.min(255, Math.floor(b * 0.7 + 70));
+      } else if (tint === 'ruby') {
+        r = Math.min(255, Math.floor(r * 1.1 + 90));
+        g = Math.min(255, Math.floor(g * 0.25 + 20));
+        b = Math.min(255, Math.floor(b * 0.25 + 20));
+      } else if (tint === 'golden') {
+        r = Math.min(255, Math.floor(r * 1.1 + 90));
+        g = Math.min(255, Math.floor(g * 0.95 + 70));
+        b = Math.min(255, Math.floor(b * 0.2 + 20));
+      } else if (tint === 'frost') {
+        r = Math.min(255, Math.floor(r * 0.5 + 130));
+        g = Math.min(255, Math.floor(g * 0.8 + 170));
+        b = Math.min(255, Math.floor(b * 1.0 + 200));
+      }
+      c.set(x, y, r, g, b, a);
+    }
+  }
+}
+
 const cache = {};
 function getSprite(species) {
   if (cache[species]) return cache[species];
+  const { base, tint } = resolveSpecies(species);
   const c = newCanvas();
-  const fn = DRAW[species] || DRAW.Rabbit;
+  const fn = DRAW[base] || DRAW.Rabbit;
   fn(c);
+  applyTint(c, tint);
   outlineSprite(c);
   const png = c.toPNG();
   cache[species] = { png, c };

@@ -1,81 +1,73 @@
 const { Px, drawText } = require('./pixel');
 const { getSpritePx } = require('./sprites');
 
-const W = 320;
-const H = 272;
+const W = 340;
+const H = 250;
 const SCALE = 3;
 
 const COL = {
-  bg: '#1a1a1f',
-  panel: '#242430',
-  border: '#d8d8d8',
-  red: '#e5484d',
-  white: '#e8e8e8',
-  gray: '#8a8a94',
-  green: '#46d160',
-  yellow: '#f2a33c',
-  blue: '#4a9ef5',
-  hp: '#e5484d',
-  mp: '#4a9ef5',
+  bg: '#141419',
+  panel: '#1f1f28',
+  panelBorder: '#2e2e3e',
+  border: '#3a3a4c',
+  red: '#ff4a55',
+  white: '#ffffff',
+  gray: '#8a8a9a',
+  green: '#4cd964',
+  yellow: '#ffcc00',
+  blue: '#4a9eff',
+  hp: '#ff4a55',
+  mp: '#4a9eff',
+  faint: '#40404c',
 };
 
 function bar(px, x, y, w, h, pct, color) {
-  px.rect(x, y, w, h, '#000000');
+  px.rect(x, y, w, h, '#0a0a0e');
   const fill = Math.max(0, Math.min(w - 2, Math.round(pct * (w - 2))));
   if (fill > 0) px.rect(x + 1, y + 1, fill, h - 2, color);
-  px.rectOutline(x, y, w, h, COL.border);
+  px.rectOutline(x, y, w, h, '#3a3a4c');
 }
 
-function miniSprite(species, size) {
-  const src = getSpritePx(species);
-  const m = new Px(size, size);
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const sx = Math.floor((x / size) * 32);
-      const sy = Math.floor((y / size) * 32);
-      const [r, g, b, a] = src.get(sx, sy);
-      if (a === 0) continue;
-      const gray = Math.floor(r * 0.3 + g * 0.59 + b * 0.11);
-      m.set(x, y, gray, gray, gray);
-    }
-  }
-  return m;
-}
+function drawPetCard(px, x, y, pet, label, isEnemy) {
+  const w = 158;
+  const h = 58;
 
-function drawTeamPanel(px, x, y, name, pets) {
-  drawText(px, name.toUpperCase(), x, y, COL.red, 1);
-  let cy = y + 10;
-  for (const p of pets) {
-    const lv = `L.${p.level}`;
-    drawText(px, lv, x, cy, COL.gray, 1);
-    const m = miniSprite(p.species, 8);
-    px.blit(m, x + 28, cy);
-    drawText(px, p.species.toUpperCase().slice(0, 11), x + 38, cy + 1, COL.white, 1);
-    cy += 12;
-  }
-}
+  // Background card with subtle border
+  px.rect(x, y, w, h, COL.panel);
+  px.rectOutline(x, y, w, h, COL.panelBorder);
 
-function drawPetRow(px, x, y, pet, label) {
+  // Pet sprite (32x32)
   const sprite = getSpritePx(pet.species);
-  px.blit(sprite, x, y, 1);
+  px.blit(sprite, x + 4, y + 13, 1);
 
-  const nameX = x + 34;
-  drawText(px, label, nameX, y, COL.gray, 1);
-  drawText(px, pet.species.toUpperCase().slice(0, 12), nameX, y + 8, COL.white, 1);
+  // If fainted, draw faint X over sprite
+  if (pet.hp <= 0) {
+    px.line(x + 8, y + 17, x + 32, y + 41, COL.red);
+    px.line(x + 32, y + 17, x + 8, y + 41, COL.red);
+  }
 
-  const hpMax = pet.max_hp || pet.hp || 1;
-  const hpPct = Math.max(0, pet.hp) / hpMax;
-  const hpColor = pet.hp <= 0 ? COL.gray : hpPct > 0.5 ? COL.green : hpPct > 0.25 ? COL.yellow : COL.hp;
-  bar(px, nameX, y + 17, 100, 7, hpPct, hpColor);
-  drawText(px, `${pet.hp}/${hpMax}`, nameX + 103, y + 17, COL.white, 1);
+  const nameX = x + 40;
 
-  const xpMax = Math.max(1, (pet.level || 1) * 100);
-  const xpPct = Math.max(0, Math.min(1, (pet.exp || 0) / xpMax));
-  bar(px, nameX, y + 26, 100, 7, xpPct, COL.mp);
-  drawText(px, `LV ${pet.level}`, nameX + 103, y + 26, COL.gray, 1);
+  // Label & Level
+  const labelCol = isEnemy ? '#ff7b72' : '#79c0ff';
+  drawText(px, label, nameX, y + 6, labelCol, 1);
+  drawText(px, `LV ${pet.level || 1}`, x + w - 38, y + 6, COL.yellow, 1);
 
-  drawText(px, `ATK ${pet.attack}`, nameX, y + 37, COL.white, 1);
-  drawText(px, `DEF ${pet.defense}`, nameX, y + 45, COL.white, 1);
+  // Species Name
+  const speciesName = (pet.species || 'Unknown').toUpperCase().slice(0, 16);
+  drawText(px, speciesName, nameX, y + 16, COL.white, 1);
+
+  // HP Bar & text
+  const hpMax = Math.max(1, pet.max_hp || pet.hp || 1);
+  const curHp = Math.max(0, pet.hp || 0);
+  const hpPct = curHp / hpMax;
+  const hpColor = curHp <= 0 ? COL.faint : hpPct > 0.5 ? COL.green : hpPct > 0.25 ? COL.yellow : COL.hp;
+  
+  bar(px, nameX, y + 27, 62, 5, hpPct, hpColor);
+  drawText(px, `${curHp}/${hpMax}`, nameX + 66, y + 26, curHp <= 0 ? COL.faint : COL.white, 1);
+
+  // Stats
+  drawText(px, `ATK ${pet.attack || 0}  DEF ${pet.defense || 0}`, nameX, y + 39, COL.gray, 1);
 }
 
 function upscale(px, factor) {
@@ -94,25 +86,29 @@ function renderBattleImage({ playerName, enemyName, myPets, theirPets, turns, re
   px.fillHex(COL.bg);
   px.rectOutline(0, 0, W, H, COL.border);
 
-  drawText(px, `${playerName} GOES INTO BATTLE!`, W / 2, 8, COL.red, 1, 'center');
+  // Header
+  const title = `${(playerName || 'YOU').toUpperCase()}  VS  ${(enemyName || 'WILD FOES').toUpperCase()}`;
+  drawText(px, title, W / 2, 7, COL.red, 1, 'center');
+  px.line(8, 19, W - 8, 19, '#2a2a3a');
+  px.line(170, 23, 170, 212, '#2a2a3a');
 
-  drawTeamPanel(px, 8, 22, 'Your Team', myPets);
-  drawTeamPanel(px, 160, 22, 'Enemy Team', theirPets);
-
-  // battle rows
-  const rowH = 62;
-  const y0 = 56;
+  // Battle rows
+  const rowH = 64;
+  const y0 = 24;
   for (let i = 0; i < 3; i++) {
     const y = y0 + i * rowH;
     const my = myPets[i];
     const th = theirPets[i];
-    if (my) drawPetRow(px, 8, y, my, `YOU ${i + 1}`);
-    if (th) drawPetRow(px, 160, y, th, `ENEMY ${i + 1}`);
+    if (my) drawPetCard(px, 8, y, my, `YOU ${i + 1}`, false);
+    if (th) drawPetCard(px, 174, y, th, `ENEMY ${i + 1}`, true);
   }
 
-  const footerY = y0 + 3 * rowH + 12;
-  drawText(px, result.toUpperCase(), W / 2, footerY, COL.red, 1, 'center');
-  drawText(px, `TURNS: ${turns}`, W / 2, footerY + 10, COL.gray, 1, 'center');
+  // Footer divider & results
+  px.line(8, 218, W - 8, 218, '#2a2a3a');
+  const win = /win/i.test(result);
+  const resCol = win ? COL.green : COL.red;
+  drawText(px, result.toUpperCase(), W / 2, 224, resCol, 1, 'center');
+  drawText(px, `TURNS: ${turns}`, W / 2, 236, COL.gray, 1, 'center');
 
   return upscale(px, SCALE).toPNG();
 }

@@ -1,7 +1,7 @@
 const db = require('../db');
 const { error } = require('../utils/embed');
 const config = require('../config');
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 const CARDBACK = '🎴';
 const SUIT_EMOJI = { '♠': '♠️', '♥': '♥️', '♦': '♦️', '♣': '♣️' };
@@ -50,13 +50,9 @@ function cardBack() {
   return (config.cardEmojis && config.cardEmojis.cardback) || CARDBACK;
 }
 
-function bjEmbed(description, color = 0x2b2d31) {
-  return new EmbedBuilder().setColor(color).setDescription(description);
-}
-
 function board({ name, player, dealer, reveal, bet, result }) {
   const lines = [];
-  if (bet != null) lines.push(`you bet **${bet.toLocaleString()}** to play blackjack`, '');
+  if (bet != null) lines.push(`**${name}**, you bet **${bet.toLocaleString()}** to play blackjack`, '');
 
   if (reveal) {
     lines.push(`**Dealer** [${handValue(dealer)}]`, formatCards(dealer));
@@ -66,7 +62,7 @@ function board({ name, player, dealer, reveal, bet, result }) {
   }
 
   lines.push('', `**${name}** [${handValue(player)}]`, formatCards(player));
-  if (result) lines.push('', result);
+  if (result) lines.push('', `**Result:** ${result}`);
   return lines.join('\n');
 }
 
@@ -79,7 +75,8 @@ function playLoop(msg, player, dealer, deck, bet, userId, name) {
   );
 
   msg.edit({
-    embeds: [bjEmbed(board({ name, player, dealer, reveal: false, bet }))],
+    content: board({ name, player, dealer, reveal: false, bet }),
+    embeds: [],
     components: [buttons],
   }).then(() => {
     const filter = i => i.user.id === userId && (i.customId === 'bj_hit' || i.customId === 'bj_stand');
@@ -97,10 +94,11 @@ function playLoop(msg, player, dealer, deck, bet, userId, name) {
           if (refund > 0) db.addBalance(userId, refund);
           while (handValue(dealer) < 17) dealer.push(deck.pop());
           await interaction.update({
-            embeds: [bjEmbed(board({
+            content: board({
               name, player, dealer, reveal: true, bet,
               result: `bust — lost **${bet.toLocaleString()}**${refund > 0 ? ` (refund **${refund}**)` : ''}`,
-            }), 0xed4245)],
+            }),
+            embeds: [],
             components: [],
           });
           return;
@@ -112,24 +110,22 @@ function playLoop(msg, player, dealer, deck, bet, userId, name) {
         while (handValue(dealer) < 17) dealer.push(deck.pop());
         const dv = handValue(dealer);
         const pv2 = handValue(player);
-        let result, color;
+        let result;
         if (dv > 21 || pv2 > dv) {
           const paid = db.payWin(userId, bet);
           result = `won **${(bet + paid).toLocaleString()}** (+**${paid.toLocaleString()}**)`;
-          color = 0x57f287;
         } else if (pv2 === dv) {
           result = `tie — **${bet.toLocaleString()}** returned`;
-          color = 0xfee75c;
         } else {
           const refund = db.getInsuranceRefund(userId, bet);
           if (refund > 0) db.addBalance(userId, refund);
           db.addBalance(userId, -bet);
           db.addGambled(userId, bet);
           result = `lost **${bet.toLocaleString()}**${refund > 0 ? ` (refund **${refund}**)` : ''}`;
-          color = 0xed4245;
         }
         await interaction.update({
-          embeds: [bjEmbed(board({ name, player, dealer, reveal: true, bet, result }), color)],
+          content: board({ name, player, dealer, reveal: true, bet, result }),
+          embeds: [],
           components: [],
         });
       }
@@ -141,22 +137,20 @@ function playLoop(msg, player, dealer, deck, bet, userId, name) {
         while (handValue(dealer) < 17) dealer.push(deck.pop());
         const dv = handValue(dealer);
         const pv2 = handValue(player);
-        let result, color;
+        let result;
         if (dv > 21 || pv2 > dv) {
           const paid = db.payWin(userId, bet);
           result = `won **${(bet + paid).toLocaleString()}** (+**${paid.toLocaleString()}**) (timed out)`;
-          color = 0x57f287;
         } else if (pv2 === dv) {
           result = `tie — **${bet.toLocaleString()}** returned (timed out)`;
-          color = 0xfee75c;
         } else {
           db.addBalance(userId, -bet);
           db.addGambled(userId, bet);
           result = `lost **${bet.toLocaleString()}** (timed out)`;
-          color = 0xed4245;
         }
         await msg.edit({
-          embeds: [bjEmbed(board({ name, player, dealer, reveal: true, bet, result }), color)],
+          content: board({ name, player, dealer, reveal: true, bet, result }),
+          embeds: [],
           components: [],
         }).catch(() => {});
       }
@@ -173,14 +167,13 @@ module.exports = {
   execute(message, args) {
     if (activeGames.has(message.author.id)) {
       const g = activeGames.get(message.author.id);
-      const resuming = `🎲 ~ Resuming your active blackjack game!`;
+      const resuming = `🎲 ~ Resuming your active blackjack game!\n\n`;
       const buttons = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('bj_hit').setLabel('Hit').setStyle(ButtonStyle.Primary),
         new ButtonBuilder().setCustomId('bj_stand').setLabel('Stand').setStyle(ButtonStyle.Danger),
       );
       return message.channel.send({
-        content: resuming,
-        embeds: [bjEmbed(board({ name: g.name, player: g.player, dealer: g.dealer, reveal: false, bet: g.bet }))],
+        content: resuming + board({ name: g.name, player: g.player, dealer: g.dealer, reveal: false, bet: g.bet }),
         components: [buttons],
       }).then(msg => {
         if (global._interactionOwners) global._interactionOwners.set(msg.id, message.author.id);
@@ -207,18 +200,18 @@ module.exports = {
       const dv = handValue(dealer);
       if (dv === 21) {
         return message.channel.send({
-          embeds: [bjEmbed(board({
+          content: board({
             name, player, dealer, reveal: true, bet: amount,
             result: 'tie — **' + amount.toLocaleString() + '** returned',
-          }), 0xfee75c)],
+          }),
         });
       }
       const paid = db.payWin(message.author.id, amount);
       return message.channel.send({
-        embeds: [bjEmbed(board({
+        content: board({
           name, player, dealer, reveal: true, bet: amount,
           result: `blackjack! won **${(amount + paid).toLocaleString()}** (+**${paid.toLocaleString()}**)`,
-        }), 0x57f287)],
+        }),
       });
     }
 
@@ -229,7 +222,7 @@ module.exports = {
       new ButtonBuilder().setCustomId('bj_stand').setLabel('Stand').setStyle(ButtonStyle.Danger),
     );
     message.channel.send({
-      embeds: [bjEmbed(board({ name, player, dealer, reveal: false, bet: amount }))],
+      content: board({ name, player, dealer, reveal: false, bet: amount }),
       components: [initialButtons],
     }).then(msg => {
       if (global._interactionOwners) global._interactionOwners.set(msg.id, message.author.id);
