@@ -1967,6 +1967,13 @@ function levelInfo(userId) {
   return { level: u.level, xp: u.xp, needed: xpForLevel(u.level), progress: u.xp / xpForLevel(u.level) };
 }
 
+function getLevelRank(userId) {
+  const u = ensureUser(userId);
+  if (!u) return 1;
+  const rows = db.exec(`SELECT COUNT(*) FROM users WHERE level > ${u.level} OR (level = ${u.level} AND xp > ${u.xp})`);
+  return (rows[0]?.values[0][0] || 0) + 1;
+}
+
 /** Grant command XP with a cooldown. Returns { leveledUp, newLevel, reward } or null on cooldown. */
 function grantXp(userId, amount) {
   let u = ensureUser(userId);
@@ -6053,7 +6060,7 @@ hasPerk,
   getBalanceFactor,
   mergeUser,
   payWin,
-  xpForLevel, levelInfo, grantXp,
+  xpForLevel, levelInfo, grantXp, getLevelRank,
   bankDeposit, bankWithdraw, adminBankRemove, takeLoan,   payLoan, LOAN_INTEREST, MAX_LOAN_MULT,
   sharkLoan, SHARK_INTEREST, SHARK_MAX, getLoan, hasOutstandingLoan,
   stockPrice, getStockPrices, buyStock, sellStock, getStockShares, getPortfolio, STOCKS,

@@ -12,7 +12,7 @@ const {
 } = require('discord.js');
 
 const activeGames = new Map();
-const ROWS = 3; const COLS = 3; const BOMBS = 3;
+const ROWS = 3; const COLS = 3; const BOMBS = 1;
 
 function createGrid(bc) {
   const cells = Array(ROWS * COLS).fill(false);
@@ -26,7 +26,7 @@ function mult(gems, bombs) {
   let m = 1;
   const total = ROWS * COLS;
   for (let i = 0; i < gems; i++) m *= (total - i) / (total - bombs - i);
-  const boost = 0.98;
+  const boost = 0.94;
   return Math.max(1.05, Math.round(m * boost * 100) / 100);
 }
 
@@ -58,11 +58,15 @@ function buildContainer(game) {
     color = 0x57f287;
     const total = game.total;
     const paid = game.paid;
+    const rc = game.revealed.size;
+    const nextMult = mult(rc + 1, b);
+    const nextPayout = Math.floor(game.bet * nextMult);
+    const nextPaid = Math.floor((nextPayout - game.bet) * db.getBalanceFactor(game.userId)) + game.bet;
     const lines = [
-      `### 💰 <@${game.userId}> cashed out!`,
+      `### 💎 <@${game.userId}> cashed out!`,
       `-# **Bet**: \`${bet.toLocaleString()}\`    **Mines**: \`${b}\``,
-      `-# **Cashed Out**: \`${total.toLocaleString()}\` \`(${(total / game.bet).toFixed(2)}x)\``,
-      `-# **Profit**: \`+${paid.toLocaleString()}\``,
+      `-# **Winnings**: \`${total.toLocaleString()}\` \`(${(total / game.bet).toFixed(2)}x)\``,
+      `-# ~~**Next**: \`${nextPaid.toLocaleString()}\` \`(${nextMult.toFixed(2)}x)\`~~`,
     ];
     header = lines.join('\n');
   } else if (game.outcomeType === 'cleared') {
