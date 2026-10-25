@@ -32,7 +32,8 @@ module.exports = {
       `🪙 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and picked **${side}**\nThe coin spins... 🔄`
     );
 
-    const delay = process.env.DB_PATH ? 10 : 750;
+    const isTest = process.env.TEST === '1' || (process.env.DB_PATH && process.env.DB_PATH.startsWith('/tmp'));
+    const delay = isTest ? 10 : 750;
     await new Promise(r => setTimeout(r, delay));
 
     if (win) {

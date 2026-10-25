@@ -51,10 +51,10 @@ module.exports = {
     const initialEmbed = card({
       description:
         `🎰 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and pulled the slot machine!\n\n` +
-        `___SLOTS___\n` +
-        `  🌀 | 🌀 | 🌀\n` +
-        `  🌀 | 🌀 | 🌀  ◄\n` +
-        `  🌀 | 🌀 | 🌀\n\n` +
+        `**\` ___SLOTS___ \`**\n` +
+        `  🌀   🌀   🌀\n` +
+        `▶ 🌀   🌀   🌀 ◀\n` +
+        `  🌀   🌀   🌀\n\n` +
         `*The reels are spinning...*`,
       color: 0x5865f2,
     });
@@ -65,18 +65,19 @@ module.exports = {
     });
     if (!initialMsg) return;
 
-    const delay = process.env.DB_PATH ? 10 : 500;
+    const isTest = process.env.TEST === '1' || (process.env.DB_PATH && process.env.DB_PATH.startsWith('/tmp'));
+    const delay = isTest ? 10 : 600;
     await sleep(delay);
 
-    // Frame 1: Reel 1 locked
+    // Frame 1: Left reel (index 0) locked
     await initialMsg.edit({
       embeds: [card({
         description:
           `🎰 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and pulled the slot machine!\n\n` +
-          `___SLOTS___\n` +
-          `  ${REELS[top[0]]} | 🌀 | 🌀\n` +
-          `  ${REELS[middle[0]]} | 🌀 | 🌀  ◄\n` +
-          `  ${REELS[bottom[0]]} | 🌀 | 🌀\n\n` +
+          `**\` ___SLOTS___ \`**\n` +
+          `  ${REELS[top[0]]}   🌀   🌀\n` +
+          `▶ ${REELS[middle[0]]}   🌀   🌀 ◀\n` +
+          `  ${REELS[bottom[0]]}   🌀   🌀\n\n` +
           `*Locking reels...*`,
         color: 0x5865f2,
       })],
@@ -84,15 +85,15 @@ module.exports = {
 
     await sleep(delay);
 
-    // Frame 2: Reel 2 locked
+    // Frame 2: Right reel (index 2) locked (OwO reveal order: left -> right -> center)
     await initialMsg.edit({
       embeds: [card({
         description:
           `🎰 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and pulled the slot machine!\n\n` +
-          `___SLOTS___\n` +
-          `  ${REELS[top[0]]} | ${REELS[top[1]]} | 🌀\n` +
-          `  ${REELS[middle[0]]} | ${REELS[middle[1]]} | 🌀  ◄\n` +
-          `  ${REELS[bottom[0]]} | ${REELS[bottom[1]]} | 🌀\n\n` +
+          `**\` ___SLOTS___ \`**\n` +
+          `  ${REELS[top[0]]}   🌀   ${REELS[top[2]]}\n` +
+          `▶ ${REELS[middle[0]]}   🌀   ${REELS[middle[2]]} ◀\n` +
+          `  ${REELS[bottom[0]]}   🌀   ${REELS[bottom[2]]}\n\n` +
           `*Locking reels...*`,
         color: 0x5865f2,
       })],
@@ -107,10 +108,11 @@ module.exports = {
     if (winnings > 0) {
       const net = winnings - amount;
       const paid = db.payWin(message.author.id, net);
+      const gross = amount + paid;
       if (jackpot) {
-        outcomeText = `... and hit the **777 MEGA JACKPOT**! You won **${paid.toLocaleString()}** ${currency}!`;
+        outcomeText = `... and hit the **777 MEGA JACKPOT**! You won **${gross.toLocaleString()}** ${currency}! (+**${paid.toLocaleString()}** net)`;
       } else {
-        outcomeText = `... and you won **${paid.toLocaleString()}** ${currency}!`;
+        outcomeText = `... and you won **${gross.toLocaleString()}** ${currency}! (+**${paid.toLocaleString()}** net)`;
       }
     } else {
       db.addBalance(message.author.id, -amount);
@@ -124,17 +126,17 @@ module.exports = {
       }
     }
 
-    const t = top.map(i => REELS[i]).join(' | ');
-    const m = middle.map(i => REELS[i]).join(' | ');
-    const b = bottom.map(i => REELS[i]).join(' | ');
+    const t = `${REELS[top[0]]}   ${REELS[top[1]]}   ${REELS[top[2]]}`;
+    const m = `${REELS[middle[0]]}   ${REELS[middle[1]]}   ${REELS[middle[2]]}`;
+    const b = `${REELS[bottom[0]]}   ${REELS[bottom[1]]}   ${REELS[bottom[2]]}`;
 
     const color = jackpot ? 0xffd700 : (winnings > 0 ? 0x57f287 : 0xed4245);
     const finalEmbed = card({
       description:
         `🎰 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and pulled the slot machine!\n\n` +
-        `___SLOTS___\n` +
+        `**\` ___SLOTS___ \`**\n` +
         `  ${t}\n` +
-        `  ${m}  ◄\n` +
+        `▶ ${m} ◀\n` +
         `  ${b}\n\n` +
         outcomeText,
       color,
