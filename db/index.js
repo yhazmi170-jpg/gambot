@@ -990,7 +990,11 @@ function marriedMult(userId) {
 }
 
 function getBalanceFactor(userId) {
-  return 1;
+  if (config.isOwner(userId)) return 1;
+  const u = ensureUser(userId);
+  if (!u) return 1;
+  const reduction = Math.min(Math.floor(u.balance / 500000) * 0.01, 0.6);
+  return Math.max(1 - reduction, 0.4);
 }
 
 /** Credit a gambling win: scales profit by balance factor. Optional stakeReturn (e.g. mines prepaid bet). Returns adjusted profit paid. */

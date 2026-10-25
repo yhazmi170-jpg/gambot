@@ -17,14 +17,14 @@ module.exports = {
         aliases: 'cf, coin, flip',
         desc: 'A 50/50 gambling game. Bet on heads or tails. Wins pay even money.',
         play: `\`${prefix} cf <amount> <heads/tails>\` — amount first, then your side\nExample: \`${prefix} cf 1000 heads\``,
-        tips: 'Pure luck. The reply shows **picked** vs **landed** so you can always see your own choice.',
+        tips: 'Pure luck. The reply shows **picked** vs **landed** so you can always see your own choice. High balance slightly lowers win payouts.',
       },
       slots: {
         name: 'Slots',
         aliases: 'slot',
         desc: 'A 3-reel slot machine. Match symbols to win multipliers on your bet.',
         play: `\`${prefix} slots <amount>\`\nExample: \`${prefix} slots 1000\``,
-        tips: '3-of-a-kind: 🍒2× 🍇2× 🍊3× 🍋3× 🍉5× 💎8× 7️⃣30×\nPairs: 🍒1× 🍇1× 🍊1× 🍋1× 🍉2× 💎3× 7️⃣6×',
+        tips: '3-of-a-kind: 🍒2× 🍇2× 🍊3× 🍋3× 🍉5× 💎8× 7️⃣30×\nPairs: 🍒1× 🍇1× 🍊1× 🍋1× 🍉2× 💎3× 7️⃣6×\nHigh bal slightly lowers net wins.',
       },
       dice: {
         name: 'Dice',
@@ -45,7 +45,7 @@ module.exports = {
         aliases: 'bj, twentyone, blackjack',
         desc: 'Beat the dealer without going over 21. Layout shows Dealer [10+?] with a hidden card, then your hand total — owo style.',
         play: `\`${prefix} bj <amount>\`\nButtons: **Hit** draw, **Stand** keep\nExample: \`${prefix} bj 1000\``,
-        tips: 'Hit on 11 or below. Stand on 17+. Dealer hits to 17.',
+        tips: 'Hit on 11 or below. Stand on 17+. Dealer hits to 17. High bal slightly lowers win payouts.',
       },
       poker: {
         name: 'Video Poker',
@@ -264,6 +264,7 @@ heist: {
     message.channel.send({ embeds: [embed('📖 Game Help', [
       ['Usage', `\`${prefix} gamehelp <game>\` — rules + tips`],
       ['Games', list],
+      ['Note', 'Higher balance slightly reduces gambling wins and daily/work/weekly — not by much.'],
     ], 0x2b2d31)] });
   },
 };

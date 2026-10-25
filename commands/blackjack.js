@@ -68,93 +68,85 @@ function board({ name, player, dealer, reveal, bet, result }) {
 
 const activeGames = new Map();
 
-function playLoop(msg, player, dealer, deck, bet, userId, name) {
-  const buttons = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('bj_hit').setLabel('Hit').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('bj_stand').setLabel('Stand').setStyle(ButtonStyle.Danger),
-  );
+function attachCollector(msg, player, dealer, deck, bet, userId, name) {
+  const filter = i => i.user.id === userId && (i.customId === 'bj_hit' || i.customId === 'bj_stand');
+  const col = msg.createMessageComponentCollector({ filter, time: 30000, max: 1 });
 
-  msg.edit({
-    content: board({ name, player, dealer, reveal: false, bet }),
-    embeds: [],
-    components: [buttons],
-  }).then(() => {
-    const filter = i => i.user.id === userId && (i.customId === 'bj_hit' || i.customId === 'bj_stand');
-    const col = msg.createMessageComponentCollector({ filter, time: 30000, max: 1 });
-
-    col.on('collect', async (interaction) => {
-      if (interaction.customId === 'bj_hit') {
-        player.push(deck.pop());
-        const npv = handValue(player);
-        if (npv > 21) {
-          activeGames.delete(userId);
-          db.addBalance(userId, -bet);
-          db.addGambled(userId, bet);
-          const refund = db.getInsuranceRefund(userId, bet);
-          if (refund > 0) db.addBalance(userId, refund);
-          while (handValue(dealer) < 17) dealer.push(deck.pop());
-          await interaction.update({
-            content: board({
-              name, player, dealer, reveal: true, bet,
-              result: `bust — lost **${bet.toLocaleString()}**${refund > 0 ? ` (refund **${refund}**)` : ''}`,
-            }),
-            embeds: [],
-            components: [],
-          });
-          return;
-        }
-        await interaction.deferUpdate();
-        playLoop(msg, player, dealer, deck, bet, userId, name);
-      } else {
+  col.on('collect', async (interaction) => {
+    if (interaction.customId === 'bj_hit') {
+      player.push(deck.pop());
+      const npv = handValue(player);
+      if (npv > 21) {
         activeGames.delete(userId);
+        db.addBalance(userId, -bet);
+        db.addGambled(userId, bet);
+        const refund = db.getInsuranceRefund(userId, bet);
+        if (refund > 0) db.addBalance(userId, refund);
         while (handValue(dealer) < 17) dealer.push(deck.pop());
-        const dv = handValue(dealer);
-        const pv2 = handValue(player);
-        let result;
-        if (dv > 21 || pv2 > dv) {
-          const paid = db.payWin(userId, bet);
-          result = `won **${(bet + paid).toLocaleString()}** (+**${paid.toLocaleString()}**)`;
-        } else if (pv2 === dv) {
-          result = `tie — **${bet.toLocaleString()}** returned`;
-        } else {
-          const refund = db.getInsuranceRefund(userId, bet);
-          if (refund > 0) db.addBalance(userId, refund);
-          db.addBalance(userId, -bet);
-          db.addGambled(userId, bet);
-          result = `lost **${bet.toLocaleString()}**${refund > 0 ? ` (refund **${refund}**)` : ''}`;
-        }
-        await interaction.update({
-          content: board({ name, player, dealer, reveal: true, bet, result }),
-          embeds: [],
+        return interaction.update({
+          content: board({
+            name, player, dealer, reveal: true, bet,
+            result: `bust — lost **${bet.toLocaleString()}**${refund > 0 ? ` (refund **${refund}**)` : ''}`,
+          }),
           components: [],
         });
       }
-    });
-
-    col.on('end', async (collected) => {
-      if (!collected.size) {
-        activeGames.delete(userId);
-        while (handValue(dealer) < 17) dealer.push(deck.pop());
-        const dv = handValue(dealer);
-        const pv2 = handValue(player);
-        let result;
-        if (dv > 21 || pv2 > dv) {
-          const paid = db.payWin(userId, bet);
-          result = `won **${(bet + paid).toLocaleString()}** (+**${paid.toLocaleString()}**) (timed out)`;
-        } else if (pv2 === dv) {
-          result = `tie — **${bet.toLocaleString()}** returned (timed out)`;
-        } else {
-          db.addBalance(userId, -bet);
-          db.addGambled(userId, bet);
-          result = `lost **${bet.toLocaleString()}** (timed out)`;
-        }
-        await msg.edit({
-          content: board({ name, player, dealer, reveal: true, bet, result }),
-          embeds: [],
-          components: [],
-        }).catch(() => {});
+      const buttons = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('bj_hit').setLabel('Hit').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('bj_stand').setLabel('Stand').setStyle(ButtonStyle.Danger),
+      );
+      await interaction.update({
+        content: board({ name, player, dealer, reveal: false, bet }),
+        components: [buttons],
+      });
+      attachCollector(msg, player, dealer, deck, bet, userId, name);
+    } else {
+      activeGames.delete(userId);
+      while (handValue(dealer) < 17) dealer.push(deck.pop());
+      const dv = handValue(dealer);
+      const pv2 = handValue(player);
+      let result;
+      if (dv > 21 || pv2 > dv) {
+        const paid = db.payWin(userId, bet);
+        result = `won **${(bet + paid).toLocaleString()}** (+**${paid.toLocaleString()}**)`;
+      } else if (pv2 === dv) {
+        result = `tie — **${bet.toLocaleString()}** returned`;
+      } else {
+        const refund = db.getInsuranceRefund(userId, bet);
+        if (refund > 0) db.addBalance(userId, refund);
+        db.addBalance(userId, -bet);
+        db.addGambled(userId, bet);
+        result = `lost **${bet.toLocaleString()}**${refund > 0 ? ` (refund **${refund}**)` : ''}`;
       }
-    });
+      await interaction.update({
+        content: board({ name, player, dealer, reveal: true, bet, result }),
+        components: [],
+      });
+    }
+  });
+
+  col.on('end', async (collected) => {
+    if (!collected.size && activeGames.has(userId)) {
+      activeGames.delete(userId);
+      while (handValue(dealer) < 17) dealer.push(deck.pop());
+      const dv = handValue(dealer);
+      const pv2 = handValue(player);
+      let result;
+      if (dv > 21 || pv2 > dv) {
+        const paid = db.payWin(userId, bet);
+        result = `won **${(bet + paid).toLocaleString()}** (+**${paid.toLocaleString()}**) (timed out)`;
+      } else if (pv2 === dv) {
+        result = `tie — **${bet.toLocaleString()}** returned (timed out)`;
+      } else {
+        db.addBalance(userId, -bet);
+        db.addGambled(userId, bet);
+        result = `lost **${bet.toLocaleString()}** (timed out)`;
+      }
+      await msg.edit({
+        content: board({ name, player, dealer, reveal: true, bet, result }),
+        components: [],
+      }).catch(() => {});
+    }
   });
 }
 
@@ -165,6 +157,8 @@ module.exports = {
   description: 'blackjack — beat the dealer to 21',
   aliases: ['bj', 'twentyone'],
   execute(message, args) {
+    const name = message.author.username || 'Player';
+
     if (activeGames.has(message.author.id)) {
       const g = activeGames.get(message.author.id);
       const resuming = `🎲 ~ Resuming your active blackjack game!\n\n`;
@@ -178,7 +172,7 @@ module.exports = {
       }).then(msg => {
         if (global._interactionOwners) global._interactionOwners.set(msg.id, message.author.id);
         g.msg = msg;
-        playLoop(msg, g.player, g.dealer, g.deck, g.bet, message.author.id, g.name);
+        attachCollector(msg, g.player, g.dealer, g.deck, g.bet, message.author.id, g.name);
       }).catch(() => {});
     }
 
@@ -188,8 +182,6 @@ module.exports = {
     const user = db.ensureUser(message.author.id);
     if (user.balance < amount) return message.channel.send({ embeds: [error('not enough money')] });
 
-    const name = message.member?.displayName || message.author.username;
-    
     const deck = createDeck();
     let player = [deck.pop(), deck.pop()];
     let dealer = [deck.pop(), deck.pop()];
@@ -227,7 +219,7 @@ module.exports = {
     }).then(msg => {
       if (global._interactionOwners) global._interactionOwners.set(msg.id, message.author.id);
       setTimeout(() => { if (global._interactionOwners) global._interactionOwners.delete(msg.id); }, 300000);
-      playLoop(msg, player, dealer, deck, amount, message.author.id, name);
+      attachCollector(msg, player, dealer, deck, amount, message.author.id, name);
     }).catch(() => {});
   },
 };
