@@ -31,7 +31,7 @@ function mult(gems, bombs) {
 }
 
 function buildContainer(game) {
-  const rc = game.revealed.size;
+  const rc = game.picked ? game.picked.size : game.revealed.size;
   const b = game.bombCount;
   const bet = game.bet;
 
@@ -105,13 +105,16 @@ function buildContainer(game) {
     for (let c = 0; c < COLS; c++) {
       const idx = r * COLS + c;
       const rev = game.revealed.has(idx);
+      const isPicked = game.picked && game.picked.has(idx);
       let emoji, style, disabled;
       if (game.hitBomb === idx) {
         emoji = '💥'; style = ButtonStyle.Danger; disabled = true;
+      } else if (isPicked) {
+        emoji = '💎'; style = ButtonStyle.Success; disabled = true;
       } else if (rev && game.bombs[idx]) {
-        emoji = '💣'; style = ButtonStyle.Danger; disabled = true;
+        emoji = '💣'; style = ButtonStyle.Secondary; disabled = true;
       } else if (rev) {
-        emoji = '💎'; style = ButtonStyle.Primary; disabled = true;
+        emoji = '💎'; style = ButtonStyle.Secondary; disabled = true;
       } else {
         emoji = '1563723503981699205'; style = ButtonStyle.Secondary; disabled = !game.active;
       }
@@ -122,7 +125,7 @@ function buildContainer(game) {
     gridRows.push(new ActionRowBuilder().addComponents(tileRow));
   }
 
-  const canCashOut = game.active && game.revealed.size > 0 && game.hitBomb === undefined;
+  const canCashOut = game.active && game.picked && game.picked.size > 0 && game.hitBomb === undefined;
   const cashRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('m_cash')
@@ -194,7 +197,7 @@ module.exports = {
       } else {
         bombCount = BOMBS;
       }
-      const game = { bombs: createGrid(bombCount), bombCount, revealed: new Set(), bet: amount, active: true, lastSafe: -1, hitBomb: undefined, testMode, hasCustomMines, userId: message.author.id };
+      const game = { bombs: createGrid(bombCount), bombCount, revealed: new Set(), picked: new Set(), bet: amount, active: true, lastSafe: -1, lastClicked: -1, hitBomb: undefined, testMode, hasCustomMines, userId: message.author.id };
       activeGames.set(message.author.id, game);
 
       message.channel.send(buildContainer(game)).then(msg => {
@@ -204,9 +207,9 @@ module.exports = {
         col.on('collect', async (i) => {
           if (!game.active) { await i.deferUpdate().catch(() => {}); return; }
           if (i.customId === 'm_cash') {
-            if (game.revealed.size === 0) { await i.deferUpdate().catch(() => {}); return; }
+            if (game.picked.size === 0) { await i.deferUpdate().catch(() => {}); return; }
             game.active = false; activeGames.delete(message.author.id);
-            const p = Math.floor(game.bet * mult(game.revealed.size, game.bombCount));
+            const p = Math.floor(game.bet * mult(game.picked.size, game.bombCount));
             const paid = game.testMode ? (p - game.bet) : db.payWin(message.author.id, p - game.bet, game.bet);
             const total = game.bet + paid;
             for (let j = 0; j < ROWS * COLS; j++) game.revealed.add(j);
@@ -218,6 +221,7 @@ module.exports = {
           }
           const idx = parseInt(i.customId.split('_')[1]);
           if (game.revealed.has(idx)) { await i.deferUpdate().catch(() => {}); return; }
+          game.lastClicked = idx;
           if (game.bombs[idx]) {
             game.active = false; game.hitBomb = idx; activeGames.delete(message.author.id);
             for (let j = 0; j < ROWS * COLS; j++) game.revealed.add(j);
@@ -230,8 +234,10 @@ module.exports = {
             game.refund = refund;
             return i.update(buildContainer(game)).catch(() => {});
           }
-          game.revealed.add(idx); game.lastSafe = idx;
-          const rc = game.revealed.size;
+          game.revealed.add(idx);
+          game.picked.add(idx);
+          game.lastSafe = idx;
+          const rc = game.picked.size;
           if (rc >= ROWS * COLS - game.bombCount) {
             game.active = false; activeGames.delete(message.author.id);
             const p = Math.floor(game.bet * mult(rc, game.bombCount));
