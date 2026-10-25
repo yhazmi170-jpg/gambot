@@ -9,6 +9,7 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  MessageFlags,
 } = require('discord.js');
 
 const activeGames = new Map();
@@ -126,7 +127,10 @@ function buildContainer(game) {
 
   container.addActionRowComponents(row1, row2);
 
-  return { components: [container] };
+  return {
+    components: [container],
+    flags: [MessageFlags.IsComponentsV2],
+  };
 }
 
 module.exports = {
@@ -165,7 +169,10 @@ module.exports = {
 
     activeGames.set(message.author.id, game);
 
-    const msg = await message.channel.send(buildContainer(game)).catch(() => null);
+    const msg = await message.channel.send(buildContainer(game)).catch((err) => {
+      console.error('[HighLow] Error sending container:', err);
+      return null;
+    });
     if (!msg) {
       activeGames.delete(message.author.id);
       db.addBalance(message.author.id, amount);
