@@ -28,6 +28,8 @@ function calcWin(reels, bet) {
   return 0;
 }
 
+const SPIN_EMOJI = '<a:slot_spin:1563712006627008624>';
+
 module.exports = {
   name: 'slots',
   helpCategory: 'Games',
@@ -44,17 +46,12 @@ module.exports = {
     const authorName = message.author.username || 'Player';
     const currency = config.currency;
 
-    const top = spin();
-    const middle = spin();
-    const bottom = spin();
+    const reels = spin();
 
     const initialContent =
       `🎰 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and pulled the slot machine!\n\n` +
       `**\` ___SLOTS___ \`**\n` +
-      `  🌀   🌀   🌀\n` +
-      `▶ 🌀   🌀   🌀 ◀\n` +
-      `  🌀   🌀   🌀\n\n` +
-      `*The reels are spinning...*`;
+      `${SPIN_EMOJI}  ${SPIN_EMOJI}  ${SPIN_EMOJI}`;
 
     const initialMsg = await message.channel.send(initialContent).catch(err => {
       console.error('Failed to send initial slots message:', err);
@@ -70,10 +67,7 @@ module.exports = {
     await initialMsg.edit(
       `🎰 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and pulled the slot machine!\n\n` +
       `**\` ___SLOTS___ \`**\n` +
-      `  ${REELS[top[0]]}   🌀   🌀\n` +
-      `▶ ${REELS[middle[0]]}   🌀   🌀 ◀\n` +
-      `  ${REELS[bottom[0]]}   🌀   🌀\n\n` +
-      `*Locking reels...*`
+      `${REELS[reels[0]]}  ${SPIN_EMOJI}  ${SPIN_EMOJI}`
     ).catch(() => {});
 
     await sleep(delay);
@@ -82,17 +76,14 @@ module.exports = {
     await initialMsg.edit(
       `🎰 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and pulled the slot machine!\n\n` +
       `**\` ___SLOTS___ \`**\n` +
-      `  ${REELS[top[0]]}   🌀   ${REELS[top[2]]}\n` +
-      `▶ ${REELS[middle[0]]}   🌀   ${REELS[middle[2]]} ◀\n` +
-      `  ${REELS[bottom[0]]}   🌀   ${REELS[bottom[2]]}\n\n` +
-      `*Locking reels...*`
+      `${REELS[reels[0]]}  ${SPIN_EMOJI}  ${REELS[reels[2]]}`
     ).catch(() => {});
 
     await sleep(delay);
 
-    const winnings = calcWin(middle, amount);
+    const winnings = calcWin(reels, amount);
     let outcomeText = '';
-    const jackpot = middle[0] === 6 && middle[1] === 6 && middle[2] === 6;
+    const jackpot = reels[0] === 6 && reels[1] === 6 && reels[2] === 6;
 
     if (winnings > 0) {
       const net = winnings - amount;
@@ -115,16 +106,10 @@ module.exports = {
       }
     }
 
-    const t = `${REELS[top[0]]}   ${REELS[top[1]]}   ${REELS[top[2]]}`;
-    const m = `${REELS[middle[0]]}   ${REELS[middle[1]]}   ${REELS[middle[2]]}`;
-    const b = `${REELS[bottom[0]]}   ${REELS[bottom[1]]}   ${REELS[bottom[2]]}`;
-
     const finalContent =
       `🎰 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and pulled the slot machine!\n\n` +
       `**\` ___SLOTS___ \`**\n` +
-      `  ${t}\n` +
-      `▶ ${m} ◀\n` +
-      `  ${b}\n\n` +
+      `${REELS[reels[0]]}  ${REELS[reels[1]]}  ${REELS[reels[2]]}\n\n` +
       outcomeText;
 
     await initialMsg.edit(finalContent).catch(() => {});

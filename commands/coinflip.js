@@ -28,8 +28,9 @@ module.exports = {
     const win = result === side;
     const mult = 1;
 
+    const COIN_SPIN = '<a:coinflip:1563711499820605506>';
     const initialMsg = await message.channel.send(
-      `🪙 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and picked **${side}**\nThe coin spins... 🔄`
+      `🪙 **${authorName}** spent **${amount.toLocaleString()}** ${currency} and picked **${side}**\nThe coin spins... ${COIN_SPIN}`
     );
 
     const isTest = process.env.TEST === '1' || (process.env.DB_PATH && process.env.DB_PATH.startsWith('/tmp'));
