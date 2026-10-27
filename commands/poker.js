@@ -1,12 +1,22 @@
 const db = require('../db');
-const { embed, error } = require('../utils/embed');
+const { error } = require('../utils/embed');
 const config = require('../config');
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+
+let customCardEmojis = {};
+try {
+  customCardEmojis = require('../utils/card_emojis.json');
+} catch (_) {}
 
 const SUITS = ['♠', '♥', '♦', '♣'];
 const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 const VALUE_RANK = Object.fromEntries(VALUES.map((v, i) => [v, i + 2]));
 const SUIT_EMOJI = { '♠': '♠️', '♥': '♥️', '♦': '♦️', '♣': '♣️' };
+const SUIT_CODE = { '♠': 's', '♥': 'h', '♦': 'd', '♣': 'c' };
+const RANK_NAMES = {
+  14: 'Aces', 13: 'Kings', 12: 'Queens', 11: 'Jacks', 10: '10s',
+  9: '9s', 8: '8s', 7: '7s', 6: '6s', 5: '5s', 4: '4s', 3: '3s', 2: '2s'
+};
 
 function createDeck() {
   const deck = [];
@@ -21,6 +31,11 @@ function createDeck() {
 }
 
 function cardLabel(c) {
+  const key = `${c.value === '10' ? '10' : c.value.toLowerCase()}${SUIT_CODE[c.suit]}`;
+  if (customCardEmojis[key]) return customCardEmojis[key];
+  if (config.cardEmojis && (config.cardEmojis[key] || config.cardEmojis[key.toUpperCase()])) {
+    return config.cardEmojis[key] || config.cardEmojis[key.toUpperCase()];
+  }
   return `**${c.value}**${SUIT_EMOJI[c.suit]}`;
 }
 
@@ -56,6 +71,24 @@ function evaluateHand(cards) {
   return { rank: 0, name: 'Nothing', payout: 0 };
 }
 
+function describeHand(cards) {
+  const result = evaluateHand(cards);
+  if (result.rank > 0) return `${result.name} (${result.payout}×)`;
+
+  const values = cards.map(c => VALUE_RANK[c.value]).sort((a, b) => b - a);
+  const counts = {};
+  for (const v of values) counts[v] = (counts[v] || 0) + 1;
+  const groups = Object.entries(counts).sort((a, b) => b[1] - a[1] || b[0] - a[0]);
+
+  if (groups[0] && groups[0][1] === 2) {
+    const pairVal = groups[0][0];
+    return `Pair of ${RANK_NAMES[pairVal] || pairVal} (Low Pair)`;
+  }
+  const maxVal = Math.max(...values);
+  const highName = Object.keys(VALUE_RANK).find(k => VALUE_RANK[k] === maxVal) || 'None';
+  return `High Card (${highName})`;
+}
+
 module.exports = {
   name: 'poker',
   description: 'video poker (VIP perk) — hold/draw for payouts',
@@ -76,32 +109,85 @@ module.exports = {
     let cards = [deck.pop(), deck.pop(), deck.pop(), deck.pop(), deck.pop()];
     let held = [false, false, false, false, false];
 
-    function makeField() {
-      const cardsLine = cards.map((c, i) => {
-        return `${cardLabel(c)}${held[i] ? ' `HOLD`' : ''}`;
-      }).join('   ');
-      return `${cardsLine}\n**Bet:** ${amount.toLocaleString()} ${config.currency}\nRF \`800×\` · SF \`50×\` · 4K \`25×\` · FH \`9×\` · Fl \`6×\` · St \`4×\` · 3K \`3×\` · 2P \`2×\` · JoB \`1×\``;
+    function buildPokerEmbed(isFinal = false, result = null, outcomeLine = '', finalColor = 0x5865f2) {
+      const cardRow = cards.map(c => cardLabel(c)).join(' ');
+      const statusRow = cards.map((_, i) => {
+        if (isFinal) {
+          return held[i] ? '`[ HELD ]`' : '`[ DRAWN ]`';
+        }
+        return held[i] ? '`[🔒HELD]`' : `\`[  #${i + 1}  ]\``;
+      }).join(' ');
+
+      const descLines = [
+        `🪙 **Bet:** **${amount.toLocaleString()}** ${config.currency}`,
+        '',
+        cardRow,
+        statusRow,
+        '',
+      ];
+
+      if (isFinal) {
+        descLines.push(`🏆 **Final Hand:** **${result.name}**`);
+        descLines.push(outcomeLine);
+      } else {
+        descLines.push(`🎯 **Current Hand:** **${describeHand(cards)}**`);
+        descLines.push('*Tap card buttons below to HOLD, then click DRAW to replace unheld cards.*');
+      }
+
+      const e = new EmbedBuilder()
+        .setColor(isFinal ? finalColor : 0x5865f2)
+        .setAuthor({
+          name: `${message.author.username}'s Video Poker`,
+          iconURL: message.author.displayAvatarURL ? message.author.displayAvatarURL({ dynamic: true }) : undefined,
+        })
+        .setTitle(isFinal ? '🃏 Video Poker — Round Over' : '🃏 Video Poker')
+        .setDescription(descLines.join('\n'))
+        .addFields({
+          name: '📊 Paytable',
+          value:
+            '`800×` Royal Flush  • `50×` Straight Flush • `25×` 4 of a Kind\n' +
+            '`  9×` Full House   • ` 6×` Flush          • `  4×` Straight\n' +
+            '`  3×` 3 of a Kind  • ` 2×` Two Pair       • `  1×` Jacks or Better',
+        });
+
+      if (!isFinal) {
+        e.setFooter({ text: 'Hold cards you want to keep • Pair of Jacks or better wins' });
+      }
+
+      return e;
     }
 
-    const btnStyle = (i) => held[i] ? ButtonStyle.Primary : ButtonStyle.Secondary;
-    function makeButtons() {
+    function makeButtons(disabled = false) {
+      const heldCount = held.filter(Boolean).length;
+      const drawLabel = heldCount === 5
+        ? 'Keep All Cards'
+        : (heldCount === 0 ? 'Draw (Replace All 5)' : `Draw (${5 - heldCount} New Cards)`);
+
+      const cardButtons = cards.map((c, i) => {
+        const isHeld = held[i];
+        return new ButtonBuilder()
+          .setCustomId(`ph_${i}`)
+          .setLabel(`${i + 1} · ${c.value}`)
+          .setEmoji(isHeld ? '🔒' : SUIT_EMOJI[c.suit])
+          .setStyle(isHeld ? ButtonStyle.Success : ButtonStyle.Secondary)
+          .setDisabled(disabled);
+      });
+
+      const drawButton = new ButtonBuilder()
+        .setCustomId('pd')
+        .setLabel(drawLabel)
+        .setEmoji('🔄')
+        .setStyle(ButtonStyle.Primary)
+        .setDisabled(disabled);
+
       return [
-        new ActionRowBuilder().addComponents(
-          cards.map((c, i) => new ButtonBuilder()
-            .setCustomId(`ph_${i}`)
-            .setLabel(c.value)
-            .setEmoji(SUIT_EMOJI[c.suit])
-            .setStyle(btnStyle(i)))
-        ),
-        new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId('pd').setLabel('DRAW').setStyle(ButtonStyle.Success)
-        ),
+        new ActionRowBuilder().addComponents(cardButtons),
+        new ActionRowBuilder().addComponents(drawButton),
       ];
     }
 
-    const color = 0x2b2d31;
     message.channel.send({
-      embeds: [embed('🃏 Video Poker', [['', makeField()]], color)],
+      embeds: [buildPokerEmbed()],
       components: makeButtons(),
     }).then(msg => {
       if (global._interactionOwners) global._interactionOwners.set(msg.id, message.author.id);
@@ -113,20 +199,24 @@ module.exports = {
         for (let i = 0; i < 5; i++) if (!held[i]) cards[i] = deck.pop();
         const result = evaluateHand(cards);
         let line;
+        let color;
         if (result.payout > 1) {
           const profit = amount * result.payout - amount;
           const paid = db.payWin(uid, profit);
           line = `**${result.name}!** Won **${(amount + paid).toLocaleString()}** ${config.currency} (+**${paid.toLocaleString()}**)`;
+          color = 0x57f287;
         } else if (result.payout === 1) {
           line = `**Jacks or Better!** — push (bet returned)`;
+          color = 0xfee75c;
         } else {
           db.addBalance(uid, -amount); db.addGambled(uid, amount);
           const refund = db.getInsuranceRefund(uid, amount);
           if (refund > 0) db.addBalance(uid, refund);
-          line = `**${result.name}** — lost **${amount.toLocaleString()}** ${config.currency}${refund > 0 ? ` (refund **${refund}**)` : ''}`;
+          line = `**${result.name}** — lost **${amount.toLocaleString()}** ${config.currency}${refund > 0 ? ` (refund **${refund.toLocaleString()}**)` : ''}`;
+          color = 0xed4245;
         }
         msg.edit({
-          embeds: [embed('🃏 Video Poker', [['', makeField()], ['Result', line]], result.payout >= 1 ? 0x57f287 : 0xed4245)],
+          embeds: [buildPokerEmbed(true, result, line, color)],
           components: [],
         }).catch(() => {});
       }
@@ -135,7 +225,7 @@ module.exports = {
         if (interaction.customId === 'pd') { finish(true); col.stop(); return; }
         const idx = parseInt(interaction.customId.split('_')[1]);
         held[idx] = !held[idx];
-        await interaction.update({ embeds: [embed('🃏 Video Poker', [['', makeField()]], color)], components: makeButtons() });
+        await interaction.update({ embeds: [buildPokerEmbed()], components: makeButtons() }).catch(() => {});
       });
 
       col.on('end', async (collected) => {

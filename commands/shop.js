@@ -95,41 +95,144 @@ function buildShop(guildId) {
 
 const pendingShops = new Map();
 
+const CATEGORY_ICONS = ['🛍️', '📅', '🛠️', '👥'];
 const CATEGORY_SHORT = ['One-Time', 'Monthly Subs', 'Server Tools', 'Social'];
+const CATEGORY_TITLES = ['One-Time Upgrades', 'Monthly Subscriptions', 'Server Tools', 'Social & Identity'];
+const CATEGORY_DESCS = [
+  'Permanent perks, hunting gems, egg luck & bet caps',
+  'Auto-renewing loss insurance & higher daily/weekly caps',
+  'Auto-react slots, rain command & 1v1 coinflip duels',
+  'Custom profile badge, colored lb names & rep command',
+];
 
-function buildMenuEmbed(guildId) {
+function buildMenuEmbed(userOrId, guildId) {
+  let uid = null;
+  if (typeof userOrId === 'string' && /^\d{16,21}$/.test(userOrId)) uid = userOrId;
+  else if (userOrId && userOrId.id) uid = userOrId.id;
+  else if (!guildId && typeof userOrId === 'string') guildId = userOrId;
+
   const list = guildId ? shopFor(guildId) : SHOP;
-  const lines = list.map((cat, idx) => `**${CATEGORY_SHORT[idx]}** — ${cat.items.length} item${cat.items.length > 1 ? 's' : ''}`).join('\n');
-  return new EmbedBuilder().setColor(0x2b2d31).setTitle('Shop').setDescription(`pick a category to browse items\n\n${lines}`);
+  const user = uid ? db.ensureUser(uid) : null;
+  const ownedPerks = uid ? db.getUserPerks(uid).map(p => p.perk) : [];
+  const saleMult = db.eventMult('priceMult');
+
+  let banner = '';
+  if (saleMult < 1) {
+    banner = `🔥 **STOREWIDE SALE: ${Math.round((1 - saleMult) * 100)}% OFF EVERYTHING!**\n\n`;
+  }
+
+  const walletStr = user
+    ? `💳 **Wallet:** **${user.balance.toLocaleString()}** ${config.currency}  •  💎 **${user.gems || 0}** gems  •  ⭐ **${ownedPerks.length}** perks owned\n\n`
+    : '';
+
+  const catLines = list.map((cat, idx) => {
+    return `${CATEGORY_ICONS[idx]} **${CATEGORY_TITLES[idx]}** (\`${cat.items.length} items\`)\n└ ${CATEGORY_DESCS[idx]}`;
+  }).join('\n\n');
+
+  return new EmbedBuilder()
+    .setColor(0x5865f2)
+    .setTitle('🛍️ Gambot Perks & Upgrades Shop')
+    .setDescription(
+      `${walletStr}${banner}` +
+      `Pick a category below to browse items and purchase:\n\n` +
+      `${catLines}`
+    )
+    .setFooter({ text: 'Tap a category button below to view items & prices' });
 }
 
 function buildMenuRow(guildId) {
   const list = guildId ? shopFor(guildId) : SHOP;
   return new ActionRowBuilder().addComponents(list.map((cat, idx) =>
-    new ButtonBuilder().setCustomId(`shop_cat_${idx}`).setLabel(CATEGORY_SHORT[idx]).setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder()
+      .setCustomId(`shop_cat_${idx}`)
+      .setLabel(CATEGORY_SHORT[idx])
+      .setEmoji(CATEGORY_ICONS[idx])
+      .setStyle(ButtonStyle.Primary)
   ));
 }
 
-function buildCategoryEmbed(cat, idx) {
-  const lines = cat.items.map(it => `\`${priceStr(it.price)}\` ${it.name}${it.monthly ? ' /mo' : ''} — ${it.desc}`).join('\n');
-  return new EmbedBuilder().setColor(0x2b2d31).setTitle(cat.category).setDescription(`${lines}\n\nclick a button to purchase — confirm on the next screen`);
+function buildCategoryEmbed(cat, idx, userOrId, guildId) {
+  let uid = null;
+  if (typeof userOrId === 'string' && /^\d{16,21}$/.test(userOrId)) uid = userOrId;
+  else if (userOrId && userOrId.id) uid = userOrId.id;
+
+  const user = uid ? db.ensureUser(uid) : null;
+  const saleMult = db.eventMult('priceMult');
+
+  const itemsText = cat.items.map(it => {
+    const isPerkItem = !it.gems && !it.weaponCrates;
+    const owned = isPerkItem && uid && db.hasPerk(uid, it.id);
+    const effPrice = Math.floor(it.price * saleMult);
+    const priceText = saleMult < 1
+      ? `~~${priceStr(it.price)}~~ **${priceStr(effPrice)}**`
+      : `\`${priceStr(effPrice)}\``;
+    const monthlyText = it.monthly ? ' `/mo`' : '';
+
+    if (owned) {
+      return `✅ **${it.name}**${monthlyText} — \`[OWNED]\`\n└ *${it.desc}*`;
+    }
+
+    return `🔹 ${priceText} **${it.name}**${monthlyText}\n└ *${it.desc}*`;
+  }).join('\n\n');
+
+  const walletStr = user ? `💳 **Your Balance:** **${user.balance.toLocaleString()}** ${config.currency}\n\n` : '';
+
+  return new EmbedBuilder()
+    .setColor(0x5865f2)
+    .setTitle(`${CATEGORY_ICONS[idx]} Shop — ${CATEGORY_TITLES[idx]}`)
+    .setDescription(
+      `${walletStr}` +
+      `${itemsText}\n\n` +
+      `*Click an item button below to purchase. You will confirm before money is spent.*`
+    )
+    .setFooter({ text: '◀ Categories to return to menu' });
 }
 
-function buildCategoryRows(idx, guildId) {
+function buildCategoryRows(idx, userOrId, guildId) {
+  let uid = null;
+  if (typeof userOrId === 'string' && /^\d{16,21}$/.test(userOrId)) uid = userOrId;
+  else if (userOrId && userOrId.id) uid = userOrId.id;
+
   const cat = guildId ? shopFor(guildId)[idx] : SHOP[idx];
+  const user = uid ? db.ensureUser(uid) : null;
+  const saleMult = db.eventMult('priceMult');
   const rows = [];
   let row = [];
+
   for (const it of cat.items) {
-    row.push(new ButtonBuilder()
-      .setCustomId(`shop_${it.id}`)
-      .setLabel(`${it.name.split('(')[0].trim()} - ${priceStr(it.price)}${it.monthly ? '/mo' : ''}`)
-      .setStyle(ButtonStyle.Secondary));
-    if (row.length === 5) { rows.push(new ActionRowBuilder().addComponents(row)); row = []; }
+    const isPerkItem = !it.gems && !it.weaponCrates;
+    const owned = isPerkItem && uid && db.hasPerk(uid, it.id);
+    const effPrice = Math.floor(it.price * saleMult);
+    const shortLabel = it.name.split('(')[0].trim().replace(/^v\s+/, '');
+
+    const btn = new ButtonBuilder().setCustomId(`shop_${it.id}`);
+
+    if (owned) {
+      btn.setLabel(`${shortLabel.slice(0, 16)} (Owned)`)
+        .setEmoji('✅')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(true);
+    } else {
+      const canAfford = user && user.balance >= effPrice;
+      btn.setLabel(`${shortLabel.slice(0, 16)} • ${priceStr(effPrice)}${it.monthly ? '/mo' : ''}`)
+        .setStyle(canAfford ? ButtonStyle.Success : ButtonStyle.Secondary);
+    }
+
+    row.push(btn);
+    if (row.length === 5) {
+      rows.push(new ActionRowBuilder().addComponents(row));
+      row = [];
+    }
   }
-  if (row.length) rows.push(new ActionRowBuilder().addComponents(row));
+
+  if (row.length) {
+    rows.push(new ActionRowBuilder().addComponents(row));
+  }
+
   rows.push(new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('shop_back').setLabel('◀ Back').setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId('shop_back').setLabel('◀ Categories').setEmoji('🔙').setStyle(ButtonStyle.Danger)
   ));
+
   return rows;
 }
 
@@ -152,11 +255,17 @@ async function handleInteraction(i) {
       const idx = parseInt(id.replace('shop_cat_', ''), 10);
       const list = i.guild ? shopFor(i.guild.id) : SHOP;
       if (isNaN(idx) || !list[idx]) return;
-      await i.update({ embeds: [buildCategoryEmbed(list[idx], idx)], components: buildCategoryRows(idx, i.guild && i.guild.id) });
+      await i.update({
+        embeds: [buildCategoryEmbed(list[idx], idx, i.user.id, i.guild && i.guild.id)],
+        components: buildCategoryRows(idx, i.user.id, i.guild && i.guild.id)
+      });
       return;
     }
     if (id === 'shop_back') {
-      await i.update({ embeds: [buildMenuEmbed(i.guild && i.guild.id)], components: [buildMenuRow(i.guild && i.guild.id)] });
+      await i.update({
+        embeds: [buildMenuEmbed(i.user.id, i.guild && i.guild.id)],
+        components: [buildMenuRow(i.guild && i.guild.id)]
+      });
       return;
     }
 
@@ -186,19 +295,31 @@ async function handleInteraction(i) {
     const price = Math.floor(item.price * saleMult);
     if (!user || user.balance < price) {
       i.user.send(`You tried to buy **${item.name}** (\`${priceStr(price)}\` ${config.currency}) but you don't have enough money.`).catch(() => {});
-      await i.followUp({ embeds: [errEmbed('Not enough money.')], ephemeral: true });
+      await i.followUp({ embeds: [errEmbed(`Not enough money. You need **${price.toLocaleString()}** ${config.currency} (Balance: **${(user?.balance || 0).toLocaleString()}**).`)], ephemeral: true });
       return;
     }
 
     const confirm = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`shop_buy_${itemId}`).setLabel('Confirm').setStyle(ButtonStyle.Success).setEmoji('✅'),
+      new ButtonBuilder().setCustomId(`shop_buy_${itemId}`).setLabel('Confirm Purchase').setStyle(ButtonStyle.Success).setEmoji('✅'),
       new ButtonBuilder().setCustomId(`shop_no_${itemId}`).setLabel('Cancel').setStyle(ButtonStyle.Danger).setEmoji('❌'),
     );
 
     const purchaseId = crypto.randomUUID();
     pendingShops.set(i.user.id, { itemId, item, guild: i.guild, channel: i.channel, purchaseId });
     setTimeout(() => pendingShops.delete(i.user.id), 30000);
-    await i.followUp({ embeds: [warnEmbed(`**${item.name}**\nPrice: \`${priceStr(price)}\` ${config.currency}${item.monthly ? '/mo' : ''}${saleMult < 1 ? ` ~~\`${priceStr(item.price)}\`~~ **-${Math.round((1 - saleMult) * 100)}% sale!**` : ''}\n\n${item.desc}\n\nConfirm purchase?`)], components: [confirm], ephemeral: true });
+
+    const confirmEmbed = new EmbedBuilder()
+      .setColor(0xfee75c)
+      .setTitle('🛒 Confirm Purchase')
+      .setDescription(
+        `Are you sure you want to purchase **${item.name}**?\n\n` +
+        `🪙 **Price:** **${price.toLocaleString()}** ${config.currency}${item.monthly ? ' (auto-renews monthly)' : ''}${saleMult < 1 ? ` ~~\`${priceStr(item.price)}\`~~ **-${Math.round((1 - saleMult) * 100)}% SALE!**` : ''}\n` +
+        `💳 **Balance After:** **${user.balance.toLocaleString()}** ➔ **${(user.balance - price).toLocaleString()}** ${config.currency}\n\n` +
+        `📝 **Description:** ${item.desc}\n` +
+        `💡 **How to use:** \`${item.use}\``
+      );
+
+    await i.followUp({ embeds: [confirmEmbed], components: [confirm], ephemeral: true });
   } catch (e) { console.error('shop item err:', e); }
 }
 
@@ -213,7 +334,7 @@ async function handleConfirm(j) {
       return;
     }
     if (!isBuy) {
-      await j.update({ embeds: [errEmbed('Purchase cancelled.')], components: [] });
+      await j.update({ embeds: [new EmbedBuilder().setColor(0xed4245).setDescription('❌ Purchase cancelled.')], components: [] });
       return;
     }
 
@@ -269,7 +390,10 @@ async function handleConfirm(j) {
       pending.channel?.send(`<@${j.user.id}> bought **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency}!`).then(m => setTimeout(() => m.delete().catch(() => {}), 5000)).catch(() => {});
       j.user.send(`**Purchase Confirmation**\nYou bought **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency} in **${pending.guild?.name || 'the server'}**\n\n**How to use:** ${pending.item.use}`).catch(() => {});
       for (const adminId of config.dmOwners) j.client.users.fetch(adminId).then(o => o.send(`<@${j.user.id}> bought **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency}!`).catch(() => {})).catch(() => {});
-      await j.update({ embeds: [okEmbed(`Purchased **${pending.item.name}**!`)], components: [] });
+      await j.update({
+        embeds: [new EmbedBuilder().setColor(0x57f287).setTitle('✅ Purchase Successful').setDescription(`You bought **${pending.item.name}** for **${price.toLocaleString()}** ${config.currency}!\n\n**How to use:** ${pending.item.use}`)],
+        components: []
+      });
     });
   } catch (e) { console.error('shop confirm err:', e); }
 }
@@ -285,12 +409,34 @@ function postShop(channel, guildId) {
 module.exports = { buildShop, postShop, handleInteraction, SHOP, allShopItems, getShopItem,
   name: 'shop',
   helpCategory: 'Shop',
-  helpArgs: '',
-  description: 'browse and buy perks',
+  helpArgs: '[category]',
+  description: 'browse and buy perks & upgrades',
   aliases: ['store', 'market'],
   execute(message, args) {
     const guildId = message.guild && message.guild.id;
-    message.channel.send({ embeds: [buildMenuEmbed(guildId)], components: [buildMenuRow(guildId)] }).then(msg => {
+    const uid = message.author.id;
+    const sub = (args[0] || '').toLowerCase();
+    if (sub) {
+      const catIdx = ['1', 'onetime', 'one-time', 'perm', 'permanent'].includes(sub) ? 0 :
+                     ['2', 'sub', 'subs', 'monthly', 'month'].includes(sub) ? 1 :
+                     ['3', 'server', 'tools', 'tool'].includes(sub) ? 2 :
+                     ['4', 'social', 'rep', 'badge'].includes(sub) ? 3 : -1;
+      if (catIdx !== -1) {
+        const list = guildId ? shopFor(guildId) : SHOP;
+        return message.channel.send({
+          embeds: [buildCategoryEmbed(list[catIdx], catIdx, uid, guildId)],
+          components: buildCategoryRows(catIdx, uid, guildId),
+        }).then(msg => {
+          if (global._interactionOwners) global._interactionOwners.set(msg.id, message.author.id);
+          setTimeout(() => { if (global._interactionOwners) global._interactionOwners.delete(msg.id); }, 300000);
+        });
+      }
+    }
+
+    message.channel.send({
+      embeds: [buildMenuEmbed(uid, guildId)],
+      components: [buildMenuRow(guildId)]
+    }).then(msg => {
       if (global._interactionOwners) global._interactionOwners.set(msg.id, message.author.id);
       setTimeout(() => { if (global._interactionOwners) global._interactionOwners.delete(msg.id); }, 300000);
     });
