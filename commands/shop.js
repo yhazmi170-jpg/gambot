@@ -2,7 +2,15 @@ const db = require('../db');
 const config = require('../config');
 const crypto = require('crypto');
 const { withPurchaseLock } = require('../utils/purchaseLock');
-const { ContainerBuilder, TextDisplayBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags, EmbedBuilder } = require('discord.js');
+const {
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  MessageFlags,
+} = require('discord.js');
 
 const SHOP = [
   {
@@ -73,33 +81,9 @@ function priceStr(p) {
   return String(p);
 }
 
-function buildShop(guildId) {
-  const list = guildId ? shopFor(guildId) : SHOP;
-  const containers = [];
-  for (const cat of list) {
-    const lines = [`**${cat.category}**`];
-    const buttons = [];
-    let row = [];
-    for (const item of cat.items) {
-      lines.push(`\`${priceStr(item.price)}\` ${item.name}${item.monthly ? ' /mo' : ''} — ${item.desc}`);
-      row.push(new ButtonBuilder()
-        .setCustomId(`shop_${item.id}`)
-        .setLabel(`${item.name} - ${priceStr(item.price)}${item.monthly ? '/mo' : ''}`)
-        .setStyle(ButtonStyle.Secondary));
-      if (row.length === 5) { buttons.push(new ActionRowBuilder().addComponents(row)); row = []; }
-    }
-    if (row.length) buttons.push(new ActionRowBuilder().addComponents(row));
-    containers.push(new ContainerBuilder()
-      .setAccentColor(0x2b2d31)
-      .addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')))
-      .addActionRowComponents(...buttons));
-  }
-  return containers;
-}
-
 const pendingShops = new Map();
 
-function buildMenuEmbed(userOrId, guildId) {
+function buildMenuContainer(userOrId, guildId) {
   let uid = null;
   if (typeof userOrId === 'string' && /^\d{16,21}$/.test(userOrId)) uid = userOrId;
   else if (userOrId && userOrId.id) uid = userOrId.id;
@@ -109,8 +93,9 @@ function buildMenuEmbed(userOrId, guildId) {
   const saleMult = db.eventMult('priceMult');
 
   const lines = [
-    user ? `Balance: **${user.balance.toLocaleString()}** ${config.currency}` : '',
-    saleMult < 1 ? `Sale: ${Math.round((1 - saleMult) * 100)}% off` : '',
+    `### Shop`,
+    user ? `-# **Balance**: \`${user.balance.toLocaleString()}\` money` : '',
+    saleMult < 1 ? `-# **Sale**: ${Math.round((1 - saleMult) * 100)}% off` : '',
     '',
     '**One-Time**',
     'rob (15m) • double_work (6m) • bet_cap (2m) • lottery_ticket (7m)',
@@ -128,23 +113,27 @@ function buildMenuEmbed(userOrId, guildId) {
     'colored_lb (750k) • badge (500k) • rep (300k)',
   ].filter(l => l !== null);
 
-  return new EmbedBuilder()
-    .setColor(0x2b2d31)
-    .setTitle('Shop')
-    .setDescription(lines.join('\n'));
-}
-
-function buildMenuRow(guildId) {
   const list = guildId ? shopFor(guildId) : SHOP;
-  return new ActionRowBuilder().addComponents(list.map((cat, idx) =>
+  const menuRow = new ActionRowBuilder().addComponents(list.map((cat, idx) =>
     new ButtonBuilder()
       .setCustomId(`shop_cat_${idx}`)
       .setLabel(cat.short || cat.category)
       .setStyle(ButtonStyle.Secondary)
   ));
+
+  const container = new ContainerBuilder()
+    .setAccentColor(0x2b2d31)
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')))
+    .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(1))
+    .addActionRowComponents(menuRow);
+
+  return {
+    components: [container],
+    flags: [MessageFlags.IsComponentsV2],
+  };
 }
 
-function buildCategoryEmbed(cat, idx, userOrId, guildId) {
+function buildCategoryContainer(cat, idx, userOrId, guildId) {
   let uid = null;
   if (typeof userOrId === 'string' && /^\d{16,21}$/.test(userOrId)) uid = userOrId;
   else if (userOrId && userOrId.id) uid = userOrId.id;
@@ -152,32 +141,22 @@ function buildCategoryEmbed(cat, idx, userOrId, guildId) {
   const user = uid ? db.ensureUser(uid) : null;
   const saleMult = db.eventMult('priceMult');
 
-  const itemsText = cat.items.map(it => {
+  const itemsLines = cat.items.map(it => {
     const isPerkItem = !it.gems && !it.weaponCrates;
     const owned = isPerkItem && uid && db.hasPerk(uid, it.id);
     const effPrice = Math.floor(it.price * saleMult);
-    const priceText = `${priceStr(effPrice)}${it.monthly ? '/mo' : ''}`;
+    const pStr = `${priceStr(effPrice)}${it.monthly ? '/mo' : ''}`;
+    if (owned) return `\`${pStr}\` **${it.name}** [OWNED] — ${it.desc}`;
+    return `\`${pStr}\` **${it.name}** — ${it.desc}`;
+  });
 
-    if (owned) {
-      return `• **${it.name}** [OWNED] — ${it.desc}`;
-    }
-    return `• **${it.name}** (${priceText}) — ${it.desc}`;
-  }).join('\n');
+  const headerLines = [
+    `### Shop — ${cat.category}`,
+    user ? `-# **Balance**: \`${user.balance.toLocaleString()}\` money` : '',
+    '',
+    ...itemsLines,
+  ].filter(l => l !== null);
 
-  const walletStr = user ? `Balance: **${user.balance.toLocaleString()}** ${config.currency}\n\n` : '';
-
-  return new EmbedBuilder()
-    .setColor(0x2b2d31)
-    .setTitle(`Shop — ${cat.category}`)
-    .setDescription(`${walletStr}${itemsText}`);
-}
-
-function buildCategoryRows(idx, userOrId, guildId) {
-  let uid = null;
-  if (typeof userOrId === 'string' && /^\d{16,21}$/.test(userOrId)) uid = userOrId;
-  else if (userOrId && userOrId.id) uid = userOrId.id;
-
-  const cat = guildId ? shopFor(guildId)[idx] : SHOP[idx];
   const rows = [];
   let row = [];
 
@@ -202,39 +181,84 @@ function buildCategoryRows(idx, userOrId, guildId) {
     }
   }
 
-  if (row.length) {
-    rows.push(new ActionRowBuilder().addComponents(row));
-  }
+  if (row.length) rows.push(new ActionRowBuilder().addComponents(row));
 
   rows.push(new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('shop_back').setLabel('Back').setStyle(ButtonStyle.Secondary)
   ));
 
-  return rows;
+  const container = new ContainerBuilder()
+    .setAccentColor(0x2b2d31)
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(headerLines.join('\n')))
+    .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(1));
+
+  for (const r of rows) {
+    container.addActionRowComponents(r);
+  }
+
+  return {
+    components: [container],
+    flags: [MessageFlags.IsComponentsV2],
+  };
 }
 
-function errEmbed(text) {
-  return new EmbedBuilder().setColor(0xed4245).setDescription(text);
+function buildShop(guildId) {
+  const list = guildId ? shopFor(guildId) : SHOP;
+  const containers = [];
+  for (const cat of list) {
+    const lines = [`**${cat.category}**`];
+    const buttons = [];
+    let row = [];
+    for (const item of cat.items) {
+      lines.push(`\`${priceStr(item.price)}\` ${item.name}${item.monthly ? ' /mo' : ''} — ${item.desc}`);
+      row.push(new ButtonBuilder()
+        .setCustomId(`shop_${item.id}`)
+        .setLabel(`${item.name} - ${priceStr(item.price)}${item.monthly ? '/mo' : ''}`)
+        .setStyle(ButtonStyle.Secondary));
+      if (row.length === 5) { buttons.push(new ActionRowBuilder().addComponents(row)); row = []; }
+    }
+    if (row.length) buttons.push(new ActionRowBuilder().addComponents(row));
+    containers.push(new ContainerBuilder()
+      .setAccentColor(0x2b2d31)
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')))
+      .addActionRowComponents(...buttons));
+  }
+  return containers;
+}
+
+const header = new ContainerBuilder()
+  .setAccentColor(0x2b2d31)
+  .addTextDisplayComponents(new TextDisplayBuilder().setContent('**SHOP**\nClick a button to purchase.\nConfirm on next screen.'));
+
+function postShop(channel, guildId) {
+  channel.send({ components: [header, ...buildShop(guildId)], flags: [MessageFlags.IsComponentsV2] }).catch(() => {});
+}
+
+function errContainer(text) {
+  const c = new ContainerBuilder()
+    .setAccentColor(0xed4245)
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`### Error\n-# ${text}`));
+  return { components: [c], flags: [MessageFlags.IsComponentsV2] };
 }
 
 async function startPurchase(user, item, channel, guild, interaction) {
   const isPerkItem = !item.gems && !item.weaponCrates;
   if (isPerkItem && db.hasPerk(user.id, item.id)) {
-    const msg = { embeds: [errEmbed('You already own this perk.')], ephemeral: true };
-    return interaction ? interaction.followUp(msg) : channel.send(msg);
+    const payload = errContainer('You already own this perk.');
+    return interaction ? interaction.followUp({ ...payload, ephemeral: true }) : channel.send(payload);
   }
 
   if (pendingShops.has(user.id)) {
-    const msg = { embeds: [errEmbed('You have a pending purchase. Complete or wait for it.')], ephemeral: true };
-    return interaction ? interaction.followUp(msg) : channel.send(msg);
+    const payload = errContainer('You have a pending purchase. Complete or wait for it.');
+    return interaction ? interaction.followUp({ ...payload, ephemeral: true }) : channel.send(payload);
   }
 
   const u = db.ensureUser(user.id);
   const saleMult = db.eventMult('priceMult');
   const price = Math.floor(item.price * saleMult);
   if (!u || u.balance < price) {
-    const msg = { embeds: [errEmbed(`Not enough money. Need **${price.toLocaleString()}** ${config.currency}.`)], ephemeral: true };
-    return interaction ? interaction.followUp(msg) : channel.send(msg);
+    const payload = errContainer(`Not enough money. Need \`${price.toLocaleString()}\` ${config.currency}.`);
+    return interaction ? interaction.followUp({ ...payload, ephemeral: true }) : channel.send(payload);
   }
 
   const confirm = new ActionRowBuilder().addComponents(
@@ -246,18 +270,21 @@ async function startPurchase(user, item, channel, guild, interaction) {
   pendingShops.set(user.id, { itemId: item.id, item, guild, channel, purchaseId });
   setTimeout(() => pendingShops.delete(user.id), 30000);
 
-  const confirmEmbed = new EmbedBuilder()
-    .setColor(0x2b2d31)
-    .setTitle('Confirm')
-    .setDescription(
-      `Buy **${item.name}** for **${price.toLocaleString()}** ${config.currency}${item.monthly ? ' (/mo)' : ''}?\n` +
-      `Balance after: **${(u.balance - price).toLocaleString()}** ${config.currency}`
-    );
+  const confirmContainer = new ContainerBuilder()
+    .setAccentColor(0x2b2d31)
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+      `### Confirm Purchase\n` +
+      `-# Buy **${item.name}** for \`${price.toLocaleString()}\` ${config.currency}${item.monthly ? ' (/mo)' : ''}?\n` +
+      `-# Balance after: \`${(u.balance - price).toLocaleString()}\` ${config.currency}`
+    ))
+    .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(1))
+    .addActionRowComponents(confirm);
 
+  const payload = { components: [confirmContainer], flags: [MessageFlags.IsComponentsV2] };
   if (interaction) {
-    await interaction.followUp({ embeds: [confirmEmbed], components: [confirm], ephemeral: true });
+    await interaction.followUp({ ...payload, ephemeral: true });
   } else {
-    channel.send({ embeds: [confirmEmbed], components: [confirm] });
+    channel.send(payload);
   }
 }
 
@@ -270,17 +297,11 @@ async function handleInteraction(i) {
       const idx = parseInt(id.replace('shop_cat_', ''), 10);
       const list = i.guild ? shopFor(i.guild.id) : SHOP;
       if (isNaN(idx) || !list[idx]) return;
-      await i.update({
-        embeds: [buildCategoryEmbed(list[idx], idx, i.user.id, i.guild && i.guild.id)],
-        components: buildCategoryRows(idx, i.user.id, i.guild && i.guild.id)
-      });
+      await i.update(buildCategoryContainer(list[idx], idx, i.user.id, i.guild && i.guild.id));
       return;
     }
     if (id === 'shop_back') {
-      await i.update({
-        embeds: [buildMenuEmbed(i.user.id, i.guild && i.guild.id)],
-        components: [buildMenuRow(i.guild && i.guild.id)]
-      });
+      await i.update(buildMenuContainer(i.user.id, i.guild && i.guild.id));
       return;
     }
 
@@ -302,11 +323,13 @@ async function handleConfirm(j) {
     pendingShops.delete(j.user.id);
 
     if (!pending) {
-      await j.update({ embeds: [errEmbed('Session expired — click the item again.')], components: [] });
+      const c = new ContainerBuilder().setAccentColor(0xed4245).addTextDisplayComponents(new TextDisplayBuilder().setContent('### Expired\n-# Session expired — click the item again.'));
+      await j.update({ components: [c], flags: [MessageFlags.IsComponentsV2] });
       return;
     }
     if (!isBuy) {
-      await j.update({ embeds: [new EmbedBuilder().setColor(0x2b2d31).setDescription('Cancelled.')], components: [] });
+      const c = new ContainerBuilder().setAccentColor(0x2b2d31).addTextDisplayComponents(new TextDisplayBuilder().setContent('### Cancelled\n-# Purchase cancelled.'));
+      await j.update({ components: [c], flags: [MessageFlags.IsComponentsV2] });
       return;
     }
 
@@ -315,7 +338,8 @@ async function handleConfirm(j) {
       const saleMult = db.eventMult('priceMult');
       const price = Math.floor(pending.item.price * saleMult);
       if (price <= 0) {
-        await j.update({ embeds: [errEmbed('Payment failed — you were not charged.')], components: [] });
+        const c = new ContainerBuilder().setAccentColor(0xed4245).addTextDisplayComponents(new TextDisplayBuilder().setContent('### Error\n-# Payment failed — you were not charged.'));
+        await j.update({ components: [c], flags: [MessageFlags.IsComponentsV2] });
         return;
       }
 
@@ -328,7 +352,8 @@ async function handleConfirm(j) {
           purchaseOk = true;
         } else {
           console.error('shop purchase failed:', res && res.error, 'user:', j.user.id, 'item:', pending.itemId, 'purchase:', purchaseId);
-          await j.update({ embeds: [errEmbed('Your order was not charged.')], components: [] });
+          const c = new ContainerBuilder().setAccentColor(0xed4245).addTextDisplayComponents(new TextDisplayBuilder().setContent('### Error\n-# Your order was not charged.'));
+          await j.update({ components: [c], flags: [MessageFlags.IsComponentsV2] });
           return;
         }
       } else {
@@ -338,7 +363,8 @@ async function handleConfirm(j) {
           const userNow = db.ensureUser(j.user.id);
           if (!userNow || userNow.balance < price) {
             j.user.send(`You tried to buy **${pending.item.name}** (${priceStr(price)} ${config.currency}) but you don't have enough money.`).catch(() => {});
-            await j.update({ embeds: [errEmbed('Not enough money.')], components: [] });
+            const c = new ContainerBuilder().setAccentColor(0xed4245).addTextDisplayComponents(new TextDisplayBuilder().setContent('### Error\n-# Not enough money.'));
+            await j.update({ components: [c], flags: [MessageFlags.IsComponentsV2] });
             return;
           }
           db.addBalance(j.user.id, -price);
@@ -362,20 +388,17 @@ async function handleConfirm(j) {
       pending.channel?.send(`<@${j.user.id}> bought **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency}!`).then(m => setTimeout(() => m.delete().catch(() => {}), 5000)).catch(() => {});
       j.user.send(`Purchased **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency} in **${pending.guild?.name || 'the server'}**\nUse: ${pending.item.use}`).catch(() => {});
       for (const adminId of config.dmOwners) j.client.users.fetch(adminId).then(o => o.send(`<@${j.user.id}> bought **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency}!`).catch(() => {})).catch(() => {});
-      await j.update({
-        embeds: [new EmbedBuilder().setColor(0x57f287).setDescription(`Bought **${pending.item.name}** for **${price.toLocaleString()}** ${config.currency}.\nUse: \`${pending.item.use}\``)],
-        components: []
-      });
+
+      const c = new ContainerBuilder()
+        .setAccentColor(0x57f287)
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+          `### Purchased\n` +
+          `-# Bought **${pending.item.name}** for \`${price.toLocaleString()}\` ${config.currency}.\n` +
+          `-# Use: \`${pending.item.use}\``
+        ));
+      await j.update({ components: [c], flags: [MessageFlags.IsComponentsV2] });
     });
   } catch (e) { console.error('shop confirm err:', e); }
-}
-
-const header = new ContainerBuilder()
-  .setAccentColor(0x2b2d31)
-  .addTextDisplayComponents(new TextDisplayBuilder().setContent('**SHOP**\nClick a button to purchase.\nConfirm on next screen.'));
-
-function postShop(channel, guildId) {
-  channel.send({ components: [header, ...buildShop(guildId)], flags: MessageFlags.IsComponentsV2 }).catch(() => {});
 }
 
 module.exports = { buildShop, postShop, handleInteraction, SHOP, allShopItems, getShopItem,
@@ -391,9 +414,9 @@ module.exports = { buildShop, postShop, handleInteraction, SHOP, allShopItems, g
 
     if (first === 'buy' || message.content.toLowerCase().startsWith('v buy') || message.content.toLowerCase().startsWith('vbuy')) {
       const itemQuery = (first === 'buy' ? args.slice(1).join(' ') : args.join(' ')).trim().toLowerCase();
-      if (!itemQuery) return message.channel.send({ embeds: [errEmbed('usage: `v buy <item>` — check `v shop` for items')] });
+      if (!itemQuery) return message.channel.send(errContainer('usage: `v buy <item>` — check `v shop` for items'));
       const item = allShopItems().find(it => it.id.toLowerCase() === itemQuery || it.name.toLowerCase().includes(itemQuery));
-      if (!item) return message.channel.send({ embeds: [errEmbed('item not found — check `v shop` for item names')] });
+      if (!item) return message.channel.send(errContainer('item not found — check `v shop` for item names'));
       return startPurchase(message.author, item, message.channel, message.guild, null);
     }
 
@@ -404,20 +427,14 @@ module.exports = { buildShop, postShop, handleInteraction, SHOP, allShopItems, g
                      ['4', 'social'].includes(first) ? 3 : -1;
       if (catIdx !== -1) {
         const list = guildId ? shopFor(guildId) : SHOP;
-        return message.channel.send({
-          embeds: [buildCategoryEmbed(list[catIdx], catIdx, uid, guildId)],
-          components: buildCategoryRows(catIdx, uid, guildId),
-        }).then(msg => {
+        return message.channel.send(buildCategoryContainer(list[catIdx], catIdx, uid, guildId)).then(msg => {
           if (global._interactionOwners) global._interactionOwners.set(msg.id, message.author.id);
           setTimeout(() => { if (global._interactionOwners) global._interactionOwners.delete(msg.id); }, 300000);
         });
       }
     }
 
-    message.channel.send({
-      embeds: [buildMenuEmbed(uid, guildId)],
-      components: [buildMenuRow(guildId)]
-    }).then(msg => {
+    message.channel.send(buildMenuContainer(uid, guildId)).then(msg => {
       if (global._interactionOwners) global._interactionOwners.set(msg.id, message.author.id);
       setTimeout(() => { if (global._interactionOwners) global._interactionOwners.delete(msg.id); }, 300000);
     });

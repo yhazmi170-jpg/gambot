@@ -1,7 +1,15 @@
 const db = require('../db');
 const { error } = require('../utils/embed');
 const config = require('../config');
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const {
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  MessageFlags,
+} = require('discord.js');
 
 const SUITS = ['s', 'h', 'd', 'c'];
 const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
@@ -73,6 +81,55 @@ function describeHand(cards) {
   return `High Card (${highName})`;
 }
 
+function buildPokerContainer(cards, held, amount, uid, isFinal = false, result = null, outcomeLine = '') {
+  let color = 0x2b2d31;
+  if (isFinal && result) {
+    color = result.payout > 1 ? 0x57f287 : (result.payout === 1 ? 0xfee75c : 0xed4245);
+  }
+
+  const lines = [
+    `### Video Poker`,
+    `-# **Player**: <@${uid}>    **Bet**: \`${amount.toLocaleString()}\``,
+  ];
+
+  if (isFinal) {
+    lines.push(`-# **Result**: ${outcomeLine}`);
+  } else {
+    lines.push(`-# **Hand**: \`${describeHand(cards)}\``);
+  }
+
+  const cardButtons = cards.map((c, i) => {
+    const isHeld = held[i];
+    return new ButtonBuilder()
+      .setCustomId(`ph_${i}`)
+      .setLabel(isHeld ? `[ ${c.value}${c.suit} ]` : `${c.value}${c.suit}`)
+      .setStyle(isHeld ? ButtonStyle.Success : ButtonStyle.Secondary)
+      .setDisabled(isFinal);
+  });
+
+  const cardRow = new ActionRowBuilder().addComponents(cardButtons);
+
+  const container = new ContainerBuilder()
+    .setAccentColor(color)
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')))
+    .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(1))
+    .addActionRowComponents(cardRow);
+
+  if (!isFinal) {
+    const drawRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('pd').setLabel('DRAW').setStyle(ButtonStyle.Success)
+    );
+    container
+      .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(1))
+      .addActionRowComponents(drawRow);
+  }
+
+  return {
+    components: [container],
+    flags: [MessageFlags.IsComponentsV2],
+  };
+}
+
 module.exports = {
   name: 'poker',
   description: 'video poker (VIP perk) — hold/draw for payouts',
@@ -93,60 +150,7 @@ module.exports = {
     let cards = [deck.pop(), deck.pop(), deck.pop(), deck.pop(), deck.pop()];
     let held = [false, false, false, false, false];
 
-    function buildPokerEmbed(isFinal = false, result = null, outcomeLine = '') {
-      const cardRow = cards.map((c, i) => {
-        const str = `${c.value}${c.suit}`;
-        return held[i] ? `**[${str}]**` : `\`${str}\``;
-      }).join('  ');
-
-      const descLines = [
-        `Bet: **${amount.toLocaleString()}** ${config.currency}`,
-        '',
-        cardRow,
-        '',
-      ];
-
-      if (isFinal) {
-        descLines.push(outcomeLine);
-      } else {
-        descLines.push(`Hand: **${describeHand(cards)}**`);
-      }
-
-      let color = 0x2b2d31;
-      if (isFinal && result) {
-        color = result.payout > 1 ? 0x57f287 : (result.payout === 1 ? 0xfee75c : 0xed4245);
-      }
-
-      return new EmbedBuilder()
-        .setColor(color)
-        .setTitle('Video Poker')
-        .setDescription(descLines.join('\n'));
-    }
-
-    function makeButtons() {
-      const cardButtons = cards.map((c, i) => {
-        const isHeld = held[i];
-        return new ButtonBuilder()
-          .setCustomId(`ph_${i}`)
-          .setLabel(isHeld ? `${c.value}${c.suit} [HOLD]` : `${c.value}${c.suit}`)
-          .setStyle(isHeld ? ButtonStyle.Success : ButtonStyle.Secondary);
-      });
-
-      const drawButton = new ButtonBuilder()
-        .setCustomId('pd')
-        .setLabel('DRAW')
-        .setStyle(ButtonStyle.Success);
-
-      return [
-        new ActionRowBuilder().addComponents(cardButtons),
-        new ActionRowBuilder().addComponents(drawButton),
-      ];
-    }
-
-    message.channel.send({
-      embeds: [buildPokerEmbed()],
-      components: makeButtons(),
-    }).then(msg => {
+    message.channel.send(buildPokerContainer(cards, held, amount, uid)).then(msg => {
       if (global._interactionOwners) global._interactionOwners.set(msg.id, message.author.id);
       setTimeout(() => { if (global._interactionOwners) global._interactionOwners.delete(msg.id); }, 300000);
       const filter = i => i.user.id === uid && (i.customId === 'pd' || i.customId.startsWith('ph_'));
@@ -159,26 +163,23 @@ module.exports = {
         if (result.payout > 1) {
           const profit = amount * result.payout - amount;
           const paid = db.payWin(uid, profit);
-          line = `**${result.name}** — won **${(amount + paid).toLocaleString()}** ${config.currency} (+**${paid.toLocaleString()}**)`;
+          line = `**${result.name}** — won \`${(amount + paid).toLocaleString()}\` (+${paid.toLocaleString()})`;
         } else if (result.payout === 1) {
-          line = `**Jacks or Better** — push (${amount.toLocaleString()} ${config.currency} returned)`;
+          line = `**Jacks or Better** — push (\`${amount.toLocaleString()}\` returned)`;
         } else {
           db.addBalance(uid, -amount); db.addGambled(uid, amount);
           const refund = db.getInsuranceRefund(uid, amount);
           if (refund > 0) db.addBalance(uid, refund);
-          line = `**${result.name}** — lost **${amount.toLocaleString()}** ${config.currency}${refund > 0 ? ` (refund **${refund.toLocaleString()}**)` : ''}`;
+          line = `**${result.name}** — lost \`${amount.toLocaleString()}\`${refund > 0 ? ` (refund \`${refund.toLocaleString()}\`)` : ''}`;
         }
-        msg.edit({
-          embeds: [buildPokerEmbed(true, result, line)],
-          components: [],
-        }).catch(() => {});
+        msg.edit(buildPokerContainer(cards, held, amount, uid, true, result, line)).catch(() => {});
       }
 
       col.on('collect', async (interaction) => {
         if (interaction.customId === 'pd') { finish(true); col.stop(); return; }
         const idx = parseInt(interaction.customId.split('_')[1]);
         held[idx] = !held[idx];
-        await interaction.update({ embeds: [buildPokerEmbed()], components: makeButtons() }).catch(() => {});
+        await interaction.update(buildPokerContainer(cards, held, amount, uid)).catch(() => {});
       });
 
       col.on('end', async (collected) => {
