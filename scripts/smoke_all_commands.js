@@ -213,7 +213,7 @@ async function seed() {
 const ARGS = {
   bal: [], cash: [], bank: ['balance'], profile: [], lb: [], leaderboard: [], slb: [], glb: [], toulb: [], toulbonline: [],
   daily: [], weekly: [], streak: [], work: [], rep: ['@222222222222222222', 'nice'], pray: [], freebet: [], here: [], level: [], activity: [], version: [], help: [], perkhelp: [], gamehelp: [], incidents: [], lore: [],
-  coinflip: ['100'], cf: ['100', 'heads'], dice: ['100'], roll: ['100'], roulette: ['100'], crash: ['100', '2'], slots: ['100'], mines: ['100', '3'], lottery: ['2'], wheel: ['100'], poker: [], try: ['all'],
+  coinflip: ['100'], cf: ['100', 'heads'], dice: ['100'], roll: ['100'], roulette: ['100'], crash: ['100', '2'], slots: ['100'], mines: ['100', '3'], lottery: ['2'], wheel: ['100'], try: ['all'],
   gamble: ['100'], blackjack: ['100'], bj: ['100'], snailgarden: ['100'], sg: ['100'], garden: [], gardenshop: [], gardenbuy: ['soil'], gardenpet: ['snail'],
   hunt: ['2'], zoo: [], team: [], sacrifice: ['all'], hatch: [], sell: ['all'], upgrade: ['efficiency'], huntbot: [], autohuntbot: [], autohunt: ['5'], givepets: ['@222222222222222222', '9003'],
   weapon: ['list'], weaponcrate: ['open', 'all'], wc: ['open', 'all'], animal: ['9001'], rename: ['9001', 'NewName'], evolve: ['9001'],

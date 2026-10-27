@@ -47,13 +47,6 @@ module.exports = {
         play: `\`${prefix} bj <amount>\`\nButtons: **Hit** draw, **Stand** keep\nExample: \`${prefix} bj 1000\``,
         tips: 'Hit on 11 or below. Stand on 17+. Dealer hits to 17. High bal slightly lowers win payouts.',
       },
-      poker: {
-        name: 'Video Poker',
-        aliases: 'poker, videopoker',
-        desc: 'VIP game. Get dealt 5 cards, hold what you want, draw the rest. Jacks or better to win.',
-        play: `\`${prefix} poker <amount>\`\nToggle hold on each card, then **DRAW**\nRequires **VIP game modes** perk (or owner)\nExample: \`${prefix} poker 1000\``,
-        tips: 'Hold pairs of jacks+. Paytable: RF 800× · SF 50× · 4K 25× · FH 9× · Fl 6× · St 4× · 3K 3× · 2P 2× · JoB 1×',
-      },
       mines: {
         name: 'Mines',
         aliases: 'mine, mines',

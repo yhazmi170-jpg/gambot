@@ -21,7 +21,6 @@ const SHOP = [
       { id: 'double_work', name: 'double_work', price: 6000000, desc: '2x work payout', use: 'v work pays 2x' },
       { id: 'bet_cap', name: 'bet_cap', price: 2000000, desc: '500k max bet', use: 'v <game> all' },
       { id: 'lottery_ticket', name: 'lottery_ticket', price: 7000000, desc: 'free ticket each draw', use: 'auto on draw' },
-      { id: 'vip_games', name: 'vip_games', price: 8000000, desc: 'video poker access', use: 'v poker <amount>' },
       { id: 'gem', name: 'gem', price: 2000000, gems: 1, desc: '1 hunt gem', use: 'v hunt' },
       { id: 'gems5', name: 'gems5', price: 9000000, gems: 5, desc: '5 hunt gems', use: 'v hunt' },
       { id: 'egg_luck', name: 'egg_luck', price: 3500000, desc: '2x egg drops', use: 'v hunt' },

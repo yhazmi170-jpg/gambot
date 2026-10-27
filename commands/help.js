@@ -20,7 +20,6 @@ const perkCmdMap = {
   rain: `\`${prefix} rain <amount>\` — rain money to online members`,
   duel: `\`${prefix} duel <@user> <amount>\` — 1v1 coinflip (capped at 100,000,000 per duel)`,
   rep: `\`${prefix} rep <@user>\` — give reputation`,
-  vip_games: `\`${prefix} poker <amount>\` — video poker (VIP)`,
 };
 
 const CATEGORY_ORDER = ['Economy', 'Games', 'Pets', 'Shop', 'Social', 'Fun', 'Profile', 'Info', 'Admin'];
