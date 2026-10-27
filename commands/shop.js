@@ -97,20 +97,7 @@ function buildMenuContainer(userOrId, guildId) {
     user ? `-# **Balance**: \`${user.balance.toLocaleString()}\` money` : '',
     saleMult < 1 ? `-# **Sale**: ${Math.round((1 - saleMult) * 100)}% off` : '',
     '',
-    '**One-Time**',
-    'rob (15m) • double_work (6m) • bet_cap (2m) • lottery_ticket (7m)',
-    'vip_games (8m) • gem (2m) • gems5 (9m) • egg_luck (3.5m)',
-    'double_quest (4m) • weapon_crate (15k)',
-    '',
-    '**Monthly**',
-    'insurance (150k/mo) • insurance2 (300k/mo) • insurance3 (500k/mo)',
-    'insurance4 (800k/mo) • daily_cap (600k/mo)',
-    '',
-    '**Tools**',
-    'auto_react (1.5m) • rain (3m) • duel (2m)',
-    '',
-    '**Social**',
-    'colored_lb (750k) • badge (500k) • rep (300k)',
+    'Pick a category to browse items.',
   ].filter(l => l !== null);
 
   const list = guildId ? shopFor(guildId) : SHOP;

@@ -12,6 +12,7 @@ const {
 } = require('discord.js');
 
 const SUITS = ['s', 'h', 'd', 'c'];
+const SUIT_EMOJI = { 's': '♠️', 'h': '♥️', 'd': '♦️', 'c': '♣️' };
 const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 const VALUE_RANK = Object.fromEntries(VALUES.map((v, i) => [v, i + 2]));
 const RANK_NAMES = {
@@ -87,6 +88,11 @@ function buildPokerContainer(cards, held, amount, uid, isFinal = false, result =
     color = result.payout > 1 ? 0x57f287 : (result.payout === 1 ? 0xfee75c : 0xed4245);
   }
 
+  const cardDisplay = cards.map((c, i) => {
+    const cardStr = `${c.value}${SUIT_EMOJI[c.suit]}`;
+    return held[i] ? `**[${cardStr}]**` : cardStr;
+  }).join('   ');
+
   const lines = [
     `### Video Poker`,
     `-# **Player**: <@${uid}>    **Bet**: \`${amount.toLocaleString()}\``,
@@ -98,11 +104,15 @@ function buildPokerContainer(cards, held, amount, uid, isFinal = false, result =
     lines.push(`-# **Hand**: \`${describeHand(cards)}\``);
   }
 
+  lines.push('');
+  lines.push(cardDisplay);
+
   const cardButtons = cards.map((c, i) => {
     const isHeld = held[i];
     return new ButtonBuilder()
       .setCustomId(`ph_${i}`)
-      .setLabel(isHeld ? `[ ${c.value}${c.suit} ]` : `${c.value}${c.suit}`)
+      .setLabel(isHeld ? `${c.value} HELD` : c.value)
+      .setEmoji(SUIT_EMOJI[c.suit])
       .setStyle(isHeld ? ButtonStyle.Success : ButtonStyle.Secondary)
       .setDisabled(isFinal);
   });
