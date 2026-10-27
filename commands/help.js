@@ -1,10 +1,17 @@
 const fs = require('fs');
 const path = require('path');
 const db = require('../db');
-const { embed } = require('../utils/embed');
 const config = require('../config');
 const { version } = require('../package.json');
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  MessageFlags,
+} = require('discord.js');
 
 const prefix = config.prefixes[0];
 
@@ -16,23 +23,7 @@ const perkCmdMap = {
   vip_games: `\`${prefix} poker <amount>\` — video poker (VIP)`,
 };
 
-const CATEGORY_ORDER = ['Economy', 'Games', 'Pets', 'Social', 'Fun', 'Shop'];
-
-// Discord caps a single embed field at 1024 chars — chunk long lists across fields.
-function chunkFields(name, lines) {
-  const fields = [];
-  let cur = '';
-  for (const line of lines) {
-    if (cur.length + line.length + 1 > 1024) {
-      fields.push([name, cur]);
-      cur = line;
-    } else {
-      cur = cur ? cur + '\n' + line : line;
-    }
-  }
-  if (cur) fields.push([name, cur]);
-  return fields;
-}
+const CATEGORY_ORDER = ['Economy', 'Games', 'Pets', 'Shop', 'Social', 'Fun', 'Profile', 'Info', 'Admin'];
 
 function loadCategories() {
   const cmdsByCat = {};
@@ -42,8 +33,9 @@ function loadCategories() {
     delete require.cache[require.resolve(path.join(dir, file))];
     const cmd = require(path.join(dir, file));
     if (cmd.helpCategory) {
-      if (!cmdsByCat[cmd.helpCategory]) cmdsByCat[cmd.helpCategory] = [];
-      cmdsByCat[cmd.helpCategory].push({
+      const cat = cmd.helpCategory === 'Perks' ? 'Shop' : cmd.helpCategory;
+      if (!cmdsByCat[cat]) cmdsByCat[cat] = [];
+      cmdsByCat[cat].push({
         name: cmd.name,
         line: `\`${prefix} ${cmd.name}${cmd.helpArgs ? ' ' + cmd.helpArgs : ''}\` — ${cmd.description || cmd.name}`,
       });
@@ -62,62 +54,87 @@ function loadCategories() {
   return cats;
 }
 
-const CATEGORY_EMOJIS = {
-  Economy: '💰',
-  Games: '🎲',
-  Pets: '🐾',
-  Social: '👥',
-  Fun: '🎭',
-  Shop: '🛍️',
-};
-
-function buildMenuEmbed(uid) {
-  const owned = db.getUserPerks(uid).map(p => p.perk);
+function buildMenuContainer(uid) {
+  const owned = uid ? db.getUserPerks(uid).map(p => p.perk) : [];
   const cats = loadCategories();
-  const lines = cats.map(([cat], i) => `**${i + 1}. ${cat}**`).join('\n');
-  const hasPerks = owned.length > 0;
-  const tips = [
-    `\`${prefix} gamehelp <game>\` — rules for each game`,
-    `\`${prefix} version\` — bot version (v${version})`,
-    'Higher balance = slightly lower rewards/wins (caps at 60% less)',
+
+  const lines = [
+    `### Gambot Help`,
+    `-# Prefix: \`${prefix}\` · Version: \`v${version}\``,
+    '',
+    'Pick a category to view commands.',
   ];
-  return new EmbedBuilder().setColor(0x2b2d31)
-    .setTitle(`Gambot v${version}`)
-    .setDescription(`pick a category to see its commands${hasPerks ? `\n**Perks** — ${owned.length} owned, tap to see them` : ''}\n\n${lines}\n\n${tips.join(' · ')}`);
-}
 
-function buildMenuRow(uid) {
-  const owned = db.getUserPerks(uid).map(p => p.perk);
-  const cats = loadCategories();
   const buttons = cats.map(([cat], i) =>
-    new ButtonBuilder().setCustomId(`help_cat_${i}`).setLabel(cat).setStyle(ButtonStyle.Secondary));
+    new ButtonBuilder().setCustomId(`help_cat_${i}`).setLabel(cat).setStyle(ButtonStyle.Secondary)
+  );
+
+  const perksLabel = owned.length > 0 ? `Perks (${owned.length})` : 'Perks';
+  buttons.push(new ButtonBuilder().setCustomId('help_perks').setLabel(perksLabel).setStyle(ButtonStyle.Secondary));
+
   const rows = [];
   let row = [];
   for (const b of buttons) {
     row.push(b);
-    if (row.length === 5) { rows.push(new ActionRowBuilder().addComponents(row)); row = []; }
+    if (row.length === 5) {
+      rows.push(new ActionRowBuilder().addComponents(row));
+      row = [];
+    }
   }
-  const hasPerks = owned.length > 0;
-  if (row.length || hasPerks) {
-    if (hasPerks) row.push(new ButtonBuilder().setCustomId('help_perks').setLabel('Perks').setStyle(ButtonStyle.Secondary));
-    if (row.length) rows.push(new ActionRowBuilder().addComponents(row));
+  if (row.length) rows.push(new ActionRowBuilder().addComponents(row));
+
+  const container = new ContainerBuilder()
+    .setAccentColor(0x2b2d31)
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')))
+    .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(1));
+
+  for (const r of rows) {
+    container.addActionRowComponents(r);
   }
-  return rows;
+
+  return {
+    components: [container],
+    flags: [MessageFlags.IsComponentsV2],
+  };
 }
 
-function buildCategoryEmbed(cat) {
-  const fields = chunkFields(cat[0], cat[1]);
-  return embed(`Help — ${cat[0]}`, fields, 0x2b2d31);
+function buildCategoryContainer(cat) {
+  const catName = cat[0];
+  const cmdLines = cat[1];
+
+  const header = `### Help — ${catName}\n-# Prefix: \`${prefix}\` · ${cmdLines.length} commands\n`;
+
+  const textChunks = [];
+  let cur = header;
+  for (const line of cmdLines) {
+    if (cur.length + line.length + 1 > 3800) {
+      textChunks.push(cur);
+      cur = line;
+    } else {
+      cur = cur ? cur + '\n' + line : line;
+    }
+  }
+  if (cur) textChunks.push(cur);
+
+  const backRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('help_back').setLabel('Back').setStyle(ButtonStyle.Secondary)
+  );
+
+  const container = new ContainerBuilder().setAccentColor(0x2b2d31);
+  for (const chunk of textChunks) {
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(chunk));
+  }
+  container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(1));
+  container.addActionRowComponents(backRow);
+
+  return {
+    components: [container],
+    flags: [MessageFlags.IsComponentsV2],
+  };
 }
 
-function buildCategoryRows() {
-  return [new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('help_back').setLabel('Back').setStyle(ButtonStyle.Secondary),
-  )];
-}
-
-function buildPerksEmbed(uid) {
-  const owned = db.getUserPerks(uid).map(p => p.perk);
+function buildPerksContainer(uid) {
+  const owned = uid ? db.getUserPerks(uid).map(p => p.perk) : [];
   const { allShopItems } = require('./shop');
   const items = allShopItems();
   const shopMap = Object.fromEntries(items.map(i => [i.id, i]));
@@ -129,40 +146,93 @@ function buildPerksEmbed(uid) {
     } else {
       const c = perkCmdMap[id];
       if (c) lines.push(`**${id}**\n${c}`);
+      else lines.push(`**${id}**`);
     }
   }
-  if (!lines.length) lines.push('you don\'t own any perks yet — buy them in `v shop`');
-  const fields = chunkFields('Your Perks', lines);
-  return embed(`Your Perks (${owned.length})`, fields, 0x2b2d31);
+  if (!lines.length) lines.push('No perks owned yet. Buy perks in `v shop`.');
+
+  const header = `### Help — Perks\n-# ${owned.length} owned\n`;
+  const textChunks = [];
+  let cur = header;
+  for (const line of lines) {
+    if (cur.length + line.length + 1 > 3800) {
+      textChunks.push(cur);
+      cur = line;
+    } else {
+      cur = cur ? cur + '\n' + line : line;
+    }
+  }
+  if (cur) textChunks.push(cur);
+
+  const backRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('help_back').setLabel('Back').setStyle(ButtonStyle.Secondary)
+  );
+
+  const container = new ContainerBuilder().setAccentColor(0x2b2d31);
+  for (const chunk of textChunks) {
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(chunk));
+  }
+  container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(1));
+  container.addActionRowComponents(backRow);
+
+  return {
+    components: [container],
+    flags: [MessageFlags.IsComponentsV2],
+  };
 }
 
 async function handleInteraction(i) {
   try {
     if (!i.customId.startsWith('help_')) return;
     if (i.customId === 'help_perks') {
-      await i.update({ embeds: [buildPerksEmbed(i.user.id)], components: buildCategoryRows() });
+      await i.update(buildPerksContainer(i.user.id));
       return;
     }
     if (i.customId === 'help_back') {
-      await i.update({ embeds: [buildMenuEmbed(i.user.id)], components: buildMenuRow(i.user.id) });
+      await i.update(buildMenuContainer(i.user.id));
       return;
     }
     if (i.customId.startsWith('help_cat_')) {
       const idx = parseInt(i.customId.replace('help_cat_', ''), 10);
       const cats = loadCategories();
       if (isNaN(idx) || !cats[idx]) return;
-      await i.update({ embeds: [buildCategoryEmbed(cats[idx])], components: buildCategoryRows() });
+      await i.update(buildCategoryContainer(cats[idx]));
     }
-  } catch (e) { console.error('help interaction err:', e); }
+  } catch (e) {
+    console.error('help interaction err:', e);
+  }
 }
 
 module.exports = {
   name: 'help',
   aliases: ['commands', 'cmds'],
   handleInteraction,
-  execute(message) {
+  execute(message, args) {
     const uid = message.author.id;
-    message.channel.send({ embeds: [buildMenuEmbed(uid)], components: buildMenuRow(uid) }).then(msg => {
+    if (args && args.length) {
+      const query = args[0].toLowerCase();
+      const cats = loadCategories();
+      const matchedCat = cats.find(([c]) => c.toLowerCase() === query);
+      if (matchedCat) {
+        return message.channel.send(buildCategoryContainer(matchedCat));
+      }
+      const dir = path.join(__dirname);
+      const files = fs.readdirSync(dir).filter(f => f.endsWith('.js') && f !== 'help.js');
+      for (const file of files) {
+        const cmd = require(path.join(dir, file));
+        if (cmd.name === query || (cmd.aliases && cmd.aliases.includes(query))) {
+          const container = new ContainerBuilder()
+            .setAccentColor(0x2b2d31)
+            .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+              `### \`${prefix} ${cmd.name}${cmd.helpArgs ? ' ' + cmd.helpArgs : ''}\`\n${cmd.description || cmd.name}`
+            ));
+          return message.channel.send({ components: [container], flags: [MessageFlags.IsComponentsV2] });
+        }
+      }
+    }
+
+    const payload = buildMenuContainer(uid);
+    message.channel.send(payload).then(msg => {
       if (global._interactionOwners) global._interactionOwners.set(msg.id, uid);
       setTimeout(() => { if (global._interactionOwners) global._interactionOwners.delete(msg.id); }, 300000);
     });
