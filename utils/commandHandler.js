@@ -121,6 +121,43 @@ async function handleMessage(message) {
     }
   }
 
+  // Fused prefix shortcuts (e.g. `vh`, `wh` for hunt, `vb`, `wb` for battle, `vcf` for coinflip)
+  if (!cmdName && content.length > 1) {
+    const tokens = content.split(/\s+/);
+    const firstWord = tokens[0];
+    const firstLower = firstWord.toLowerCase();
+
+    let matchedLead = null;
+    let candidateCmd = null;
+
+    if (firstLower.startsWith('ovo') && firstLower.length > 3) {
+      matchedLead = 'ovo';
+      candidateCmd = firstLower.slice(3);
+    } else if (firstLower.length > 1 && (firstLower.startsWith('v') || firstLower.startsWith('w'))) {
+      matchedLead = firstLower[0];
+      candidateCmd = firstLower.slice(1);
+    }
+
+    if (matchedLead && candidateCmd) {
+      const FUSED_IGNORE = new Set([
+        'where', 'win', 'war', 'var', 'wav', 'who', 'why', 'what', 'when',
+        'with', 'went', 'were', 'will', 'would', 'want', 'well', 'way',
+        'word', 'work', 'week', 'wait', 'walk', 'wish', 'wide', 'wife',
+        'wind', 'wine', 'wing', 'wire', 'wise', 'worn', 'wore', 'wood',
+        'wool', 'very', 'view', 'vote', 'vast', 'via', 'voice', 'value'
+      ]);
+
+      if (!FUSED_IGNORE.has(firstLower)) {
+        const potentialCmd = getCommand(candidateCmd);
+        if (potentialCmd) {
+          prefix = matchedLead;
+          cmdName = candidateCmd;
+          args = tokens.slice(1);
+        }
+      }
+    }
+  }
+
   if (!cmdName) return;
 
   const cmd = getCommand(cmdName);
