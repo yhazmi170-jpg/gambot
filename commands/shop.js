@@ -6,47 +6,51 @@ const { ContainerBuilder, TextDisplayBuilder, ActionRowBuilder, ButtonBuilder, B
 
 const SHOP = [
   {
-    category: 'ONE-TIME PURCHASES',
+    category: 'One-Time',
+    short: 'One-Time',
     items: [
-      { id: 'rob', name: 'v rob @user ability', price: 15000000, desc: '30% chance to steal 20% of target\'s balance (max 3M) / 70% chance you lose 20% of your balance (max 3M) + 30m jail, insurance downgrade, -50 credit', use: 'Use v rob @user to attempt a robbery (requires rob perk)' },
-      { id: 'double_work', name: 'Double work payout (perm)', price: 6000000, desc: 'permanently earn 2x from v work', use: 'Just use v work — it pays double automatically' },
-      { id: 'bet_cap', name: 'Bet Cap (500k)', price: 2000000, desc: 'bet up to 500k in games (max)', use: 'Use v <game> all to bet up to 500k' },
-      { id: 'lottery_ticket', name: 'Free lottery ticket/draw', price: 7000000, desc: 'get a free ticket every lottery draw', use: 'You will auto-get 1 free ticket each lottery draw' },
-      { id: 'vip_games', name: 'VIP game modes access', price: 8000000, desc: 'unlocks exclusive games (poker)', use: 'Use v poker <amount> to play video poker' },
-      { id: 'gem', name: 'Gem', price: 2000000, gems: 1, desc: 'every 5 gems you hold = +1 extra animal per hunt (v hunt)', use: 'v hunt — more gems = more animals per hunt' },
-      { id: 'gems5', name: 'Gem Pack (x5)', price: 9000000, gems: 5, desc: '5 gems = +1 extra animal per hunt', use: 'v hunt — more gems = more animals per hunt' },
-      { id: 'egg_luck', name: 'Egg Luck (2x egg drops)', price: 3500000, desc: 'double your chance of finding eggs while hunting', use: 'Eggs drop 2x as often from v hunt / autohunt — v hatch to open' },
-      { id: 'double_quest', name: 'Double Quest Rewards', price: 4000000, desc: 'daily quests and weekly bounties pay 2x', use: 'v quest claim / v bounty claim pay double' },
-      { id: 'weapon_crate', name: 'Weapon Crate', price: 15000, weaponCrates: 1, desc: 'open it for a random weapon: Great Sword, Poison Dagger, Flame Staff, Vampiric Staff, Healing Staff, Defender Aegis, Bow, Rune of Power', use: 'v weaponcrate open — equip with v weapon equip #<wepId> #<animalId>' },
+      { id: 'rob', name: 'rob', price: 15000000, desc: 'steal ability', use: 'v rob @user' },
+      { id: 'double_work', name: 'double_work', price: 6000000, desc: '2x work payout', use: 'v work pays 2x' },
+      { id: 'bet_cap', name: 'bet_cap', price: 2000000, desc: '500k max bet', use: 'v <game> all' },
+      { id: 'lottery_ticket', name: 'lottery_ticket', price: 7000000, desc: 'free ticket each draw', use: 'auto on draw' },
+      { id: 'vip_games', name: 'vip_games', price: 8000000, desc: 'video poker access', use: 'v poker <amount>' },
+      { id: 'gem', name: 'gem', price: 2000000, gems: 1, desc: '1 hunt gem', use: 'v hunt' },
+      { id: 'gems5', name: 'gems5', price: 9000000, gems: 5, desc: '5 hunt gems', use: 'v hunt' },
+      { id: 'egg_luck', name: 'egg_luck', price: 3500000, desc: '2x egg drops', use: 'v hunt' },
+      { id: 'double_quest', name: 'double_quest', price: 4000000, desc: '2x quest rewards', use: 'v quest' },
+      { id: 'weapon_crate', name: 'weapon_crate', price: 15000, weaponCrates: 1, desc: 'weapon crate', use: 'v weaponcrate open' },
     ],
   },
   {
-    category: 'MONTHLY SUB (auto-renew if you can afford it)',
+    category: 'Monthly',
+    short: 'Monthly',
     items: [
-      { id: 'insurance', name: 'Insurance (10% loss refund)', price: 150000, desc: '10% of losses refunded', monthly: true, use: 'Losses are auto-refunded 10% — no command needed' },
-      { id: 'insurance2', name: 'Insurance Upgrade II (15% refund)', price: 300000, desc: 'raises your loss refund to 15%', monthly: true, use: 'Overrides the base — losses auto-refund 15%' },
-      { id: 'insurance3', name: 'Insurance Upgrade III (20% refund)', price: 500000, desc: 'raises your loss refund to 20%', monthly: true, use: 'Overrides lower tiers — losses auto-refund 20%' },
-      { id: 'insurance4', name: 'Insurance Upgrade IV (25% refund)', price: 800000, desc: 'raises your loss refund to 25%', monthly: true, use: 'Overrides lower tiers — losses auto-refund 25%' },
-      { id: 'daily_cap', name: 'Higher daily/weekly cap', price: 600000, desc: 'daily cap raised to 15k, weekly to 25k', monthly: true, use: 'Use v daily and v weekly normally — caps are higher' },
+      { id: 'insurance', name: 'insurance', price: 150000, desc: '10% loss refund', monthly: true, use: 'auto-refund 10%' },
+      { id: 'insurance2', name: 'insurance2', price: 300000, desc: '15% loss refund', monthly: true, use: 'auto-refund 15%' },
+      { id: 'insurance3', name: 'insurance3', price: 500000, desc: '20% loss refund', monthly: true, use: 'auto-refund 20%' },
+      { id: 'insurance4', name: 'insurance4', price: 800000, desc: '25% loss refund', monthly: true, use: 'auto-refund 25%' },
+      { id: 'daily_cap', name: 'daily_cap', price: 600000, desc: '15k daily / 25k weekly cap', monthly: true, use: 'v daily' },
     ],
   },
   {
-    category: 'SERVER TOOLS',
+    category: 'Tools',
+    short: 'Tools',
     items: [
-      { id: 'auto_react', name: 'Auto-react on messages', price: 1500000, desc: 'set an emoji that the bot auto-reacts to your messages with', use: 'Use v autoreact <emoji> to set your reaction emoji' },
-      { id: 'auto_react2', name: 'Auto-react — 2nd emoji slot', price: 4000000, desc: 'react with TWO emojis at once instead of one', use: 'Use v autoreact ☠️ 🔥 to set both' },
-      { id: 'auto_react3', name: 'Auto-react — 3rd emoji slot', price: 12000000, desc: 'react with THREE emojis at once', use: 'Use v autoreact ☠️ 🔥 💀 to set all three' },
-      { id: 'auto_react4', name: 'Auto-react — 4th emoji slot', price: 30000000, desc: 'react with FOUR emojis at once (max)', use: 'Use v autoreact ☠️ 🔥 💀 🌟 to set all four' },
-      { id: 'rain', name: 'v rain <amount>', price: 3000000, desc: 'rain money to everyone online', use: 'Use v rain <amount> to share money with online members' },
-      { id: 'duel', name: 'v duel @user <amount>', price: 2000000, desc: '1v1 coinflip challenge another user', use: 'Use v duel @user <amount> to challenge someone' },
+      { id: 'auto_react', name: 'auto_react', price: 1500000, desc: 'auto-react slot 1', use: 'v autoreact <emoji>' },
+      { id: 'auto_react2', name: 'auto_react2', price: 4000000, desc: 'auto-react slot 2', use: 'v autoreact <e1> <e2>' },
+      { id: 'auto_react3', name: 'auto_react3', price: 12000000, desc: 'auto-react slot 3', use: 'v autoreact <e1> <e2> <e3>' },
+      { id: 'auto_react4', name: 'auto_react4', price: 30000000, desc: 'auto-react slot 4', use: 'v autoreact <e1> <e2> <e3> <e4>' },
+      { id: 'rain', name: 'rain', price: 3000000, desc: 'rain money command', use: 'v rain <amount>' },
+      { id: 'duel', name: 'duel', price: 2000000, desc: '1v1 coinflip duel', use: 'v duel @user <amount>' },
     ],
   },
   {
-    category: 'SOCIAL',
+    category: 'Social',
+    short: 'Social',
     items: [
-      { id: 'colored_lb', name: 'Colored leaderboard name', price: 750000, desc: 'your name shows in color on v lb', use: 'Use v setlb <emoji> then check v lb' },
-      { id: 'badge', name: 'Custom badge emoji', price: 500000, desc: 'set a badge emoji shown on your profile and lb', use: 'Use v setbadge <emoji>' },
-      { id: 'rep', name: 'v rep @user', price: 300000, desc: 'give reputation points to others', use: 'Use v rep @user to give reputation' },
+      { id: 'colored_lb', name: 'colored_lb', price: 750000, desc: 'colored name on lb', use: 'v setlb <emoji>' },
+      { id: 'badge', name: 'badge', price: 500000, desc: 'custom badge', use: 'v setbadge <emoji>' },
+      { id: 'rep', name: 'rep', price: 300000, desc: 'reputation command', use: 'v rep @user' },
     ],
   },
 ];
@@ -60,7 +64,7 @@ function allShopItems() {
 }
 
 function getShopItem(id) {
-  return allShopItems().find(it => it.id === id);
+  return allShopItems().find(it => it.id === id || it.name.toLowerCase() === id.toLowerCase());
 }
 
 function priceStr(p) {
@@ -80,7 +84,7 @@ function buildShop(guildId) {
       lines.push(`\`${priceStr(item.price)}\` ${item.name}${item.monthly ? ' /mo' : ''} — ${item.desc}`);
       row.push(new ButtonBuilder()
         .setCustomId(`shop_${item.id}`)
-        .setLabel(`${item.name.split('(')[0].trim()} - ${priceStr(item.price)}${item.monthly ? '/mo' : ''}`)
+        .setLabel(`${item.name} - ${priceStr(item.price)}${item.monthly ? '/mo' : ''}`)
         .setStyle(ButtonStyle.Secondary));
       if (row.length === 5) { buttons.push(new ActionRowBuilder().addComponents(row)); row = []; }
     }
@@ -95,49 +99,39 @@ function buildShop(guildId) {
 
 const pendingShops = new Map();
 
-const CATEGORY_ICONS = ['🛍️', '📅', '🛠️', '👥'];
-const CATEGORY_SHORT = ['One-Time', 'Monthly Subs', 'Server Tools', 'Social'];
-const CATEGORY_TITLES = ['One-Time Upgrades', 'Monthly Subscriptions', 'Server Tools', 'Social & Identity'];
-const CATEGORY_DESCS = [
-  'Permanent perks, hunting gems, egg luck & bet caps',
-  'Auto-renewing loss insurance & higher daily/weekly caps',
-  'Auto-react slots, rain command & 1v1 coinflip duels',
-  'Custom profile badge, colored lb names & rep command',
-];
-
 function buildMenuEmbed(userOrId, guildId) {
   let uid = null;
   if (typeof userOrId === 'string' && /^\d{16,21}$/.test(userOrId)) uid = userOrId;
   else if (userOrId && userOrId.id) uid = userOrId.id;
   else if (!guildId && typeof userOrId === 'string') guildId = userOrId;
 
-  const list = guildId ? shopFor(guildId) : SHOP;
   const user = uid ? db.ensureUser(uid) : null;
-  const ownedPerks = uid ? db.getUserPerks(uid).map(p => p.perk) : [];
   const saleMult = db.eventMult('priceMult');
 
-  let banner = '';
-  if (saleMult < 1) {
-    banner = `🔥 **STOREWIDE SALE: ${Math.round((1 - saleMult) * 100)}% OFF EVERYTHING!**\n\n`;
-  }
-
-  const walletStr = user
-    ? `💳 **Wallet:** **${user.balance.toLocaleString()}** ${config.currency}  •  💎 **${user.gems || 0}** gems  •  ⭐ **${ownedPerks.length}** perks owned\n\n`
-    : '';
-
-  const catLines = list.map((cat, idx) => {
-    return `${CATEGORY_ICONS[idx]} **${CATEGORY_TITLES[idx]}** (\`${cat.items.length} items\`)\n└ ${CATEGORY_DESCS[idx]}`;
-  }).join('\n\n');
+  const lines = [
+    user ? `Balance: **${user.balance.toLocaleString()}** ${config.currency}` : '',
+    saleMult < 1 ? `Sale: ${Math.round((1 - saleMult) * 100)}% off` : '',
+    '',
+    '**One-Time**',
+    'rob (15m) • double_work (6m) • bet_cap (2m) • lottery_ticket (7m)',
+    'vip_games (8m) • gem (2m) • gems5 (9m) • egg_luck (3.5m)',
+    'double_quest (4m) • weapon_crate (15k)',
+    '',
+    '**Monthly**',
+    'insurance (150k/mo) • insurance2 (300k/mo) • insurance3 (500k/mo)',
+    'insurance4 (800k/mo) • daily_cap (600k/mo)',
+    '',
+    '**Tools**',
+    'auto_react (1.5m) • rain (3m) • duel (2m)',
+    '',
+    '**Social**',
+    'colored_lb (750k) • badge (500k) • rep (300k)',
+  ].filter(l => l !== null);
 
   return new EmbedBuilder()
-    .setColor(0x5865f2)
-    .setTitle('🛍️ Gambot Perks & Upgrades Shop')
-    .setDescription(
-      `${walletStr}${banner}` +
-      `Pick a category below to browse items and purchase:\n\n` +
-      `${catLines}`
-    )
-    .setFooter({ text: 'Tap a category button below to view items & prices' });
+    .setColor(0x2b2d31)
+    .setTitle('Shop')
+    .setDescription(lines.join('\n'));
 }
 
 function buildMenuRow(guildId) {
@@ -145,9 +139,8 @@ function buildMenuRow(guildId) {
   return new ActionRowBuilder().addComponents(list.map((cat, idx) =>
     new ButtonBuilder()
       .setCustomId(`shop_cat_${idx}`)
-      .setLabel(CATEGORY_SHORT[idx])
-      .setEmoji(CATEGORY_ICONS[idx])
-      .setStyle(ButtonStyle.Primary)
+      .setLabel(cat.short || cat.category)
+      .setStyle(ButtonStyle.Secondary)
   ));
 }
 
@@ -163,29 +156,20 @@ function buildCategoryEmbed(cat, idx, userOrId, guildId) {
     const isPerkItem = !it.gems && !it.weaponCrates;
     const owned = isPerkItem && uid && db.hasPerk(uid, it.id);
     const effPrice = Math.floor(it.price * saleMult);
-    const priceText = saleMult < 1
-      ? `~~${priceStr(it.price)}~~ **${priceStr(effPrice)}**`
-      : `\`${priceStr(effPrice)}\``;
-    const monthlyText = it.monthly ? ' `/mo`' : '';
+    const priceText = `${priceStr(effPrice)}${it.monthly ? '/mo' : ''}`;
 
     if (owned) {
-      return `✅ **${it.name}**${monthlyText} — \`[OWNED]\`\n└ *${it.desc}*`;
+      return `• **${it.name}** [OWNED] — ${it.desc}`;
     }
+    return `• **${it.name}** (${priceText}) — ${it.desc}`;
+  }).join('\n');
 
-    return `🔹 ${priceText} **${it.name}**${monthlyText}\n└ *${it.desc}*`;
-  }).join('\n\n');
-
-  const walletStr = user ? `💳 **Your Balance:** **${user.balance.toLocaleString()}** ${config.currency}\n\n` : '';
+  const walletStr = user ? `Balance: **${user.balance.toLocaleString()}** ${config.currency}\n\n` : '';
 
   return new EmbedBuilder()
-    .setColor(0x5865f2)
-    .setTitle(`${CATEGORY_ICONS[idx]} Shop — ${CATEGORY_TITLES[idx]}`)
-    .setDescription(
-      `${walletStr}` +
-      `${itemsText}\n\n` +
-      `*Click an item button below to purchase. You will confirm before money is spent.*`
-    )
-    .setFooter({ text: '◀ Categories to return to menu' });
+    .setColor(0x2b2d31)
+    .setTitle(`Shop — ${cat.category}`)
+    .setDescription(`${walletStr}${itemsText}`);
 }
 
 function buildCategoryRows(idx, userOrId, guildId) {
@@ -194,28 +178,21 @@ function buildCategoryRows(idx, userOrId, guildId) {
   else if (userOrId && userOrId.id) uid = userOrId.id;
 
   const cat = guildId ? shopFor(guildId)[idx] : SHOP[idx];
-  const user = uid ? db.ensureUser(uid) : null;
-  const saleMult = db.eventMult('priceMult');
   const rows = [];
   let row = [];
 
   for (const it of cat.items) {
     const isPerkItem = !it.gems && !it.weaponCrates;
     const owned = isPerkItem && uid && db.hasPerk(uid, it.id);
-    const effPrice = Math.floor(it.price * saleMult);
-    const shortLabel = it.name.split('(')[0].trim().replace(/^v\s+/, '');
-
     const btn = new ButtonBuilder().setCustomId(`shop_${it.id}`);
 
     if (owned) {
-      btn.setLabel(`${shortLabel.slice(0, 16)} (Owned)`)
-        .setEmoji('✅')
+      btn.setLabel(`${it.name} [OWNED]`)
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(true);
     } else {
-      const canAfford = user && user.balance >= effPrice;
-      btn.setLabel(`${shortLabel.slice(0, 16)} • ${priceStr(effPrice)}${it.monthly ? '/mo' : ''}`)
-        .setStyle(canAfford ? ButtonStyle.Success : ButtonStyle.Secondary);
+      btn.setLabel(it.name)
+        .setStyle(ButtonStyle.Secondary);
     }
 
     row.push(btn);
@@ -230,7 +207,7 @@ function buildCategoryRows(idx, userOrId, guildId) {
   }
 
   rows.push(new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('shop_back').setLabel('◀ Categories').setEmoji('🔙').setStyle(ButtonStyle.Danger)
+    new ButtonBuilder().setCustomId('shop_back').setLabel('Back').setStyle(ButtonStyle.Secondary)
   ));
 
   return rows;
@@ -239,11 +216,49 @@ function buildCategoryRows(idx, userOrId, guildId) {
 function errEmbed(text) {
   return new EmbedBuilder().setColor(0xed4245).setDescription(text);
 }
-function okEmbed(text) {
-  return new EmbedBuilder().setColor(0x57f287).setDescription(text);
-}
-function warnEmbed(text) {
-  return new EmbedBuilder().setColor(0xfee75c).setDescription(text);
+
+async function startPurchase(user, item, channel, guild, interaction) {
+  const isPerkItem = !item.gems && !item.weaponCrates;
+  if (isPerkItem && db.hasPerk(user.id, item.id)) {
+    const msg = { embeds: [errEmbed('You already own this perk.')], ephemeral: true };
+    return interaction ? interaction.followUp(msg) : channel.send(msg);
+  }
+
+  if (pendingShops.has(user.id)) {
+    const msg = { embeds: [errEmbed('You have a pending purchase. Complete or wait for it.')], ephemeral: true };
+    return interaction ? interaction.followUp(msg) : channel.send(msg);
+  }
+
+  const u = db.ensureUser(user.id);
+  const saleMult = db.eventMult('priceMult');
+  const price = Math.floor(item.price * saleMult);
+  if (!u || u.balance < price) {
+    const msg = { embeds: [errEmbed(`Not enough money. Need **${price.toLocaleString()}** ${config.currency}.`)], ephemeral: true };
+    return interaction ? interaction.followUp(msg) : channel.send(msg);
+  }
+
+  const confirm = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`shop_buy_${item.id}`).setLabel('Confirm').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`shop_no_${item.id}`).setLabel('Cancel').setStyle(ButtonStyle.Secondary),
+  );
+
+  const purchaseId = crypto.randomUUID();
+  pendingShops.set(user.id, { itemId: item.id, item, guild, channel, purchaseId });
+  setTimeout(() => pendingShops.delete(user.id), 30000);
+
+  const confirmEmbed = new EmbedBuilder()
+    .setColor(0x2b2d31)
+    .setTitle('Confirm')
+    .setDescription(
+      `Buy **${item.name}** for **${price.toLocaleString()}** ${config.currency}${item.monthly ? ' (/mo)' : ''}?\n` +
+      `Balance after: **${(u.balance - price).toLocaleString()}** ${config.currency}`
+    );
+
+  if (interaction) {
+    await interaction.followUp({ embeds: [confirmEmbed], components: [confirm], ephemeral: true });
+  } else {
+    channel.send({ embeds: [confirmEmbed], components: [confirm] });
+  }
 }
 
 async function handleInteraction(i) {
@@ -276,50 +291,7 @@ async function handleInteraction(i) {
     const item = list.flatMap(c => c.items).find(it => it.id === itemId);
     if (!item) return;
 
-    if (item.gems) {
-      // gem items are currency, not perks — skip the perk-owned check
-    } else if (item.weaponCrates) {
-      // consumable — everyone can buy more
-    } else if (db.hasPerk(i.user.id, itemId)) {
-      await i.followUp({ embeds: [errEmbed('You already own this perk.')], ephemeral: true });
-      return;
-    }
-
-    if (pendingShops.has(i.user.id)) {
-      await i.followUp({ embeds: [errEmbed('You already have a pending purchase. Finish or wait for it to expire.')], ephemeral: true });
-      return;
-    }
-
-    const user = db.ensureUser(i.user.id);
-    const saleMult = db.eventMult('priceMult');
-    const price = Math.floor(item.price * saleMult);
-    if (!user || user.balance < price) {
-      i.user.send(`You tried to buy **${item.name}** (\`${priceStr(price)}\` ${config.currency}) but you don't have enough money.`).catch(() => {});
-      await i.followUp({ embeds: [errEmbed(`Not enough money. You need **${price.toLocaleString()}** ${config.currency} (Balance: **${(user?.balance || 0).toLocaleString()}**).`)], ephemeral: true });
-      return;
-    }
-
-    const confirm = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`shop_buy_${itemId}`).setLabel('Confirm Purchase').setStyle(ButtonStyle.Success).setEmoji('✅'),
-      new ButtonBuilder().setCustomId(`shop_no_${itemId}`).setLabel('Cancel').setStyle(ButtonStyle.Danger).setEmoji('❌'),
-    );
-
-    const purchaseId = crypto.randomUUID();
-    pendingShops.set(i.user.id, { itemId, item, guild: i.guild, channel: i.channel, purchaseId });
-    setTimeout(() => pendingShops.delete(i.user.id), 30000);
-
-    const confirmEmbed = new EmbedBuilder()
-      .setColor(0xfee75c)
-      .setTitle('🛒 Confirm Purchase')
-      .setDescription(
-        `Are you sure you want to purchase **${item.name}**?\n\n` +
-        `🪙 **Price:** **${price.toLocaleString()}** ${config.currency}${item.monthly ? ' (auto-renews monthly)' : ''}${saleMult < 1 ? ` ~~\`${priceStr(item.price)}\`~~ **-${Math.round((1 - saleMult) * 100)}% SALE!**` : ''}\n` +
-        `💳 **Balance After:** **${user.balance.toLocaleString()}** ➔ **${(user.balance - price).toLocaleString()}** ${config.currency}\n\n` +
-        `📝 **Description:** ${item.desc}\n` +
-        `💡 **How to use:** \`${item.use}\``
-      );
-
-    await i.followUp({ embeds: [confirmEmbed], components: [confirm], ephemeral: true });
+    await startPurchase(i.user, item, i.channel, i.guild, i);
   } catch (e) { console.error('shop item err:', e); }
 }
 
@@ -330,11 +302,11 @@ async function handleConfirm(j) {
     pendingShops.delete(j.user.id);
 
     if (!pending) {
-      await j.update({ embeds: [errEmbed('Session expired — please click the shop item again.')], components: [] });
+      await j.update({ embeds: [errEmbed('Session expired — click the item again.')], components: [] });
       return;
     }
     if (!isBuy) {
-      await j.update({ embeds: [new EmbedBuilder().setColor(0xed4245).setDescription('❌ Purchase cancelled.')], components: [] });
+      await j.update({ embeds: [new EmbedBuilder().setColor(0x2b2d31).setDescription('Cancelled.')], components: [] });
       return;
     }
 
@@ -343,7 +315,7 @@ async function handleConfirm(j) {
       const saleMult = db.eventMult('priceMult');
       const price = Math.floor(pending.item.price * saleMult);
       if (price <= 0) {
-        await j.update({ embeds: [errEmbed('Payment failed — you were not charged. Contact support.')], components: [] });
+        await j.update({ embeds: [errEmbed('Payment failed — you were not charged.')], components: [] });
         return;
       }
 
@@ -356,7 +328,7 @@ async function handleConfirm(j) {
           purchaseOk = true;
         } else {
           console.error('shop purchase failed:', res && res.error, 'user:', j.user.id, 'item:', pending.itemId, 'purchase:', purchaseId);
-          await j.update({ embeds: [errEmbed('Your order was not charged. If your balance looks wrong, contact support.')], components: [] });
+          await j.update({ embeds: [errEmbed('Your order was not charged.')], components: [] });
           return;
         }
       } else {
@@ -365,7 +337,7 @@ async function handleConfirm(j) {
         } else {
           const userNow = db.ensureUser(j.user.id);
           if (!userNow || userNow.balance < price) {
-            j.user.send(`You tried to buy **${pending.item.name}** (\`${priceStr(price)}\` ${config.currency}) but you don't have enough money.`).catch(() => {});
+            j.user.send(`You tried to buy **${pending.item.name}** (${priceStr(price)} ${config.currency}) but you don't have enough money.`).catch(() => {});
             await j.update({ embeds: [errEmbed('Not enough money.')], components: [] });
             return;
           }
@@ -388,10 +360,10 @@ async function handleConfirm(j) {
         }
       }
       pending.channel?.send(`<@${j.user.id}> bought **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency}!`).then(m => setTimeout(() => m.delete().catch(() => {}), 5000)).catch(() => {});
-      j.user.send(`**Purchase Confirmation**\nYou bought **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency} in **${pending.guild?.name || 'the server'}**\n\n**How to use:** ${pending.item.use}`).catch(() => {});
+      j.user.send(`Purchased **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency} in **${pending.guild?.name || 'the server'}**\nUse: ${pending.item.use}`).catch(() => {});
       for (const adminId of config.dmOwners) j.client.users.fetch(adminId).then(o => o.send(`<@${j.user.id}> bought **${pending.item.name}** for \`${priceStr(pending.item.price)}\` ${config.currency}!`).catch(() => {})).catch(() => {});
       await j.update({
-        embeds: [new EmbedBuilder().setColor(0x57f287).setTitle('✅ Purchase Successful').setDescription(`You bought **${pending.item.name}** for **${price.toLocaleString()}** ${config.currency}!\n\n**How to use:** ${pending.item.use}`)],
+        embeds: [new EmbedBuilder().setColor(0x57f287).setDescription(`Bought **${pending.item.name}** for **${price.toLocaleString()}** ${config.currency}.\nUse: \`${pending.item.use}\``)],
         components: []
       });
     });
@@ -409,18 +381,27 @@ function postShop(channel, guildId) {
 module.exports = { buildShop, postShop, handleInteraction, SHOP, allShopItems, getShopItem,
   name: 'shop',
   helpCategory: 'Shop',
-  helpArgs: '[category]',
+  helpArgs: '[category | buy <item>]',
   description: 'browse and buy perks & upgrades',
-  aliases: ['store', 'market'],
+  aliases: ['store', 'market', 'buy'],
   execute(message, args) {
     const guildId = message.guild && message.guild.id;
     const uid = message.author.id;
-    const sub = (args[0] || '').toLowerCase();
-    if (sub) {
-      const catIdx = ['1', 'onetime', 'one-time', 'perm', 'permanent'].includes(sub) ? 0 :
-                     ['2', 'sub', 'subs', 'monthly', 'month'].includes(sub) ? 1 :
-                     ['3', 'server', 'tools', 'tool'].includes(sub) ? 2 :
-                     ['4', 'social', 'rep', 'badge'].includes(sub) ? 3 : -1;
+    const first = (args[0] || '').toLowerCase();
+
+    if (first === 'buy' || message.content.toLowerCase().startsWith('v buy') || message.content.toLowerCase().startsWith('vbuy')) {
+      const itemQuery = (first === 'buy' ? args.slice(1).join(' ') : args.join(' ')).trim().toLowerCase();
+      if (!itemQuery) return message.channel.send({ embeds: [errEmbed('usage: `v buy <item>` — check `v shop` for items')] });
+      const item = allShopItems().find(it => it.id.toLowerCase() === itemQuery || it.name.toLowerCase().includes(itemQuery));
+      if (!item) return message.channel.send({ embeds: [errEmbed('item not found — check `v shop` for item names')] });
+      return startPurchase(message.author, item, message.channel, message.guild, null);
+    }
+
+    if (first) {
+      const catIdx = ['1', 'onetime', 'one-time', 'perm'].includes(first) ? 0 :
+                     ['2', 'sub', 'subs', 'monthly'].includes(first) ? 1 :
+                     ['3', 'server', 'tools', 'tool'].includes(first) ? 2 :
+                     ['4', 'social'].includes(first) ? 3 : -1;
       if (catIdx !== -1) {
         const list = guildId ? shopFor(guildId) : SHOP;
         return message.channel.send({

@@ -3,16 +3,9 @@ const { error } = require('../utils/embed');
 const config = require('../config');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 
-let customCardEmojis = {};
-try {
-  customCardEmojis = require('../utils/card_emojis.json');
-} catch (_) {}
-
-const SUITS = ['♠', '♥', '♦', '♣'];
+const SUITS = ['s', 'h', 'd', 'c'];
 const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 const VALUE_RANK = Object.fromEntries(VALUES.map((v, i) => [v, i + 2]));
-const SUIT_EMOJI = { '♠': '♠️', '♥': '♥️', '♦': '♦️', '♣': '♣️' };
-const SUIT_CODE = { '♠': 's', '♥': 'h', '♦': 'd', '♣': 'c' };
 const RANK_NAMES = {
   14: 'Aces', 13: 'Kings', 12: 'Queens', 11: 'Jacks', 10: '10s',
   9: '9s', 8: '8s', 7: '7s', 6: '6s', 5: '5s', 4: '4s', 3: '3s', 2: '2s'
@@ -28,15 +21,6 @@ function createDeck() {
     [deck[i], deck[j]] = [deck[j], deck[i]];
   }
   return deck;
-}
-
-function cardLabel(c) {
-  const key = `${c.value === '10' ? '10' : c.value.toLowerCase()}${SUIT_CODE[c.suit]}`;
-  if (customCardEmojis[key]) return customCardEmojis[key];
-  if (config.cardEmojis && (config.cardEmojis[key] || config.cardEmojis[key.toUpperCase()])) {
-    return config.cardEmojis[key] || config.cardEmojis[key.toUpperCase()];
-  }
-  return `**${c.value}**${SUIT_EMOJI[c.suit]}`;
 }
 
 function evaluateHand(cards) {
@@ -73,7 +57,7 @@ function evaluateHand(cards) {
 
 function describeHand(cards) {
   const result = evaluateHand(cards);
-  if (result.rank > 0) return `${result.name} (${result.payout}×)`;
+  if (result.rank > 0) return `${result.name} (${result.payout}x)`;
 
   const values = cards.map(c => VALUE_RANK[c.value]).sort((a, b) => b - a);
   const counts = {};
@@ -82,7 +66,7 @@ function describeHand(cards) {
 
   if (groups[0] && groups[0][1] === 2) {
     const pairVal = groups[0][0];
-    return `Pair of ${RANK_NAMES[pairVal] || pairVal} (Low Pair)`;
+    return `Pair of ${RANK_NAMES[pairVal] || pairVal}`;
   }
   const maxVal = Math.max(...values);
   const highName = Object.keys(VALUE_RANK).find(k => VALUE_RANK[k] === maxVal) || 'None';
@@ -109,76 +93,49 @@ module.exports = {
     let cards = [deck.pop(), deck.pop(), deck.pop(), deck.pop(), deck.pop()];
     let held = [false, false, false, false, false];
 
-    function buildPokerEmbed(isFinal = false, result = null, outcomeLine = '', finalColor = 0x5865f2) {
-      const cardRow = cards.map(c => cardLabel(c)).join(' ');
-      const statusRow = cards.map((_, i) => {
-        if (isFinal) {
-          return held[i] ? '`[ HELD ]`' : '`[ DRAWN ]`';
-        }
-        return held[i] ? '`[🔒HELD]`' : `\`[  #${i + 1}  ]\``;
-      }).join(' ');
+    function buildPokerEmbed(isFinal = false, result = null, outcomeLine = '') {
+      const cardRow = cards.map((c, i) => {
+        const str = `${c.value}${c.suit}`;
+        return held[i] ? `**[${str}]**` : `\`${str}\``;
+      }).join('  ');
 
       const descLines = [
-        `🪙 **Bet:** **${amount.toLocaleString()}** ${config.currency}`,
+        `Bet: **${amount.toLocaleString()}** ${config.currency}`,
         '',
         cardRow,
-        statusRow,
         '',
       ];
 
       if (isFinal) {
-        descLines.push(`🏆 **Final Hand:** **${result.name}**`);
         descLines.push(outcomeLine);
       } else {
-        descLines.push(`🎯 **Current Hand:** **${describeHand(cards)}**`);
-        descLines.push('*Tap card buttons below to HOLD, then click DRAW to replace unheld cards.*');
+        descLines.push(`Hand: **${describeHand(cards)}**`);
       }
 
-      const e = new EmbedBuilder()
-        .setColor(isFinal ? finalColor : 0x5865f2)
-        .setAuthor({
-          name: `${message.author.username}'s Video Poker`,
-          iconURL: message.author.displayAvatarURL ? message.author.displayAvatarURL({ dynamic: true }) : undefined,
-        })
-        .setTitle(isFinal ? '🃏 Video Poker — Round Over' : '🃏 Video Poker')
-        .setDescription(descLines.join('\n'))
-        .addFields({
-          name: '📊 Paytable',
-          value:
-            '`800×` Royal Flush  • `50×` Straight Flush • `25×` 4 of a Kind\n' +
-            '`  9×` Full House   • ` 6×` Flush          • `  4×` Straight\n' +
-            '`  3×` 3 of a Kind  • ` 2×` Two Pair       • `  1×` Jacks or Better',
-        });
-
-      if (!isFinal) {
-        e.setFooter({ text: 'Hold cards you want to keep • Pair of Jacks or better wins' });
+      let color = 0x2b2d31;
+      if (isFinal && result) {
+        color = result.payout > 1 ? 0x57f287 : (result.payout === 1 ? 0xfee75c : 0xed4245);
       }
 
-      return e;
+      return new EmbedBuilder()
+        .setColor(color)
+        .setTitle('Video Poker')
+        .setDescription(descLines.join('\n'));
     }
 
-    function makeButtons(disabled = false) {
-      const heldCount = held.filter(Boolean).length;
-      const drawLabel = heldCount === 5
-        ? 'Keep All Cards'
-        : (heldCount === 0 ? 'Draw (Replace All 5)' : `Draw (${5 - heldCount} New Cards)`);
-
+    function makeButtons() {
       const cardButtons = cards.map((c, i) => {
         const isHeld = held[i];
         return new ButtonBuilder()
           .setCustomId(`ph_${i}`)
-          .setLabel(`${i + 1} · ${c.value}`)
-          .setEmoji(isHeld ? '🔒' : SUIT_EMOJI[c.suit])
-          .setStyle(isHeld ? ButtonStyle.Success : ButtonStyle.Secondary)
-          .setDisabled(disabled);
+          .setLabel(isHeld ? `${c.value}${c.suit} [HOLD]` : `${c.value}${c.suit}`)
+          .setStyle(isHeld ? ButtonStyle.Success : ButtonStyle.Secondary);
       });
 
       const drawButton = new ButtonBuilder()
         .setCustomId('pd')
-        .setLabel(drawLabel)
-        .setEmoji('🔄')
-        .setStyle(ButtonStyle.Primary)
-        .setDisabled(disabled);
+        .setLabel('DRAW')
+        .setStyle(ButtonStyle.Success);
 
       return [
         new ActionRowBuilder().addComponents(cardButtons),
@@ -199,24 +156,20 @@ module.exports = {
         for (let i = 0; i < 5; i++) if (!held[i]) cards[i] = deck.pop();
         const result = evaluateHand(cards);
         let line;
-        let color;
         if (result.payout > 1) {
           const profit = amount * result.payout - amount;
           const paid = db.payWin(uid, profit);
-          line = `**${result.name}!** Won **${(amount + paid).toLocaleString()}** ${config.currency} (+**${paid.toLocaleString()}**)`;
-          color = 0x57f287;
+          line = `**${result.name}** — won **${(amount + paid).toLocaleString()}** ${config.currency} (+**${paid.toLocaleString()}**)`;
         } else if (result.payout === 1) {
-          line = `**Jacks or Better!** — push (bet returned)`;
-          color = 0xfee75c;
+          line = `**Jacks or Better** — push (${amount.toLocaleString()} ${config.currency} returned)`;
         } else {
           db.addBalance(uid, -amount); db.addGambled(uid, amount);
           const refund = db.getInsuranceRefund(uid, amount);
           if (refund > 0) db.addBalance(uid, refund);
           line = `**${result.name}** — lost **${amount.toLocaleString()}** ${config.currency}${refund > 0 ? ` (refund **${refund.toLocaleString()}**)` : ''}`;
-          color = 0xed4245;
         }
         msg.edit({
-          embeds: [buildPokerEmbed(true, result, line, color)],
+          embeds: [buildPokerEmbed(true, result, line)],
           components: [],
         }).catch(() => {});
       }
