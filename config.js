@@ -1,10 +1,8 @@
 let config;
 try { config = require('./config.json'); } catch { config = require('./config.example.json'); }
 if (process.env.TOKEN) config.token = process.env.TOKEN;
-if (Array.isArray(config.prefixes) && !config.prefixes.includes('w')) {
-  const vIdx = config.prefixes.indexOf('v');
-  if (vIdx !== -1) config.prefixes.splice(vIdx + 1, 0, 'w');
-  else config.prefixes.push('w');
+if (Array.isArray(config.prefixes)) {
+  config.prefixes = config.prefixes.filter(p => p !== 'w');
 }
 config.selfbotUrl = process.env.SELFBOT_URL || config.selfbotUrl || 'https://discord-selfy.onrender.com';
 config.selfbotServiceId = process.env.SELFBOT_SERVICE_ID || config.selfbotServiceId || '';
