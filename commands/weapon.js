@@ -14,6 +14,43 @@ module.exports = {
     const userId = message.author.id;
     const sub = (args[0] || '').toLowerCase();
 
+    if (sub === 'info' || sub === 'view' || /^#?\d+$/.test(sub)) {
+      const targetId = parseInt(sub === 'info' || sub === 'view' ? String(args[1] || '').replace(/[^0-9]/g, '') : sub.replace(/[^0-9]/g, ''), 10);
+      const inv = db.getWeaponInv(userId);
+      const w = Number.isInteger(targetId) ? (inv.find(item => item.id === targetId) || db.getWeapon(targetId)) : null;
+
+      if (w) {
+        const isYours = String(w.user_id) === String(userId);
+        const tag = db.WEAPON_RARITY_TAG[w.rarity] || '⬜';
+        const color = w.rarity === 'fabled' || w.rarity === 'legendary' ? 0xffd700 : 0x2b2d31;
+
+        // Check if equipped on any animal
+        let equipLine = 'Not equipped';
+        const animalRows = db.exec(`SELECT a.id, a.species, a.name FROM animals a JOIN animals_weapon aw ON a.id = aw.animal_id WHERE aw.weapon_id = ${w.id}`);
+        if (animalRows && animalRows.length && animalRows[0].values.length) {
+          const [aid, spec, name] = animalRows[0].values[0];
+          const petName = name && name !== 'Unnamed' && name !== spec ? `${name} the ${spec}` : spec;
+          equipLine = `Equipped on **${petName}** (\`#${aid}\`)`;
+        }
+
+        const nextCost = db.weaponUpgradeCost(w.rarity, w.level);
+
+        return message.channel.send({ embeds: [embed(`${tag} ${w.emoji} ${w.name} (\`#${w.id}\`)`, [
+          ['Stats', `Quality **${w.quality}%** · Lv.**${w.level}**\nATK **+${w.atk}** · DEF **+${w.def}**`],
+          ['Effect', w.desc || 'No special effect'],
+          ['Status', `${equipLine}${isYours ? '' : ' · (Not in your inventory)'}`],
+          ['Next Upgrade', `Lv.${w.level + 1}: **${nextCost.toLocaleString()}** coins (\`v weapon upgrade #${w.id}\`)`],
+        ], color)] });
+      }
+
+      // If it's a number that doesn't match a weapon ID, let it fall through to page listing if page parameter
+      if (!/^#/.test(sub) && sub !== 'info' && sub !== 'view') {
+        // Fall through to list as a page number
+      } else {
+        return message.channel.send({ embeds: [error(`no weapon found matching \`#${targetId}\` — check your weapons with \`v weapon list\``)] });
+      }
+    }
+
     if (sub === 'list' || !sub || sub === 'inv' || /^\d+$/.test(sub)) {
       const inv = db.getWeaponInv(userId);
       if (!inv.length) {
@@ -32,7 +69,7 @@ module.exports = {
         const slice = lines.slice(p * PER_PAGE, p * PER_PAGE + PER_PAGE);
         return embed(`🔫 Armory (${inv.length})`, [
           [`Weapons (${p * PER_PAGE + 1}-${Math.min((p + 1) * PER_PAGE, inv.length)} of ${inv.length})`, slice.join('\n')],
-          ['', `page **${p + 1}/${pageCount}** · \`v weapon equip #<wepId> #<animalId>\` · \`v weapon upgrade #<wepId>\``],
+          ['', `page **${p + 1}/${pageCount}** · \`v weapon #<id>\` to view stats · \`v weapon equip #<wepId> #<animalId>\``],
         ], 0x2b2d31);
       };
 
