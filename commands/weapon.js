@@ -7,7 +7,7 @@ const PER_PAGE = 10;
 module.exports = {
   name: 'weapon',
   helpCategory: 'Pets',
-  helpArgs: '<list|equip|upgrade>',
+  helpArgs: '<list|equip|upgrade|sell|sacrifice>',
   description: 'view and equip weapons on your battle team',
   aliases: ['weps', 'armory', 'wep'],
   async execute(message, args) {
@@ -132,6 +132,91 @@ module.exports = {
       return message.channel.send({ embeds: [embed('⬆️ Weapon Upgrade', [[`${tag} ${w.emoji} ${w.name}`, `now **Lv.${res.level}** — ATK **+${res.atk}** · DEF **+${res.def}**\nnext upgrade (Lv.${res.level + 1}): **${db.weaponUpgradeCost(w.rarity, res.level).toLocaleString()}** coins`]], 0x57f287)] });
     }
 
-    return message.channel.send({ embeds: [error('usage:\n`v weapon list` — see your weapons\n`v weapon equip #<wepId> #<animalId>` — equip on a team pet\n`v weapon upgrade #<wepId>` — level it up')] });
+    if (sub === 'sell') {
+      const target = (args[1] || '').toLowerCase();
+      if (!target) {
+        return message.channel.send({
+          embeds: [error('usage: `v weapon sell <id>` · `v weapon sell <rarity|all> [count]`\n\nrarities: common · uncommon · rare · epic · mythical · legendary · fabled\nequipped weapons on pets are always skipped')],
+        });
+      }
+      const id = parseInt(target.replace(/[^0-9]/g, ''), 10);
+      if (!isNaN(id) && /^#?\d+$/.test(target)) {
+        const res = db.sellWeapon(id, userId);
+        if (!res.ok) {
+          return message.channel.send({ embeds: [error(res.reason === 'notfound' ? 'weapon not found' : "that weapon isn't yours")] });
+        }
+        const tag = db.WEAPON_RARITY_TAG[res.weapon.rarity] || '⬜';
+        return message.channel.send({
+          embeds: [embed('Sold Weapon', [
+            ['Weapon', `${tag} ${res.weapon.emoji} **${res.weapon.name}** (\`#${res.weapon.id}\` · ${res.weapon.rarity} · ${res.weapon.quality}%)`],
+            ['Price', `**${res.price.toLocaleString()}** coins`],
+            ['Balance', `**${db.getBalance(userId).toLocaleString()}** coins`],
+          ], 0x57f287)],
+        });
+      }
+
+      const count = args[2] ? parseInt(args[2], 10) : null;
+      if (count && isNaN(count)) return message.channel.send({ embeds: [error('usage: `v weapon sell <rarity|all> [count]`')] });
+
+      const res = db.sellWeapons(userId, target, count);
+      if (!res.sold) {
+        let msg = `no weapons matched \`${args[1]}\``;
+        if (res.skipped > 0) msg += ` — ${res.skipped} matched weapon(s) are equipped on pets and were skipped`;
+        return message.channel.send({ embeds: [error(msg)] });
+      }
+
+      const lines = [
+        `sold **${res.sold}** weapon(s) for **${res.coins.toLocaleString()}** coins`,
+        `balance: **${db.getBalance(userId).toLocaleString()}** coins`,
+      ];
+      if (res.skipped > 0) lines.push(`${res.skipped} equipped weapon(s) were skipped`);
+      return message.channel.send({ embeds: [embed('Sold Weapons', [['', lines.join('\n')]], 0x57f287)] });
+    }
+
+    if (sub === 'sacrifice' || sub === 'sac') {
+      const target = (args[1] || '').toLowerCase();
+      if (!target) {
+        const values = Object.entries(db.WEAPON_ESSENCE_VALUES).map(([r, v]) => `${db.WEAPON_RARITY_TAG[r] || '⬜'} ${r} = ${v} essence`).join(' · ');
+        return message.channel.send({
+          embeds: [error(`usage: \`v weapon sacrifice <id>\` · \`v weapon sacrifice <rarity|all> [count]\`\n\n${values}\n\nequipped weapons on battle pets are always skipped`)],
+        });
+      }
+
+      const id = parseInt(target.replace(/[^0-9]/g, ''), 10);
+      if (!isNaN(id) && /^#?\d+$/.test(target)) {
+        const res = db.sacrificeWeapon(id, userId);
+        if (!res.ok) {
+          return message.channel.send({ embeds: [error(res.reason === 'notfound' ? 'weapon not found' : "that weapon isn't yours")] });
+        }
+        const tag = db.WEAPON_RARITY_TAG[res.weapon.rarity] || '⬜';
+        const lines = [
+          `sacrificed **${res.weapon.name}** (\`#${res.weapon.id}\` ${tag}) for **${res.essence}** essence`,
+          `you now have **${db.getEssence(userId).toLocaleString()}** essence`,
+        ];
+        return message.channel.send({ embeds: [embed('Sacrificed Weapon', [['', lines.join('\n')]], 0x57f287)] });
+      }
+
+      let count = null;
+      if (args[2]) {
+        const n = parseInt(args[2], 10);
+        if (!isNaN(n) && n > 0) count = n;
+      }
+
+      const result = db.sacrificeWeapons(userId, target, count);
+      if (!result.sacrificed) {
+        let msg = `no weapons matched \`${args[1]}\``;
+        if (result.skipped > 0) msg += ` — ${result.skipped} matched weapon(s) are equipped on battle pets and were skipped`;
+        return message.channel.send({ embeds: [error(msg)] });
+      }
+
+      const lines = [
+        `sacrificed **${result.sacrificed}** weapon(s) for **${result.essence}** essence`,
+        `you now have **${db.getEssence(userId).toLocaleString()}** essence`,
+      ];
+      if (result.skipped > 0) lines.push(`${result.skipped} equipped weapon(s) were skipped`);
+      return message.channel.send({ embeds: [embed('Sacrificed Weapons', [['', lines.join('\n')]], 0x57f287)] });
+    }
+
+    return message.channel.send({ embeds: [error('usage:\n`v weapon list` — see your weapons\n`v weapon equip #<wepId> #<animalId>` — equip on a team pet\n`v weapon upgrade #<wepId>` — level it up\n`v weapon sell <id|rarity|all> [count]` — sell for coins\n`v weapon sacrifice <id|rarity|all> [count]` — sacrifice for essence')] });
   },
 };

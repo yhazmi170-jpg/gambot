@@ -561,6 +561,7 @@ async function init() {
     error TEXT NOT NULL DEFAULT ''
   )`);
   save();
+  settleAllEligibleContracts();
 }
 
 function save() {
@@ -2051,6 +2052,7 @@ function getAnimal(id) {
 
 function removeAnimal(id) {
   db.run(`DELETE FROM animals WHERE id = ${id}`);
+  db.run(`DELETE FROM animals_weapon WHERE animal_id = ${id}`);
   save();
 }
 
@@ -2536,6 +2538,7 @@ function sacrificeAnimals(userId, query, count) {
   db.run('BEGIN');
   try {
     db.run(`DELETE FROM animals WHERE id IN (${pricedIds.join(',')}) AND user_id = '${userId}'`);
+    db.run(`DELETE FROM animals_weapon WHERE animal_id IN (${pricedIds.join(',')})`);
     db.run(`UPDATE users SET essence = essence + ${essence} WHERE user_id = '${userId}'`);
     db.run('COMMIT');
   } catch (err) {
@@ -3533,7 +3536,7 @@ function checkAchievements(userId) {
   const dexP = dexProgress(userId);
   let contractsDone = 0;
   try {
-    const r = db.exec(`SELECT COUNT(*) FROM contracts WHERE target_id = '${safeStr(userId)}' AND status = 'completed'`);
+    const r = db.exec(`SELECT COUNT(*) FROM contracts WHERE (target_id = '${safeStr(userId)}' OR creator_id = '${safeStr(userId)}') AND status = 'completed'`);
     contractsDone = r[0] ? r[0].values[0][0] : 0;
   } catch {}
   const state = {
@@ -4823,6 +4826,168 @@ function weaponBattleMods(weapon) {
 // Expose weapon metadata for commands/UI.
 const WEAPON_RARITY_TAG = Object.fromEntries(Object.entries(WEAPON_RARITY_DATA).map(([k, v]) => [k, v.tag]));
 
+const WEAPON_BASE_SELL_PRICES = {
+  common: 5000,
+  uncommon: 12000,
+  rare: 30000,
+  epic: 75000,
+  mythical: 200000,
+  legendary: 500000,
+  fabled: 1500000,
+};
+
+function weaponSellPrice(w) {
+  if (!w) return 0;
+  const base = WEAPON_BASE_SELL_PRICES[w.rarity] || 5000;
+  const qualityFactor = 0.8 + ((w.quality || 0) / 100) * 0.4;
+  const levelFactor = 1 + ((w.level || 1) - 1) * 0.25;
+  return Math.floor(base * qualityFactor * levelFactor);
+}
+
+const WEAPON_ESSENCE_VALUES = {
+  common: 1,
+  uncommon: 3,
+  rare: 8,
+  epic: 25,
+  mythical: 100,
+  legendary: 250,
+  fabled: 500,
+};
+
+function weaponSacrificeEssence(w) {
+  if (!w) return 0;
+  const base = WEAPON_ESSENCE_VALUES[w.rarity] || 1;
+  const levelMult = 1 + ((w.level || 1) - 1) * 0.5;
+  const mult = eventMult('essenceMult');
+  return Math.floor(base * levelMult * mult);
+}
+
+function getEquippedWeaponIds() {
+  const r = db.exec(`SELECT weapon_id FROM animals_weapon`);
+  if (!r.length || !r[0].values.length) return new Set();
+  return new Set(r[0].values.map(v => v[0]));
+}
+
+function sellWeapon(weaponId, userId) {
+  const w = getWeapon(weaponId);
+  if (!w) return { ok: false, reason: 'notfound' };
+  if (String(w.user_id) !== String(userId)) return { ok: false, reason: 'notyours' };
+  const price = weaponSellPrice(w);
+  db.run(`DELETE FROM weapons_inv WHERE id = ${w.id} AND user_id = '${userId}'`);
+  db.run(`DELETE FROM animals_weapon WHERE weapon_id = ${w.id}`);
+  addBalance(userId, price);
+  save();
+  return { ok: true, weapon: w, price };
+}
+
+function sellWeapons(userId, query, count) {
+  const inv = getWeaponInv(userId);
+  const q = (query || '').toLowerCase().trim();
+  const COLOR_TO_RARITY = { gray: 'common', grey: 'common', white: 'common', green: 'uncommon', blue: 'rare', purple: 'epic', pink: 'mythical', yellow: 'legendary', gold: 'legendary', fabled: 'fabled' };
+  const equippedIds = getEquippedWeaponIds();
+
+  const isNumeric = /^\d+$/.test(q);
+  const matches = inv.filter(w => {
+    if (q === 'all') return true;
+    if (isNumeric) return w.id === parseInt(q, 10);
+    const wr = String(w.rarity || '').toLowerCase();
+    const rarityMatch = WEAPON_RARITY_ORDER.includes(q) ? wr === q : COLOR_TO_RARITY[q] ? wr === COLOR_TO_RARITY[q] : null;
+    if (rarityMatch !== null) return rarityMatch;
+    const name = String(w.name || '').toLowerCase();
+    const type = String(w.type || '').toLowerCase();
+    return name.includes(q) || type.includes(q);
+  });
+
+  const targets = count ? matches.slice(0, count) : matches;
+  let skipped = 0;
+  const sellable = [];
+  let totalCoins = 0;
+
+  for (const w of targets) {
+    if (equippedIds.has(w.id)) { skipped++; continue; }
+    sellable.push(w);
+    totalCoins += weaponSellPrice(w);
+  }
+
+  if (!sellable.length) return { sold: 0, coins: 0, skipped };
+
+  const ids = sellable.map(w => w.id).join(',');
+  db.run('BEGIN');
+  try {
+    db.run(`DELETE FROM weapons_inv WHERE id IN (${ids}) AND user_id = '${userId}'`);
+    db.run(`DELETE FROM animals_weapon WHERE weapon_id IN (${ids})`);
+    db.run(`UPDATE users SET balance = balance + ${totalCoins} WHERE user_id = '${userId}'`);
+    db.run('COMMIT');
+  } catch (err) {
+    try { db.run('ROLLBACK'); } catch (e) {}
+    throw err;
+  }
+  save();
+  return { sold: sellable.length, coins: totalCoins, skipped, weapons: sellable };
+}
+
+function sacrificeWeapon(weaponId, userId) {
+  const w = getWeapon(weaponId);
+  if (!w) return { ok: false, reason: 'notfound' };
+  if (String(w.user_id) !== String(userId)) return { ok: false, reason: 'notyours' };
+  const essence = weaponSacrificeEssence(w);
+  db.run(`DELETE FROM weapons_inv WHERE id = ${w.id} AND user_id = '${userId}'`);
+  db.run(`DELETE FROM animals_weapon WHERE weapon_id = ${w.id}`);
+  db.run(`UPDATE users SET essence = essence + ${essence} WHERE user_id = '${userId}'`);
+  trackProgress(userId, 'sacrifice', 1);
+  addPassXp(userId, PASS_XP.sacrifice);
+  save();
+  return { ok: true, weapon: w, essence };
+}
+
+function sacrificeWeapons(userId, query, count) {
+  const inv = getWeaponInv(userId);
+  const q = (query || '').toLowerCase().trim();
+  const COLOR_TO_RARITY = { gray: 'common', grey: 'common', white: 'common', green: 'uncommon', blue: 'rare', purple: 'epic', pink: 'mythical', yellow: 'legendary', gold: 'legendary', fabled: 'fabled' };
+  const equippedIds = getEquippedWeaponIds();
+
+  const isNumeric = /^\d+$/.test(q);
+  const matches = inv.filter(w => {
+    if (q === 'all') return true;
+    if (isNumeric) return w.id === parseInt(q, 10);
+    const wr = String(w.rarity || '').toLowerCase();
+    const rarityMatch = WEAPON_RARITY_ORDER.includes(q) ? wr === q : COLOR_TO_RARITY[q] ? wr === COLOR_TO_RARITY[q] : null;
+    if (rarityMatch !== null) return rarityMatch;
+    const name = String(w.name || '').toLowerCase();
+    const type = String(w.type || '').toLowerCase();
+    return name.includes(q) || type.includes(q);
+  });
+
+  const targets = count ? matches.slice(0, count) : matches;
+  let skipped = 0;
+  const sellable = [];
+  let totalEssence = 0;
+
+  for (const w of targets) {
+    if (equippedIds.has(w.id)) { skipped++; continue; }
+    sellable.push(w);
+    totalEssence += weaponSacrificeEssence(w);
+  }
+
+  if (!sellable.length) return { sacrificed: 0, essence: 0, skipped };
+
+  const ids = sellable.map(w => w.id).join(',');
+  db.run('BEGIN');
+  try {
+    db.run(`DELETE FROM weapons_inv WHERE id IN (${ids}) AND user_id = '${userId}'`);
+    db.run(`DELETE FROM animals_weapon WHERE weapon_id IN (${ids})`);
+    db.run(`UPDATE users SET essence = essence + ${totalEssence} WHERE user_id = '${userId}'`);
+    db.run('COMMIT');
+  } catch (err) {
+    try { db.run('ROLLBACK'); } catch (e) {}
+    throw err;
+  }
+  trackProgress(userId, 'sacrifice', sellable.length);
+  addPassXp(userId, PASS_XP.sacrifice * sellable.length);
+  save();
+  return { sacrificed: sellable.length, essence: totalEssence, skipped, weapons: sellable };
+}
+
 const BOSS_POT_TAX = 0.05;
 const BOSS_LIFE = 30 * 60; // 30 min
 
@@ -5111,6 +5276,10 @@ function addContractProgress(targetId, objective, amount) {
   if (!rows.length || !rows[0].values.length) return;
   for (const v of rows[0].values) {
     db.run(`UPDATE contracts SET progress = MIN(progress + ${Math.floor(amount)}, objective_n) WHERE id = ${Number(v[0])} AND status = 'active'`);
+    const c = getContract(v[0]);
+    if (c && c.progress >= c.objective_n) {
+      settleCompletedContract(c.id);
+    }
   }
   save();
 }
@@ -5124,8 +5293,23 @@ function settleCompletedContract(contractId) {
   if (changed !== 1) return { ok: false, reason: 'already' };
   const deliveryId = createDelivery(c.target_id, { sender: c.creator_id, source: 'contract', label: `${CONTRACT_OBJECTIVES[c.objective].label} — contract with <@${c.creator_id}>`.slice(0, 90), amount: c.reward });
   trackProgress(c.target_id, 'contract', 1);
+  checkAchievements(c.target_id);
+  checkTitles(c.target_id);
+  checkAchievements(c.creator_id);
+  checkTitles(c.creator_id);
   save();
   return { ok: true, deliveryId };
+}
+
+function settleAllEligibleContracts() {
+  try {
+    const rows = db.exec(`SELECT id FROM contracts WHERE status = 'active' AND progress >= objective_n`);
+    if (rows && rows.length && rows[0].values.length) {
+      for (const v of rows[0].values) {
+        settleCompletedContract(v[0]);
+      }
+    }
+  } catch (e) {}
 }
 
 // User presses claim on a finished contract (target sees it via contracts list). Idempotent.
@@ -5266,7 +5450,7 @@ function titleStateFor(userId) {
   const dexP = dexProgress(userId);
   const ach = getAchievements(userId);
   let contractsDone = 0, contractsGiven = 0;
-  try { const r = db.exec(`SELECT COUNT(*) FROM contracts WHERE target_id = '${safeStr(userId)}' AND status = 'completed'`); contractsDone = r[0] ? r[0].values[0][0] : 0; } catch {}
+  try { const r = db.exec(`SELECT COUNT(*) FROM contracts WHERE (target_id = '${safeStr(userId)}' OR creator_id = '${safeStr(userId)}') AND status = 'completed'`); contractsDone = r[0] ? r[0].values[0][0] : 0; } catch {}
   try { const r = db.exec(`SELECT COUNT(*) FROM contracts WHERE creator_id = '${safeStr(userId)}' AND status IN ('completed','active')`); contractsGiven = r[0] ? r[0].values[0][0] : 0; } catch {}
   const clan = getClanOf(userId);
   const act = getActivity(userId);
@@ -6105,6 +6289,9 @@ hasPerk,
   addWeaponCrate, getWeaponCrates, openWeaponCrate, openWeaponCrates, buyWeaponCrate,
   getWeaponInv, getWeapon, equipWeapon, getAnimalWeapon, upgradeWeapon, weaponUpgradeCost,
   weaponBattleMods, makeWeapon, rollWeaponType, rollWeaponRarity,
+  WEAPON_BASE_SELL_PRICES, weaponSellPrice, sellWeapon, sellWeapons,
+  WEAPON_ESSENCE_VALUES, weaponSacrificeEssence, sacrificeWeapon, sacrificeWeapons,
+  settleAllEligibleContracts,
    isMarried, marriedMult,
    SHINY_CHANCE, PERSONALITIES, rollShiny, rollTrait,
    // 2.0 systems
