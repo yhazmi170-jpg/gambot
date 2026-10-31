@@ -1,17 +1,20 @@
 const db = require('../db');
 const { embed, error } = require('../utils/embed');
 
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const PER_PAGE = 10;
+
 module.exports = {
   name: 'weapon',
   helpCategory: 'Pets',
   helpArgs: '<list|equip|upgrade>',
   description: 'view and equip weapons on your battle team',
   aliases: ['weps', 'armory', 'wep'],
-  execute(message, args) {
+  async execute(message, args) {
     const userId = message.author.id;
     const sub = (args[0] || '').toLowerCase();
 
-    if (sub === 'list' || !sub || sub === 'inv') {
+    if (sub === 'list' || !sub || sub === 'inv' || /^\d+$/.test(sub)) {
       const inv = db.getWeaponInv(userId);
       if (!inv.length) {
         return message.channel.send({ embeds: [embed('🔫 Armory', [['', 'you have no weapons yet — buy a crate with `v weaponcrate buy` or win one from battle/hunt!']], 0x2b2d31)] });
@@ -20,10 +23,42 @@ module.exports = {
         const tag = db.WEAPON_RARITY_TAG[w.rarity] || '⬜';
         return `\`#${w.id}\` ${tag} ${w.emoji} **${w.name}** (${w.rarity} · ${w.quality}%) Lv.${w.level} — ATK **+${w.atk}** · DEF **+${w.def}**`;
       });
-      return message.channel.send({ embeds: [embed('🔫 Armory', [
-        ['Your weapons', lines.join('\n')],
-        ['', `\`v weapon equip #<wepId> #<animalId>\` to equip on a team pet\n\`v weapon upgrade #<wepId>\` to level it up (coins)`],
-      ], 0x2b2d31)] });
+
+      const pageCount = Math.ceil(lines.length / PER_PAGE);
+      let pageArg = parseInt(sub === 'list' || sub === 'inv' || !sub ? args[1] : sub, 10);
+      let page = Number.isInteger(pageArg) && pageArg >= 1 ? Math.min(pageArg - 1, pageCount - 1) : 0;
+
+      const buildEmbed = (p) => {
+        const slice = lines.slice(p * PER_PAGE, p * PER_PAGE + PER_PAGE);
+        return embed(`🔫 Armory (${inv.length})`, [
+          [`Weapons (${p * PER_PAGE + 1}-${Math.min((p + 1) * PER_PAGE, inv.length)} of ${inv.length})`, slice.join('\n')],
+          ['', `page **${p + 1}/${pageCount}** · \`v weapon equip #<wepId> #<animalId>\` · \`v weapon upgrade #<wepId>\``],
+        ], 0x2b2d31);
+      };
+
+      if (pageCount <= 1) {
+        return message.channel.send({ embeds: [buildEmbed(0)] });
+      }
+
+      const prev = new ButtonBuilder().setCustomId('wep_prev').setLabel('◀').setStyle(ButtonStyle.Secondary);
+      const next = new ButtonBuilder().setCustomId('wep_next').setLabel('▶').setStyle(ButtonStyle.Secondary);
+      const row = new ActionRowBuilder().addComponents(prev, next);
+
+      const msg = await message.channel.send({ embeds: [buildEmbed(page)], components: [row] });
+      if (!msg || typeof msg.createMessageComponentCollector !== 'function') return;
+
+      const filter = i => i.user.id === userId && (i.customId === 'wep_prev' || i.customId === 'wep_next');
+      const col = msg.createMessageComponentCollector({ filter, time: 120000 });
+
+      col.on('collect', async (interaction) => {
+        page = interaction.customId === 'wep_next' ? Math.min(page + 1, pageCount - 1) : Math.max(page - 1, 0);
+        await interaction.update({ embeds: [buildEmbed(page)], components: [row] }).catch(() => {});
+      });
+
+      col.on('end', async () => {
+        await msg.edit({ components: [] }).catch(() => {});
+      });
+      return;
     }
 
     if (sub === 'equip') {
