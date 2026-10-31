@@ -896,7 +896,8 @@ function calcDailyReward(user, hasCap) {
 }
 
 function claimDaily(userId) {
-  const user = ensureUser(userId);
+  let user = ensureUser(userId);
+  if (!user) { db.run(`INSERT INTO users (user_id, balance) VALUES ('${userId}', 0)`); user = ensureUser(userId); }
   const now = Math.floor(Date.now() / 1000);
   let streak = 0;
   if (user.daily_time > 0 && (now - user.daily_time) < DAY * 2) {
@@ -905,19 +906,23 @@ function claimDaily(userId) {
   const hasCap = hasPerk(userId, 'daily_cap');
   const max = hasCap ? 15000 : 5000;
   const mult = marriedMult(userId);
-  const reward = Math.min(Math.floor((1000 + streak * 500) * mult), max);
+  const married = isMarried(userId);
+  const marriageBonus = married ? 1000 : 0;
+  const reward = Math.min(Math.floor((1000 + streak * 500) * mult), max) + marriageBonus;
   db.run(`UPDATE users SET daily_time = ${now}, daily_streak = ${streak}, balance = balance + ${reward} WHERE user_id = '${userId}'`);
   save();
-  return { reward, streak, max, mult };
+  return { reward, streak, max, mult, marriageBonus, married };
 }
 
 function claimWeekly(userId, amount) {
   const now = Math.floor(Date.now() / 1000);
   const mult = marriedMult(userId);
-  const final = Math.floor(amount * mult);
+  const married = isMarried(userId);
+  const marriageBonus = married ? 1000 : 0;
+  const final = Math.floor(amount * mult) + marriageBonus;
   db.run(`UPDATE users SET weekly_time = ${now}, balance = balance + ${final} WHERE user_id = '${userId}'`);
   save();
-  return { mult };
+  return { mult, marriageBonus, married, amount: final };
 }
 
 // ---- Logon streak: escalating daily bonus, resets after 48h without a claim ----

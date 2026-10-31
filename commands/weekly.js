@@ -1,5 +1,5 @@
 const db = require('../db');
-const { embed, error, success } = require('../utils/embed');
+const { error, success } = require('../utils/embed');
 const config = require('../config');
 
 module.exports = {
@@ -20,13 +20,24 @@ module.exports = {
     const factor = db.getBalanceFactor(message.author.id);
     const raw = Math.floor(base * factor);
     const married = db.marriedMult(message.author.id);
+    const isMarriedUser = db.isMarried(message.author.id);
+    const marriageBonus = isMarriedUser ? 1000 : 0;
     const rewardMult = db.eventMult('rewardMult');
-    const amount = Math.floor(raw * married * rewardMult);
+    const amount = Math.floor((raw * married + marriageBonus) * rewardMult);
     db.claimWeekly(message.author.id, raw);
-    const bonus = amount - Math.floor(raw * married);
+    const alreadyCredited = Math.floor(raw * married) + marriageBonus;
+    const bonus = amount - alreadyCredited;
     if (bonus > 0) db.addBalance(message.author.id, bonus);
+
+    let notes = [];
+    if (base > config.weeklyAmount) notes.push('daily cap perk!');
+    if (isMarriedUser) notes.push('+1,000 married');
+    if (rewardMult > 1) notes.push(`event x${rewardMult}`);
+    if (factor < 1) notes.push(`${Math.round((1 - factor) * 100)}% reduction`);
+    const noteText = notes.length ? ` (${notes.join(' · ')})` : '';
+
     message.channel.send({
-      embeds: [success(`claimed **${amount}** ${config.currency} as your weekly reward!${base > config.weeklyAmount ? ' (daily cap perk!)' : ''}${married > 1 ? ' (❤️ married +10%)' : ''}${rewardMult > 1 ? ` (event x${rewardMult})` : ''}${factor < 1 ? ` (${Math.round((1 - factor) * 100)}% reduction)` : ''}`)],
+      embeds: [success(`claimed **${amount.toLocaleString()}** ${config.currency} as your weekly reward!${noteText}`)],
     });
   },
 };
